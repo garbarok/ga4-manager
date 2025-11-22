@@ -15,26 +15,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2025-11-22
 
-### Added
-- **Custom Metrics Cleanup**: Extended cleanup command to archive custom metrics in addition to conversions and dimensions
-- `DeleteMetric()` function in `internal/ga4/metrics.go` to find and archive metrics by parameter name
-- `MetricsToRemove` field to `CleanupConfig` and `CleanupYAMLConfig` structs
-- `--type metrics` flag option for cleanup command
-- Metrics display table and cleanup logic in `cmd/cleanup.go`
-- `PageSize(200)` to `ListDimensions()` to ensure all dimensions are retrieved
+### Infrastructure & Tooling Improvements
 
-### Changed
-- Extended `--type` flag to accept `metrics` value in cleanup command
-- Updated cleanup command help text with metrics examples
-- Updated `ConvertToLegacyProject()` to include metrics cleanup configuration
+#### Added
+- **CI/CD Pipeline**: Comprehensive GitHub Actions workflows for automated testing, security scanning, and releases
+- **Multi-Platform Testing**: Automated testing on Linux, macOS, and Windows
+- **Security Scanning**: Weekly automated vulnerability scanning (govulncheck, gosec, trivy)
+- **GoReleaser Integration**: Automated multi-platform binary releases
+- **golangci-lint v2.6.2**: Code quality enforcement with golangci-lint-action v7
 
-### Technical Details
-- Provides complete GA4 property cleanup capability for conversions, dimensions, and metrics
-- Addresses GA4 Standard tier limits (50 metrics maximum)
-- Fully tested and functional
+#### Changed
+- **Go 1.25 Required**: Updated from Go 1.24 (which didn't exist) to Go 1.25
+- **Dependencies Updated**:
+  - `github.com/fatih/color` v1.16.0 → v1.18.0
+  - `github.com/spf13/cobra` v1.8.0 → v1.9.1
+  - `google.golang.org/api` v0.155.0 → v0.223.0
+  - Added 200+ transitive dependencies from golangci-lint tooling
+
+#### Fixed
+- **Windows CI Tests**: Added `shell: bash` to fix PowerShell argument parsing issues
+- **Race Detector**: Disabled on Windows (CGO limitations)
+- **Lint Action**: Updated to golangci-lint-action v7 for v2.x linter support
+
+#### CI/CD Features
+- Test matrix: Go 1.25 on ubuntu-latest, macos-latest, windows-latest
+- Security: Weekly automated scans for vulnerabilities
+- Release: Automated multi-platform binary building with GoReleaser
+- Lint: golangci-lint v2.6.2 with comprehensive checks
+
+#### Notes
+- **No functional changes** to CLI tool - same features as v1.0.0
+- All changes are infrastructure and build improvements
+- Binary functionality identical to v1.0.0
+- Improved code quality and release automation
 
 ### Commits
-- `a8f2fdf` - feat: Add custom metrics cleanup support
+- `fed29b0` - feat(ci): add comprehensive CI/CD pipeline with Go 1.25 support
 
 ## [1.0.0] - 2025-11-22
 
@@ -117,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
-- **v1.1.0** (2025-11-22): Added custom metrics cleanup support
+- **v1.1.0** (2025-11-22): Infrastructure & tooling improvements - CI/CD pipeline, Go 1.25 support, multi-platform testing, security scanning
 - **v1.0.0** (2025-11-22): First public release with production features, multi-platform binaries, and comprehensive documentation
 - **v0.9.0** (2025-11-21): Pre-release development version
 
