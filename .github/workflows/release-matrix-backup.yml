@@ -51,7 +51,7 @@ jobs:
           go build -ldflags="-s -w -X 'github.com/garbarok/ga4-manager/cmd.Version=${{ github.ref_name }}'" -o ${{ matrix.output }} .
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.output }}
           path: ${{ matrix.output }}
