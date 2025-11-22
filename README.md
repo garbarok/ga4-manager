@@ -4,8 +4,13 @@
 
 A comprehensive command-line tool for automating GA4 configuration, including conversion events, custom dimensions, custom metrics, and external service integrations.
 
+[![Test Status](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml)
+[![Security](https://github.com/garbarok/ga4-manager/actions/workflows/security.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/security.yml)
+[![Release](https://github.com/garbarok/ga4-manager/actions/workflows/release.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/garbarok/ga4-manager)](https://goreportcard.com/report/github.com/garbarok/ga4-manager)
+[![Latest Release](https://img.shields.io/github/v/release/garbarok/ga4-manager)](https://github.com/garbarok/ga4-manager/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 
 ## Features
 
@@ -226,7 +231,8 @@ Pre-configured profiles for development, production, and default environments.
 - [Error Reference](docs/ERRORS_AND_FAQ.md) - Troubleshooting guide
 - [GA4 Tier Limits](docs/TIER_LIMITS_QUICK_REF.md) - Property quota limits
 - [Security Policy](SECURITY.md) - Credential management
-- [Contributing Guide](.github/CONTRIBUTING.md) - Development setup
+- [Contributing Guide](CONTRIBUTING.md) - Development setup
+- [CI/CD Documentation](docs/development/CI_CD.md) - Continuous integration and deployment
 - [Development Docs](docs/development/) - For contributors
 
 ## Contributing

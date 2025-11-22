@@ -1,4 +1,4 @@
-name: Release
+name: Release (GoReleaser)
 
 on:
   push:
@@ -10,85 +10,30 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build and Release
+  release:
+    name: Release with GoReleaser
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            output: ga4-linux-amd64
-          - goos: linux
-            goarch: arm64
-            output: ga4-linux-arm64
-          - goos: darwin
-            goarch: amd64
-            output: ga4-darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            output: ga4-darwin-arm64
-          - goos: windows
-            goarch: amd64
-            output: ga4-windows-amd64.exe
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for GoReleaser changelog generation
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25'
+          cache: true
 
-      - name: Build binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          go build -ldflags="-s -w -X 'github.com/garbarok/ga4-manager/cmd.Version=${{ github.ref_name }}'" -o ${{ matrix.output }} .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          name: ${{ matrix.output }}
-          path: ${{ matrix.output }}
-
-  release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release assets
-        run: |
-          mkdir -p release
-          find artifacts -type f -exec mv {} release/ \;
-          cd release
-          for file in *; do
-            if [[ "$file" == *.exe ]]; then
-              zip "${file%.exe}.zip" "$file"
-            else
-              tar -czf "${file}.tar.gz" "$file"
-            fi
-          done
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            release/*.tar.gz
-            release/*.zip
-          generate_release_notes: true
-          draft: false
-          prerelease: false
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Uncomment when you create a Homebrew tap
+          # HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
