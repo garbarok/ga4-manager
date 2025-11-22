@@ -477,33 +477,46 @@ func (c *Client) UpdateEnhancedMeasurement(streamName string, settings *admin.Go
 ### 4.1 Search Console Integration
 
 **File:** `internal/ga4/searchconsole.go`
-**Status:** ✅ Completed
+**Status:** ✅ Completed (API Limitation - Manual Setup Required)
 
 **Functions:**
 
 ```go
 func (c *Client) GenerateSearchConsoleSetupGuide(propertyID, siteUrl string) string
-// Note: API does not support programmatic link creation. This function generates a manual setup guide.
+// Note: GA4 Admin API does not support programmatic link creation
+// This function generates comprehensive manual setup guides
 ```
+
+**API Limitation:** The GA4 Admin API does not provide endpoints for Search Console link creation. The tool provides detailed step-by-step guides for manual setup.
 
 **Benefits:**
 
-- Clear instructions for manual linking.
-- Automatic query data in GA4 once linked.
+- Clear step-by-step setup instructions
+- Direct links to GA4 admin panels
+- Automatic query data in GA4 once linked
 
 ### 4.2 Channel Grouping Configuration
 
 **File:** `internal/ga4/channels.go`
-**Status:** ✅ Completed
+**Status:** ✅ Completed & Fixed (2025-11-22)
 
-**Purpose:** Configure custom channel groupings for better attribution. The initial 500 error was due to an implementation bug and is now resolved.
+**Purpose:** Configure custom channel groupings for better attribution.
+
+**Recent Fix:** Resolved API compatibility issues:
+- Fixed `GoogleAnalyticsAdminV1alphaChannelGroupFilterInListFilter` type
+- Fixed `GoogleAnalyticsAdminV1alphaChannelGroupFilterStringFilter` type
+- Fixed `FilterExpressions` field in `ChannelGroupFilterExpressionList`
+- All lint errors resolved, builds successfully with 0 issues
 
 **Default Channels to Configure:**
 
 ```go
-- Organic Search (google, bing, duckduckgo, etc.)
-- Paid Search (google/ads, bing/ads)
-// ... and 7 others
+- Organic Search (Google, Bing, DuckDuckGo)
+- Paid Search (Google Ads, Bing Ads)
+- Organic Social (Facebook, Twitter, LinkedIn, Reddit)
+- Paid Social (Facebook Ads, LinkedIn Ads)
+- Direct, Referral, Email, Affiliates, Display
+// 9 total channel groups
 ```
 
 **Functions:**
@@ -511,20 +524,32 @@ func (c *Client) GenerateSearchConsoleSetupGuide(propertyID, siteUrl string) str
 ```go
 func (c *Client) CreateChannelGroup(propertyID string, group ChannelGroup) (*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroup, error)
 func (c *Client) ListChannelGroups(propertyID string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroup, error)
+func (c *Client) UpdateChannelGroup(channelGroupName string, group ChannelGroup) error
 func (c *Client) DeleteChannelGroup(channelGroupName string) error
+func (c *Client) SetupDefaultChannelGroups(propertyID string) error
 ```
 
 ### 4.3 BigQuery Export Setup
 
 **File:** `internal/ga4/bigquery.go`
-**Status:** ✅ Completed
+**Status:** ✅ Completed (API Limitation - Manual Setup Required)
+
+**Recent Fix:** Resolved API compatibility issues:
+- Removed non-existent `Dataset` field from BigQueryLink struct
+- Updated Create/Delete methods to return informative errors
+- All lint errors resolved
+
+**API Limitation:** The GA4 Admin API does not support creating or deleting BigQuery links programmatically. The tool can list existing links and provides comprehensive setup guides.
 
 **Functions:**
 
 ```go
-func (c *Client) CreateBigQueryLink(config BigQueryConfig) (*analyticsadmin.GoogleAnalyticsAdminV1alphaBigQueryLink, error)
 func (c *Client) ListBigQueryLinks(propertyID string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaBigQueryLink, error)
-func (c *Client) DeleteBigQueryLink(linkName string) error
+func (c *Client) GetBigQueryLink(linkName string) (*analyticsadmin.GoogleAnalyticsAdminV1alphaBigQueryLink, error)
+func (c *Client) GetBigQueryExportStatus(propertyID string) (map[string]interface{}, error)
+func (c *Client) BigQueryLinkExists(propertyID string) (bool, error)
+func (c *Client) GenerateBigQuerySetupGuide(config BigQueryConfig) string
+// Note: CreateBigQueryLink and DeleteBigQueryLink return errors directing to manual setup
 ```
 
 **Configuration Options:**
@@ -533,11 +558,18 @@ func (c *Client) DeleteBigQueryLink(linkName string) error
 - Streaming export
 - Fresh daily tables
 - Include advertising identifiers
+- Export stream filters
 
 ### 4.4 New CLI Command: Link
 
 **File:** `cmd/link.go`
-**Status:** ✅ Completed
+**Status:** ✅ Completed & Fixed (2025-11-22)
+
+**Recent Fixes:**
+- Fixed project selection logic (replaced non-existent `config.GetProject()`)
+- Fixed all unchecked error returns from color print functions
+- Removed Dataset field references
+- All lint errors resolved, fully functional
 
 **Usage:**
 
@@ -545,18 +577,32 @@ func (c *Client) DeleteBigQueryLink(linkName string) error
 # Get a guide to link Search Console
 ./ga4 link --project snapcompress --service search-console --url https://snapcompress.com
 
-# Create a BigQuery export link
+# Generate BigQuery export setup guide
 ./ga4 link --project personal --service bigquery --gcp-project my-gcp-project --dataset analytics
 
 # Setup default channel groups
 ./ga4 link --project snapcompress --service channels
 
-# List all links
+# List all existing links
 ./ga4 link --project snapcompress --list
 
-# Unlink a service
-./ga4 link --project snapcompress --unlink bigquery
+# Unlink a service (where supported)
+./ga4 link --project snapcompress --unlink channels
 ```
+
+### 4.5 Linting & Code Quality (Added 2025-11-22)
+
+**Configuration:**
+- Installed `golangci-lint` v2.6.2
+- Created `.golangci.yml` configuration file
+- Added `make lint` command to Makefile
+- All default linters enabled (errcheck, govet, ineffassign, staticcheck, unused)
+
+**Status:** ✅ All lint errors fixed - 0 issues
+
+**Build Status:** ✅ Builds successfully (20MB binary)
+
+**Testing:** All commands validated and working correctly
 
 ---
 

@@ -26,11 +26,18 @@ make install        # Installs to /usr/local/bin/ga4
 ```bash
 make test           # Run all tests
 go test -v ./...   # Verbose test output
+make lint           # Run golangci-lint
 ```
 
 ### Cleanup
 ```bash
 make clean         # Remove build artifacts
+```
+
+### Linting
+```bash
+make lint           # Run linter (golangci-lint v2.6.2)
+golangci-lint run   # Direct linter execution
 ```
 
 ### Project-Specific Commands
@@ -50,8 +57,9 @@ make report-personal      # Show Personal Website config
 ### CLI Structure (Cobra-based)
 The application uses Cobra for CLI commands with the following hierarchy:
 - **root.go**: Base command, checks for `GOOGLE_APPLICATION_CREDENTIALS`
-- **setup.go**: Creates conversions and dimensions via GA4 API
-- **report.go**: Lists existing conversions and dimensions
+- **setup.go**: Creates conversions, dimensions, and metrics via GA4 API
+- **report.go**: Lists existing conversions, dimensions, and metrics
+- **link.go**: Link external services (Search Console, BigQuery, Channel Groups)
 
 ### Key Components
 
@@ -68,6 +76,14 @@ Each project defines:
 - [client.go](internal/ga4/client.go): Initializes Google Analytics Admin API service
 - [conversions.go](internal/ga4/conversions.go): Creates and lists conversion events
 - [dimensions.go](internal/ga4/dimensions.go): Creates and lists custom dimensions
+- [metrics.go](internal/ga4/metrics.go): Creates and manages custom metrics
+- [calculated.go](internal/ga4/calculated.go): Manages calculated metrics
+- [audiences.go](internal/ga4/audiences.go): Generates audience setup documentation
+- [datastreams.go](internal/ga4/datastreams.go): Manages data streams and enhanced measurement
+- [retention.go](internal/ga4/retention.go): Configures data retention settings
+- [searchconsole.go](internal/ga4/searchconsole.go): Generates Search Console setup guides
+- [bigquery.go](internal/ga4/bigquery.go): Manages BigQuery export links (list only, manual creation)
+- [channels.go](internal/ga4/channels.go): Creates and manages custom channel groups
 
 All GA4 operations require:
 - Property ID format: `properties/{propertyID}`
@@ -112,10 +128,10 @@ The `.env` file is loaded automatically in [cmd/root.go](cmd/root.go) init funct
 
 ### API Status & Limitations
 
-- **Audiences**: Cannot be created via the API due to complex filter logic requirements. They must be configured manually in the GA4 UI. The tool provides guidance on which audiences to create.
-- **Search Console Links**: The GA4 Admin API does **not** support programmatic creation of Search Console links. The `link` command for this service generates a comprehensive manual setup guide.
-- **BigQuery Links**: **Fully supported.** The tool can create, list, and delete BigQuery export links programmatically.
-- **Channel Groups**: **Fully supported.** Previous 500 errors were due to an implementation bug, which has been fixed. The tool can now create, list, and delete custom channel groups.
+- **Audiences**: Cannot be created via the API due to complex filter logic requirements. They must be configured manually in the GA4 UI. The tool provides comprehensive documentation on which audiences to create.
+- **Search Console Links**: The GA4 Admin API does **not** support programmatic creation of Search Console links. The `link` command generates comprehensive manual setup guides with step-by-step instructions.
+- **BigQuery Links**: **Partially supported.** The API can list and retrieve existing BigQuery links but cannot create or delete them. The tool generates detailed setup guides for manual configuration.
+- **Channel Groups**: **Fully supported (Fixed 2025-11-22).** All API compatibility issues have been resolved. The tool can now create, list, update, and delete custom channel groups programmatically.
 
 ## Dependencies
 
@@ -123,3 +139,44 @@ The `.env` file is loaded automatically in [cmd/root.go](cmd/root.go) init funct
 - **google.golang.org/api/analyticsadmin/v1alpha**: GA4 Admin API client
 - **github.com/fatih/color**: Terminal color output
 - **github.com/olekukonko/tablewriter**: Report table formatting
+
+## Recent Updates (2025-11-22)
+
+### Code Quality & Linting
+- Installed and configured `golangci-lint` v2.6.2
+- Created `.golangci.yml` configuration file
+- Added `make lint` command to Makefile
+- **Status**: All lint errors fixed - 0 issues
+
+### API Compatibility Fixes
+
+#### BigQuery Integration ([internal/ga4/bigquery.go](internal/ga4/bigquery.go))
+- **Fixed**: Removed non-existent `Dataset` field from `BigQueryLink` struct
+- **Fixed**: Updated `CreateBigQueryLink()` and `DeleteBigQueryLink()` to return informative errors directing users to manual setup
+- **Fixed**: Removed `Dataset` field from `GetBigQueryExportStatus()`
+- **Status**: API limitation acknowledged, manual setup guides provided
+
+#### Channel Groups Integration ([internal/ga4/channels.go](internal/ga4/channels.go))
+- **Fixed**: `GoogleAnalyticsAdminV1alphaInListFilter` → `GoogleAnalyticsAdminV1alphaChannelGroupFilterInListFilter`
+- **Fixed**: `GoogleAnalyticsAdminV1alphaStringFilter` → `GoogleAnalyticsAdminV1alphaChannelGroupFilterStringFilter`
+- **Fixed**: `Expressions` → `FilterExpressions` in `ChannelGroupFilterExpressionList`
+- **Status**: Fully functional, can create/list/update/delete channel groups
+
+#### Link Command ([cmd/link.go](cmd/link.go))
+- **Fixed**: Replaced non-existent `config.GetProject()` with proper switch statement for project selection
+- **Fixed**: All unchecked error returns from color print functions (added `_, _` receivers)
+- **Fixed**: Removed Dataset field references
+- **Fixed**: Boolean comparison simplification (`group.SystemDefined == true` → `group.SystemDefined`)
+- **Status**: Fully functional with proper error handling
+
+#### Other Fixes
+- **Fixed**: Unnecessary `fmt.Sprintf` usage in [internal/ga4/datastreams.go](internal/ga4/datastreams.go:209)
+- **Fixed**: Capitalized error strings in [internal/ga4/searchconsole.go](internal/ga4/searchconsole.go:24)
+
+### Build & Test Status
+- ✅ **Build**: Successful (20MB binary)
+- ✅ **Lint**: 0 issues
+- ✅ **Commands**: All validated and working
+  - `./ga4 setup` - Creates conversions, dimensions, metrics
+  - `./ga4 report` - Shows configuration reports
+  - `./ga4 link` - Manages external service integrations
