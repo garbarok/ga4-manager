@@ -54,7 +54,7 @@ jobs:
 
       - name: Run Gosec Security Scanner
         continue-on-error: true
-        uses: securego/gosec@v2.19.0
+        uses: securego/gosec@v2.22.10
         with:
           args: '-fmt sarif -out gosec.sarif -severity high ./...'
 
