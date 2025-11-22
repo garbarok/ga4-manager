@@ -18,14 +18,17 @@ var reportCmd = &cobra.Command{
 	RunE:  runReport,
 }
 
+var reportAll bool
+
 func init() {
 	rootCmd.AddCommand(reportCmd)
 	reportCmd.Flags().StringVarP(&projectName, "project", "p", "", "Project name (snapcompress or personal)")
+	reportCmd.Flags().BoolVarP(&reportAll, "all", "a", false, "Report on all projects")
 }
 
 func runReport(cmd *cobra.Command, args []string) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
-	
+
 	fmt.Printf("%s GA4 Configuration Report\n", cyan("📊"))
 	fmt.Println("═══════════════════════════════════════════════")
 	fmt.Println()
@@ -36,16 +39,45 @@ func runReport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create GA4 client: %w", err)
 	}
 
-	// Determine which project to report on
-	var project config.Project
-	if projectName == "" || projectName == "snapcompress" || projectName == "snap" {
-		project = config.SnapCompress
+	// Determine which projects to report on
+	var projects []config.Project
+	if reportAll {
+		projects = config.AllProjects
+	} else if projectName != "" {
+		switch projectName {
+		case "snapcompress", "snap":
+			projects = []config.Project{config.SnapCompress}
+		case "personal", "website":
+			projects = []config.Project{config.PersonalWebsite}
+		default:
+			return fmt.Errorf("unknown project: %s", projectName)
+		}
 	} else {
-		project = config.PersonalWebsite
+		// Default to SnapCompress if no project specified
+		projects = []config.Project{config.SnapCompress}
 	}
 
-	fmt.Printf("Project: %s\n", project.Name)
-	fmt.Printf("Property ID: %s\n\n", project.PropertyID)
+	// Report on each project
+	for i, project := range projects {
+		if i > 0 {
+			fmt.Println()
+			fmt.Println()
+		}
+
+		if err := reportProject(client, project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func reportProject(client *ga4.Client, project config.Project) error {
+	blue := color.New(color.FgBlue, color.Bold).SprintFunc()
+
+	fmt.Printf("%s %s (Property: %s)\n", blue("📦"), project.Name, project.PropertyID)
+	fmt.Println("───────────────────────────────────────────────")
+	fmt.Println()
 
 	// List conversions
 	fmt.Println("🎯 Conversions")
@@ -58,7 +90,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 	convTable := tablewriter.NewWriter(os.Stdout)
 	convTable.SetHeader([]string{"Event Name", "Counting Method"})
 	convTable.SetBorder(false)
-	
+
 	for _, conv := range conversions {
 		convTable.Append([]string{conv.EventName, conv.CountingMethod})
 	}
@@ -76,7 +108,7 @@ func runReport(cmd *cobra.Command, args []string) error {
 	dimTable := tablewriter.NewWriter(os.Stdout)
 	dimTable.SetHeader([]string{"Display Name", "Parameter", "Scope"})
 	dimTable.SetBorder(false)
-	
+
 	for _, dim := range dimensions {
 		dimTable.Append([]string{dim.DisplayName, dim.ParameterName, dim.Scope})
 	}
@@ -166,9 +198,6 @@ func runReport(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Print(emSummary)
 	}
-
-	fmt.Println()
-	fmt.Println("═══════════════════════════════════════════════")
 
 	return nil
 }

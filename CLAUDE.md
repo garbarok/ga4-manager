@@ -48,8 +48,11 @@ make setup-snap           # SnapCompress only
 make setup-personal       # Personal Website only
 
 # Report commands
-make report-snap          # Show SnapCompress config
-make report-personal      # Show Personal Website config
+./ga4 report --all        # Show reports for all projects
+./ga4 report -p snapcompress  # SnapCompress only
+./ga4 report -p personal  # Personal Website only
+make report-snap          # Show SnapCompress config (Makefile alias)
+make report-personal      # Show Personal Website config (Makefile alias)
 ```
 
 ## Architecture
