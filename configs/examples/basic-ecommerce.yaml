@@ -1,0 +1,103 @@
+# Basic E-Commerce GA4 Configuration
+# Generic example for online stores and e-commerce platforms
+
+project:
+  name: Basic E-Commerce Store
+  description: Generic e-commerce analytics configuration
+  version: 1.0.0
+
+ga4:
+  property_id: "123456789"  # Replace with your GA4 property ID
+  tier: standard
+
+# Conversion Events
+conversions:
+  - name: purchase
+    counting_method: ONCE_PER_EVENT
+    description: User completed a purchase
+    priority: high
+
+  - name: add_to_cart
+    counting_method: ONCE_PER_EVENT
+    description: Product added to cart
+    priority: high
+
+  - name: begin_checkout
+    counting_method: ONCE_PER_SESSION
+    description: User started checkout process
+    priority: high
+
+  - name: view_item
+    counting_method: ONCE_PER_EVENT
+    description: Product detail page viewed
+    priority: medium
+
+  - name: add_to_wishlist
+    counting_method: ONCE_PER_EVENT
+    description: Product added to wishlist
+    priority: medium
+
+# Custom Dimensions
+dimensions:
+  - parameter: user_type
+    display_name: User Type
+    description: Customer classification (new/returning/vip)
+    scope: USER
+    priority: high
+
+  - parameter: product_category
+    display_name: Product Category
+    description: Product category name
+    scope: EVENT
+    priority: high
+
+  - parameter: payment_method
+    display_name: Payment Method
+    description: Payment method used (card/paypal/etc)
+    scope: EVENT
+    priority: high
+
+  - parameter: shipping_method
+    display_name: Shipping Method
+    description: Shipping option selected
+    scope: EVENT
+    priority: medium
+
+# Custom Metrics
+metrics:
+  - parameter: cart_value
+    display_name: Cart Value
+    description: Total value of items in cart
+    unit: CURRENCY
+    scope: EVENT
+    priority: high
+
+# Audiences (manual setup required)
+audiences:
+  - name: High-Value Customers
+    description: Users with 3+ purchases or $500+ total spend
+    duration: 30
+
+  - name: Cart Abandoners
+    description: Users who added to cart but didn't purchase
+    duration: 7
+
+# Cleanup Configuration
+cleanup:
+  conversions_to_remove: []
+  dimensions_to_remove: []
+  metrics_to_remove: []
+  reason: ""
+
+# Data Retention Settings
+data_retention:
+  event_data_retention: FOURTEEN_MONTHS
+  reset_user_data_on_new_activity: true
+
+# Enhanced Measurement Settings
+enhanced_measurement:
+  page_views: true
+  scrolls: true
+  outbound_clicks: true
+  site_search: true
+  file_downloads: true

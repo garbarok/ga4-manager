@@ -1,0 +1,51 @@
+---
+# yamllint configuration for GA4 Manager configs
+# Install yamllint: pip install yamllint
+# Run: yamllint configs/
+
+extends: default
+
+rules:
+  # Line length can be longer for descriptions
+  line-length:
+    max: 120
+    level: warning
+
+  # Allow inline mappings (more readable for simple cases)
+  braces:
+    max-spaces-inside: 1
+    level: error
+
+  # Allow inline sequences
+  brackets:
+    max-spaces-inside: 1
+    level: error
+
+  # Require consistent indentation (2 spaces)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Comments can start without space after #
+  comments:
+    min-spaces-from-content: 2
+    level: warning
+
+  # Allow multiple blank lines in long configs
+  empty-lines:
+    max: 2
+
+  # Document start (---) is optional
+  document-start:
+    present: false
+
+  # Allow truthy values (yes/no, on/off, true/false)
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+    check-keys: false
+
+ignore: |
+  node_modules/
+  .git/
+  vendor/
