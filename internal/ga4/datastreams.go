@@ -206,7 +206,7 @@ func (c *Client) GetEnhancedMeasurementSummary(propertyID string) (string, error
 	summary.WriteString(fmt.Sprintf("Measurement ID: %s\n\n", stream.WebStreamData.MeasurementId))
 
 	summary.WriteString("Features:\n")
-	summary.WriteString(fmt.Sprintf("  ✓ Page Views: Always enabled\n"))
+	summary.WriteString("  ✓ Page Views: Always enabled\n")
 	summary.WriteString(fmt.Sprintf("  %s Scrolls: %t\n", boolToCheckmark(settings.ScrollsEnabled), settings.ScrollsEnabled))
 	summary.WriteString(fmt.Sprintf("  %s Outbound Clicks: %t\n", boolToCheckmark(settings.OutboundClicksEnabled), settings.OutboundClicksEnabled))
 	summary.WriteString(fmt.Sprintf("  %s Site Search: %t\n", boolToCheckmark(settings.SiteSearchEnabled), settings.SiteSearchEnabled))

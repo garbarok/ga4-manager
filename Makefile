@@ -1,4 +1,4 @@
-.PHONY: build install run clean test
+.PHONY: build install run clean test lint
 
 # Binary name
 BINARY=ga4
@@ -38,6 +38,12 @@ deps:
 test:
 	@go test -v ./...
 
+# Run linter
+lint:
+	@echo "Running linter..."
+	@golangci-lint run
+	@echo "✓ Linting passed"
+
 # Setup both projects
 setup-all: build
 	@./$(BINARY) setup --all
@@ -66,6 +72,7 @@ help:
 	@echo "  make clean          - Remove build artifacts"
 	@echo "  make deps           - Download dependencies"
 	@echo "  make test           - Run tests"
+	@echo "  make lint           - Run golangci-lint"
 	@echo ""
 	@echo "Quick commands:"
 	@echo "  make setup-all      - Setup all projects"
