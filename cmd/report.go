@@ -119,6 +119,54 @@ func runReport(cmd *cobra.Command, args []string) error {
 		calcTable.Render()
 	}
 
+	// List audiences
+	fmt.Println()
+	fmt.Println("👥 Configured Audiences")
+	fmt.Println("───────────────────────────────────────────────")
+	audienceSummary := ga4.GetAudienceSummary(project)
+	fmt.Println(audienceSummary)
+
+	audienceCategories := ga4.ListAudiencesByCategory(project)
+	audienceTable := tablewriter.NewWriter(os.Stdout)
+	audienceTable.SetHeader([]string{"Name", "Category", "Duration (days)"})
+	audienceTable.SetBorder(false)
+
+	for _, category := range []string{"SEO", "Conversion", "Content", "Behavioral"} {
+		if audiences, ok := audienceCategories[category]; ok {
+			for _, aud := range audiences {
+				audienceTable.Append([]string{aud.Name, aud.Category, fmt.Sprintf("%d", aud.MembershipDuration)})
+			}
+		}
+	}
+	audienceTable.Render()
+
+	fmt.Println()
+	fmt.Printf("Note: Audiences must be created manually in GA4 UI. Use './ga4 export --audiences' to generate setup guides.\n")
+
+	// Data retention settings
+	fmt.Println()
+	fmt.Println("🗄️  Data Retention Settings")
+	fmt.Println("───────────────────────────────────────────────")
+	retentionSettings, err := client.GetDataRetention(project.PropertyID)
+	if err != nil {
+		fmt.Printf("Warning: failed to get data retention settings: %v\n", err)
+	} else {
+		retentionMonths := ga4.GetDataRetentionMonths(retentionSettings.EventDataRetention)
+		fmt.Printf("Event Data Retention: %d months (%s)\n", retentionMonths, retentionSettings.EventDataRetention)
+		fmt.Printf("Reset on New Activity: %t\n", retentionSettings.ResetUserDataOnNewActivity)
+	}
+
+	// Enhanced measurement settings
+	fmt.Println()
+	fmt.Println("⚡ Enhanced Measurement")
+	fmt.Println("───────────────────────────────────────────────")
+	emSummary, err := client.GetEnhancedMeasurementSummary(project.PropertyID)
+	if err != nil {
+		fmt.Printf("Warning: failed to get enhanced measurement settings: %v\n", err)
+	} else {
+		fmt.Print(emSummary)
+	}
+
 	fmt.Println()
 	fmt.Println("═══════════════════════════════════════════════")
 

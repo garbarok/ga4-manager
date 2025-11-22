@@ -2,7 +2,7 @@
 .env
 
 # Binaries
-ga4
+/ga4
 *.exe
 *.dll
 *.so
