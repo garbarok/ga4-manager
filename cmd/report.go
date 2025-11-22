@@ -82,8 +82,45 @@ func runReport(cmd *cobra.Command, args []string) error {
 	}
 	dimTable.Render()
 
+	// List custom metrics
+	fmt.Println()
+	fmt.Println("📈 Custom Metrics")
+	fmt.Println("───────────────────────────────────────────────")
+	metrics, err := client.ListCustomMetrics(project.PropertyID)
+	if err != nil {
+		fmt.Printf("Warning: failed to list custom metrics: %v\n", err)
+	} else {
+		metricTable := tablewriter.NewWriter(os.Stdout)
+		metricTable.SetHeader([]string{"Display Name", "Parameter", "Unit", "Scope"})
+		metricTable.SetBorder(false)
+
+		for _, metric := range metrics {
+			metricTable.Append([]string{metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope})
+		}
+		metricTable.Render()
+	}
+
+	// List calculated metrics (recommended)
+	fmt.Println()
+	fmt.Println("🧮 Recommended Calculated Metrics (create manually in GA4 UI)")
+	fmt.Println("───────────────────────────────────────────────")
+	calculatedMetrics, err := client.ListCalculatedMetrics(project.PropertyID)
+	if err != nil {
+		fmt.Printf("Warning: failed to list calculated metrics: %v\n", err)
+	} else {
+		calcTable := tablewriter.NewWriter(os.Stdout)
+		calcTable.SetHeader([]string{"Display Name", "Formula", "Unit"})
+		calcTable.SetBorder(false)
+		calcTable.SetColWidth(50)
+
+		for _, calc := range calculatedMetrics {
+			calcTable.Append([]string{calc.DisplayName, calc.Formula, calc.MetricUnit})
+		}
+		calcTable.Render()
+	}
+
 	fmt.Println()
 	fmt.Println("═══════════════════════════════════════════════")
-	
+
 	return nil
 }

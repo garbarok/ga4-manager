@@ -86,6 +86,25 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		// Setup custom metrics
+		fmt.Printf("\n📈 Creating custom metrics...\n")
+		for _, metric := range project.Metrics {
+			err := client.CreateCustomMetric(project.PropertyID, metric)
+			if err != nil {
+				fmt.Printf("  %s %s: %s\n", red("✗"), metric.DisplayName, err)
+			} else {
+				fmt.Printf("  %s %s\n", green("✓"), metric.DisplayName)
+			}
+		}
+
+		// Recommend calculated metrics (manual setup required)
+		fmt.Printf("\n🧮 Calculated metrics (manual setup required in GA4 UI):\n")
+		calcMetrics, _ := client.ListCalculatedMetrics(project.PropertyID)
+		for _, calc := range calcMetrics {
+			fmt.Printf("  %s %s: %s\n", yellow("○"), calc.DisplayName, calc.Formula)
+		}
+		fmt.Printf("  ℹ️  Calculated metrics must be created manually in GA4 UI\n")
+
 		// Note about audiences
 		fmt.Printf("\n👥 Audiences (manual setup required):\n")
 		for _, aud := range project.Audiences {

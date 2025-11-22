@@ -6,6 +6,7 @@ type Project struct {
 	PropertyID string
 	Conversions []Conversion
 	Dimensions  []CustomDimension
+	Metrics     []CustomMetric
 	Audiences   []Audience
 }
 
@@ -112,6 +113,7 @@ var (
 			{ParameterName: "javascript_enabled", DisplayName: "JavaScript Enabled", Description: "Boolean: JS enabled status", Scope: "EVENT"},
 			{ParameterName: "cookie_consent_status", DisplayName: "Cookie Consent Status", Description: "Cookie consent status", Scope: "EVENT"},
 		},
+		Metrics: SnapCompressMetrics,
 		Audiences: []Audience{
 			{Name: "High-Intent Users", Description: "Completed 2+ compressions in 7 days", Duration: 7},
 			{Name: "Feature Explorers", Description: "Used 2+ features in 30 days", Duration: 30},
@@ -203,6 +205,7 @@ var (
 			{ParameterName: "javascript_enabled", DisplayName: "JavaScript Enabled", Description: "Boolean: JS enabled status", Scope: "EVENT"},
 			{ParameterName: "cookie_consent_status", DisplayName: "Cookie Consent Status", Description: "Cookie consent status", Scope: "EVENT"},
 		},
+		Metrics: PersonalWebsiteMetrics,
 		Audiences: []Audience{
 			{Name: "Content Consumers", Description: "Read 3+ articles in 30 days", Duration: 30},
 			{Name: "Technical Readers", Description: "Copied 2+ code snippets", Duration: 30},
