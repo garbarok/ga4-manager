@@ -1,0 +1,55 @@
+project:
+  name: Test Project
+  description: A test project for unit testing
+  version: 1.0.0
+
+ga4:
+  property_id: "123456789"
+  measurement_id: "G-XXXXXXXXXX"
+  tier: "standard"
+
+conversions:
+  - name: test_conversion_1
+    counting_method: ONCE_PER_SESSION
+    description: Test conversion event
+    priority: high
+  - name: test_conversion_2
+    counting_method: ONCE_PER_EVENT
+    description: Another test conversion
+    priority: medium
+
+dimensions:
+  - parameter: test_dimension_1
+    display_name: Test Dimension 1
+    description: A test dimension
+    scope: USER
+    priority: high
+  - parameter: test_dimension_2
+    display_name: Test Dimension 2
+    description: Another test dimension
+    scope: EVENT
+    priority: medium
+
+metrics:
+  - parameter: test_metric_1
+    display_name: Test Metric 1
+    description: A test metric
+    unit: STANDARD
+    scope: EVENT
+    priority: high
+  - parameter: test_metric_2
+    display_name: Test Metric 2
+    description: Another test metric
+    unit: CURRENCY
+    scope: EVENT
+    priority: medium
+
+cleanup:
+  conversions_to_remove:
+    - old_event_1
+    - old_event_2
+  dimensions_to_remove:
+    - old_dimension_1
+  metrics_to_remove:
+    - old_metric_1
+  reason: "These events are no longer tracked in the application"

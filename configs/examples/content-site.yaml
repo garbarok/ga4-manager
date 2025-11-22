@@ -1,0 +1,111 @@
+# Content Site GA4 Configuration
+# Generic example for blogs, news sites, and content publishers
+
+project:
+  name: Content Publishing Site
+  description: Generic blog and content site analytics
+  version: 1.0.0
+
+ga4:
+  property_id: "987654321"  # Replace with your GA4 property ID
+  tier: standard
+
+# Conversion Events
+conversions:
+  - name: article_read
+    counting_method: ONCE_PER_EVENT
+    description: User read an article to completion
+    priority: high
+
+  - name: newsletter_signup
+    counting_method: ONCE_PER_SESSION
+    description: User subscribed to newsletter
+    priority: high
+
+  - name: social_share
+    counting_method: ONCE_PER_EVENT
+    description: User shared content on social media
+    priority: high
+
+  - name: comment_posted
+    counting_method: ONCE_PER_EVENT
+    description: User posted a comment
+    priority: medium
+
+  - name: video_watch
+    counting_method: ONCE_PER_EVENT
+    description: User watched embedded video
+    priority: medium
+
+# Custom Dimensions
+dimensions:
+  - parameter: article_category
+    display_name: Article Category
+    description: Content category or topic
+    scope: EVENT
+    priority: high
+
+  - parameter: author_name
+    display_name: Author Name
+    description: Article author
+    scope: EVENT
+    priority: high
+
+  - parameter: content_type
+    display_name: Content Type
+    description: Type of content (article/video/podcast)
+    scope: EVENT
+    priority: high
+
+  - parameter: word_count
+    display_name: Word Count
+    description: Article length in words
+    scope: EVENT
+    priority: medium
+
+# Custom Metrics
+metrics:
+  - parameter: engagement_rate
+    display_name: Engagement Rate
+    description: Percentage of engaged sessions
+    unit: STANDARD
+    scope: EVENT
+    priority: high
+
+  - parameter: avg_reading_time
+    display_name: Average Reading Time
+    description: Average time spent reading
+    unit: MINUTES
+    scope: EVENT
+    priority: high
+
+# Audiences (manual setup required)
+audiences:
+  - name: Active Readers
+    description: Users who read 3+ articles in 30 days
+    duration: 30
+
+  - name: Newsletter Subscribers
+    description: Users who signed up for newsletter
+    duration: 365
+
+# Cleanup Configuration
+cleanup:
+  conversions_to_remove: []
+  dimensions_to_remove: []
+  metrics_to_remove: []
+  reason: ""
+
+# Data Retention Settings
+data_retention:
+  event_data_retention: FOURTEEN_MONTHS
+  reset_user_data_on_new_activity: true
+
+# Enhanced Measurement Settings
+enhanced_measurement:
+  page_views: true
+  scrolls: true
+  outbound_clicks: true
+  site_search: true
+  video_engagement: true
+  file_downloads: true

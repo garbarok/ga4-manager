@@ -1,0 +1,63 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Google Cloud credentials
+*credentials*.json
+*service-account*.json
+*serviceaccount*.json
+gcloud-credentials.json
+sa-key.json
+key.json
+
+# Other credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+!*.md
+
+# Binaries
+/ga4
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.backup
+*~
+
+# Configuration files (except examples)
+/configs/*
+!/configs/examples/
