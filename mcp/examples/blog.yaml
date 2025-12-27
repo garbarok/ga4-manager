@@ -1,0 +1,78 @@
+# Blog Analytics Configuration
+# Complete setup for content websites and blogs
+
+project:
+  name: "Tech Blog"
+  property_id: "YOUR_PROPERTY_ID"
+  timezone: "America/New_York"
+
+ga4:
+  # Content engagement conversions
+  conversions:
+    - name: "article_read"
+      counting_method: "ONCE_PER_SESSION"
+
+    - name: "newsletter_subscribe"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "code_copy"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "article_share"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "comment_submit"
+      counting_method: "ONCE_PER_EVENT"
+
+  # Content classification dimensions
+  dimensions:
+    - parameter: "article_category"
+      display_name: "Article Category"
+      scope: "EVENT"
+
+    - parameter: "content_language"
+      display_name: "Content Language"
+      scope: "EVENT"
+
+    - parameter: "reading_completion"
+      display_name: "Reading Completion"
+      scope: "EVENT"
+
+    - parameter: "reader_type"
+      display_name: "Reader Type"
+      scope: "USER"
+
+    - parameter: "traffic_source_type"
+      display_name: "Traffic Source Type"
+      scope: "USER"
+
+  # Content engagement metrics
+  metrics:
+    - parameter: "reading_time"
+      display_name: "Reading Time"
+      scope: "EVENT"
+      unit: "SECONDS"
+
+    - parameter: "scroll_depth"
+      display_name: "Scroll Depth"
+      scope: "EVENT"
+      unit: "STANDARD"
+
+    - parameter: "word_count"
+      display_name: "Word Count"
+      scope: "EVENT"
+      unit: "STANDARD"
+
+# Google Search Console integration
+gsc:
+  sites:
+    - url: "sc-domain:myblog.com"
+      sitemaps:
+        - "https://myblog.com/sitemap.xml"
+        - "https://myblog.com/sitemap-posts.xml"
+
+  # Monitor important pages for indexing
+  monitor_urls:
+    - "https://myblog.com/"
+    - "https://myblog.com/blog/"
+    - "https://myblog.com/about/"

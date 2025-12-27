@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GA4 Manager is a CLI tool for managing Google Analytics 4 properties, specifically designed for SnapCompress and Personal Website projects. It automates the creation of conversion events and custom dimensions using the Google Analytics Admin API.
 
+**MCP Server**: The project includes a Model Context Protocol (MCP) server that exposes all CLI commands as structured tools for Claude Desktop, Claude CLI, VS Code, Cursor, and other MCP-compatible clients. See [`mcp/README.md`](mcp/README.md) for complete documentation.
+
 ## Development Commands
 
 ### Build and Run
@@ -65,6 +67,55 @@ make report-personal      # Show Personal Website config (Makefile alias)
 ./ga4 cleanup -p personal --type conversions --yes  # Remove conversions only, skip confirmation
 ./ga4 cleanup --all --dry-run               # Preview cleanup for all projects
 ```
+
+### MCP Server Commands
+
+```bash
+# Navigate to MCP directory
+cd mcp
+
+# Install dependencies
+npm install
+
+# Build MCP server
+npm run build
+
+# Run tests (593 tests)
+npm test
+
+# Development mode (with auto-reload)
+npm run dev
+
+# Lint code
+npm run lint
+```
+
+**Setup for Claude Desktop**: See [`mcp/CONFIGURATION.md`](mcp/CONFIGURATION.md) for complete setup instructions for Claude Desktop, Claude CLI, VS Code, Cursor, and Cline.
+
+**Quick Setup**:
+```bash
+# Add to Claude Desktop (~/.config/claude-desktop/config.json)
+{
+  "mcpServers": {
+    "ga4-manager": {
+      "command": "node",
+      "args": ["/absolute/path/to/ga4-manager/mcp/dist/index.js"],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/credentials.json",
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GA4_BINARY_PATH": "/absolute/path/to/ga4-manager/ga4",
+        "GA4_DEFAULT_PROPERTY_ID": "123456789"
+      }
+    }
+  }
+}
+```
+
+**Available Tools** (12 total):
+- `ga4_setup`, `ga4_report`, `ga4_cleanup`, `ga4_link`, `ga4_validate` (5 GA4 tools)
+- `gsc_sitemaps_*`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls` (7 GSC tools)
+
+See [`mcp/README.md`](mcp/README.md) for detailed tool documentation and examples.
 
 ## Release Workflow
 

@@ -1,0 +1,79 @@
+# SaaS Product Analytics Configuration
+# Setup for software-as-a-service and web applications
+
+project:
+  name: "SaaS Product"
+  property_id: "YOUR_PROPERTY_ID"
+  timezone: "America/Los_Angeles"
+
+ga4:
+  # User activation and engagement conversions
+  conversions:
+    - name: "sign_up"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "trial_start"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "subscription_purchase"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "feature_used"
+      counting_method: "ONCE_PER_SESSION"
+
+    - name: "upgrade_click"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "support_ticket"
+      counting_method: "ONCE_PER_EVENT"
+
+  # Product usage dimensions
+  dimensions:
+    - parameter: "subscription_plan"
+      display_name: "Subscription Plan"
+      scope: "USER"
+
+    - parameter: "feature_name"
+      display_name: "Feature Name"
+      scope: "EVENT"
+
+    - parameter: "user_role"
+      display_name: "User Role"
+      scope: "USER"
+
+    - parameter: "account_age"
+      display_name: "Account Age"
+      scope: "USER"
+
+    - parameter: "trial_status"
+      display_name: "Trial Status"
+      scope: "USER"
+
+  # Product engagement metrics
+  metrics:
+    - parameter: "session_duration"
+      display_name: "Session Duration"
+      scope: "EVENT"
+      unit: "SECONDS"
+
+    - parameter: "features_used"
+      display_name: "Features Used"
+      scope: "EVENT"
+      unit: "STANDARD"
+
+    - parameter: "monthly_revenue"
+      display_name: "Monthly Revenue"
+      scope: "EVENT"
+      unit: "CURRENCY"
+
+# Marketing site search console
+gsc:
+  sites:
+    - url: "sc-domain:myproduct.com"
+      sitemaps:
+        - "https://myproduct.com/sitemap.xml"
+
+  monitor_urls:
+    - "https://myproduct.com/"
+    - "https://myproduct.com/features/"
+    - "https://myproduct.com/pricing/"

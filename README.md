@@ -44,6 +44,44 @@ A comprehensive command-line tool for automating GA4 configuration, including co
   - Configuration profiles (dev/prod/default)
   - Multi-project support
 
+## MCP Server Integration
+
+GA4 Manager includes a **Model Context Protocol (MCP) server** that exposes all CLI commands as structured tools for AI assistants and development environments.
+
+### Supported Clients
+- **Claude Desktop** - Native integration with Claude
+- **Claude CLI** - Command-line Claude interface
+- **VS Code** - Via MCP extension
+- **Cursor** - AI-powered code editor
+- **Cline** - VS Code extension
+
+### Features
+- ✅ **12 MCP Tools** - Complete CLI coverage (5 GA4 + 7 GSC tools)
+- ✅ **Structured JSON** - Machine-readable responses for agents
+- ✅ **593 Passing Tests** - Production-ready reliability
+- ✅ **Smart Parsing** - Automatic format detection (JSON, tables, CSV, markdown)
+- ✅ **Dry-Run Support** - Safe previews before applying changes
+- ✅ **Quota Tracking** - Monitor GSC API usage
+
+### Quick Setup (Claude CLI)
+
+```bash
+claude mcp add \
+  --name ga4-manager \
+  --transport stdio \
+  --command "node" \
+  --args "/absolute/path/to/ga4-manager/mcp/dist/index.js" \
+  --env "GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json" \
+  --env "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" \
+  --env "GA4_BINARY_PATH=/absolute/path/to/ga4-manager/ga4" \
+  --env "GA4_DEFAULT_PROPERTY_ID=123456789"
+```
+
+### Documentation
+- **[MCP Server README](mcp/README.md)** - Complete tool documentation
+- **[Configuration Guide](mcp/CONFIGURATION.md)** - Multi-client setup
+- **[Example Configs](mcp/examples/)** - Ready-to-use templates
+
 ## Installation
 
 ### Download Pre-built Binary
