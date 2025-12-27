@@ -14,13 +14,29 @@ A comprehensive command-line tool for automating GA4 configuration, including co
 
 ## Features
 
+### Core Capabilities
 - **🎯 Conversion Events** - Automate creation and management of GA4 conversion events
 - **📊 Custom Dimensions** - Define and deploy custom dimensions with proper scoping (USER/EVENT)
 - **📈 Custom Metrics** - Create custom metrics with measurement units (CURRENCY, SECONDS, STANDARD, etc.)
 - **🧹 Cleanup Management** - Remove unused events, dimensions, and metrics to free up quota
 - **🔗 External Integrations** - Setup guides for Search Console, BigQuery, and Channel Groups
 - **✅ Validation** - Validate YAML configuration files before deployment
-- **🏭 Production Features**:
+
+### Google Search Console Integration (Phase 4)
+- **🗺️ Sitemap Management** - Automated sitemap submission and verification
+- **🔍 URL Inspection** - Inspect URLs for indexing status and issues
+- **📊 Search Analytics** - Query search performance data (impressions, clicks, CTR, position)
+- **⚡ Unified Setup** - Single command configures both GA4 and GSC from one YAML file
+
+### Production-Ready Features
+- **🛡️ Pre-flight Validation** - Comprehensive checks before any API calls
+  - Credential validation
+  - Property access verification
+  - Resource conflict detection
+  - Quota availability checking
+- **📈 Progress Tracking** - Real-time status with color-coded indicators
+- **🔄 Rollback Mechanism** - Automatic rollback on setup failures
+- **🏭 Enterprise Features**:
   - Rate limiting (10 RPS, configurable)
   - Structured logging (JSON/text with slog)
   - Input validation (GA4 naming rules, reserved prefixes)
@@ -97,6 +113,69 @@ ga4 setup --config configs/my-store.yaml --dry-run
 
 ```bash
 ga4 setup --config configs/my-store.yaml
+```
+
+## Unified Setup Workflow (Phase 4)
+
+GA4 Manager now provides a single command to configure both Google Analytics 4 and Google Search Console:
+
+```bash
+# Single command for complete site instrumentation
+ga4 setup --config configs/mysite.yaml
+```
+
+**What happens during setup:**
+
+1. **Pre-flight Validation** ✅
+   - Verifies credentials and permissions
+   - Validates configuration schema
+   - Checks resource availability
+   - Detects conflicts with existing resources
+
+2. **GA4 Setup** (if configured)
+   - Creates conversion events
+   - Creates custom dimensions
+   - Creates custom metrics
+   - Skips duplicates automatically
+
+3. **Google Search Console Setup** (if configured)
+   - Submits sitemaps for indexing
+   - Configures URL monitoring
+   - Enables search analytics
+
+4. **Progress Tracking**
+   - Real-time status updates
+   - Color-coded indicators
+   - Duration tracking
+
+5. **Rollback on Error**
+   - Automatic cleanup if setup fails
+   - User confirmation prompt
+   - Clean state guaranteed
+
+**Example Output:**
+```
+🚀 GA4 Manager - Unified Setup
+═══════════════════════════════════════════════
+
+✓ Pre-flight validation passed
+
+[1/2] ◐ Google Analytics 4 Setup
+  Creating conversions... (5/5 created)
+  ✓ page_view
+  ✓ contact_submit
+  ○ newsletter_signup (already exists, skipping)
+
+[2/2] ✓ Google Search Console Setup
+  ✓ Submitted sitemap: https://mysite.com/sitemap.xml
+
+Setup Summary:
+  ✓ 2 steps completed
+  Duration: 8.2 seconds
+
+Next Steps:
+  1. Verify in GA4: https://analytics.google.com
+  2. Check Search Console: https://search.google.com/search-console
 ```
 
 ## Usage
@@ -182,6 +261,7 @@ project:
   description: Project description
   version: 1.0.0
 
+# Google Analytics 4 Configuration (optional)
 ga4:
   property_id: "123456789"  # Your GA4 property ID
   tier: standard             # standard or 360
@@ -203,7 +283,27 @@ metrics:
     description: Cart total value
     unit: CURRENCY
     scope: EVENT
+
+# Google Search Console Configuration (optional)
+search_console:
+  site_url: "https://example.com"  # Your verified site URL
+
+sitemaps:
+  - url: "https://example.com/sitemap.xml"
+    priority: true
+
+monitoring:
+  priority_urls:
+    - url: "https://example.com/"
+      label: "Homepage"
+    - url: "https://example.com/products/"
+      label: "Products Page"
 ```
+
+**Flexible Configuration Options:**
+- **GA4-only**: Omit `search_console` section for analytics-only setup
+- **GSC-only**: Omit `ga4` section for search visibility monitoring
+- **Combined**: Include both sections for complete site instrumentation
 
 See [configs/examples/README.md](configs/examples/README.md) for complete documentation.
 

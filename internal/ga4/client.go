@@ -84,7 +84,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	)
 
 	// Create admin service with timeout context
-	adminService, err := admin.NewService(ctx, option.WithCredentialsFile(credsFile))
+	adminService, err := admin.NewService(ctx, option.WithAuthCredentialsFile(option.ServiceAccount, credsFile))
 	if err != nil {
 		cancel()
 		client.logger.Error("failed to create admin service", slog.String("error", err.Error()))

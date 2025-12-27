@@ -61,3 +61,10 @@ Thumbs.db
 # Configuration files (except examples)
 /configs/*
 !/configs/examples/
+
+# Continuous Claude cache (local only)
+.claude/cache/
+
+# Private documentation and planning (local only)
+thoughts/
+docs/internal/
