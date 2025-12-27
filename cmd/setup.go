@@ -2,9 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 
-	"github.com/fatih/color"
+	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/ga4"
+	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -17,9 +21,18 @@ var (
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "Setup GA4 configuration for your projects",
-	Long:  `Automatically create conversions, custom dimensions, and audiences for your GA4 properties.`,
-	Example: `  # Setup from configuration file
+	Short: "Setup GA4 and Google Search Console from YAML configuration",
+	Long: `Automatically configure Google Analytics 4 and Google Search Console from a single YAML file.
+
+The setup command provides a unified workflow for:
+- Creating GA4 conversions, dimensions, and metrics
+- Submitting sitemaps to Google Search Console
+- Configuring URL monitoring and search analytics
+- Pre-flight validation of credentials and permissions
+- Rollback on errors
+
+Supports GA4-only, GSC-only, or combined configurations.`,
+	Example: `  # Setup from configuration file (RECOMMENDED)
   ga4 setup --config configs/my-ecommerce.yaml
 
   # Preview setup without making changes (dry-run)
@@ -42,114 +55,110 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	green := color.New(color.FgGreen).SprintFunc()
-	yellow := color.New(color.FgYellow).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
-	blue := color.New(color.FgBlue).SprintFunc()
-
-	fmt.Println("🚀 GA4 Manager - Setup")
-	fmt.Println("═══════════════════════════════════════════════")
-	fmt.Println()
-
-	if setupDryRun {
-		fmt.Printf("%s Dry-run mode enabled - no changes will be applied\n\n", blue("ℹ️"))
-	}
-
-	// Create GA4 client
-	client, err := ga4.NewClient()
-	if err != nil {
-		return fmt.Errorf("failed to create GA4 client: %w", err)
-	}
-
-	// Load projects based on flags
-	projects, err := loadProjects(configPath, projectName, setupAll)
+	// Load configuration
+	configs, paths, err := loadProjectConfigs(configPath, projectName, setupAll)
 	if err != nil {
 		return err
 	}
 
-	// Setup each project
-	for _, project := range projects {
-		fmt.Printf("\n📦 Setting up: %s (Property: %s)\n", project.Name, project.PropertyID)
-		fmt.Println("───────────────────────────────────────────────")
+	// Create logger
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelWarn, // Only show warnings and errors during setup
+	}))
 
-		// Setup conversions
-		fmt.Printf("\n🎯 Creating conversions...\n")
-		for _, conv := range project.Conversions {
-			if setupDryRun {
-				fmt.Printf("  %s %s (counting: %s)\n", blue("○"), conv.Name, conv.CountingMethod)
-			} else {
-				err := client.CreateConversion(project.PropertyID, conv.Name, conv.CountingMethod)
-				if err != nil {
-					fmt.Printf("  %s %s: %s\n", red("✗"), conv.Name, err)
-				} else {
-					fmt.Printf("  %s %s\n", green("✓"), conv.Name)
-				}
+	// Setup each configuration
+	for i, cfg := range configs {
+		cfgPath := paths[i]
+
+		// Create clients
+		var ga4Client *ga4.Client
+		var gscClient *gsc.Client
+
+		// Create GA4 client if needed
+		if cfg.HasAnalytics() {
+			ga4Client, err = ga4.NewClient()
+			if err != nil {
+				return fmt.Errorf("failed to create GA4 client: %w", err)
 			}
+			defer ga4Client.Close()
 		}
 
-		// Setup dimensions
-		fmt.Printf("\n📊 Creating custom dimensions...\n")
-		for _, dim := range project.Dimensions {
-			if setupDryRun {
-				fmt.Printf("  %s %s (param: %s, scope: %s)\n", blue("○"), dim.DisplayName, dim.ParameterName, dim.Scope)
-			} else {
-				err := client.CreateDimension(project.PropertyID, dim)
-				if err != nil {
-					fmt.Printf("  %s %s: %s\n", red("✗"), dim.DisplayName, err)
-				} else {
-					fmt.Printf("  %s %s\n", green("✓"), dim.DisplayName)
-				}
+		// Create GSC client if needed
+		if cfg.HasSearchConsole() {
+			gscClient, err = gsc.NewClient()
+			if err != nil {
+				return fmt.Errorf("failed to create GSC client: %w", err)
 			}
-		}
-
-		// Setup custom metrics
-		fmt.Printf("\n📈 Creating custom metrics...\n")
-		for _, metric := range project.Metrics {
-			if setupDryRun {
-				fmt.Printf("  %s %s (param: %s, scope: %s, unit: %s)\n", blue("○"), metric.DisplayName, metric.EventParameter, metric.Scope, metric.MeasurementUnit)
-			} else {
-				err := client.CreateCustomMetric(project.PropertyID, metric)
-				if err != nil {
-					fmt.Printf("  %s %s: %s\n", red("✗"), metric.DisplayName, err)
-				} else {
-					fmt.Printf("  %s %s\n", green("✓"), metric.DisplayName)
+			defer func() {
+				if err := gscClient.Close(); err != nil {
+					logger.Warn("failed to close GSC client", slog.String("error", err.Error()))
 				}
-			}
+			}()
 		}
 
-		// Recommend calculated metrics (manual setup required)
-		fmt.Printf("\n🧮 Calculated metrics (manual setup required in GA4 UI):\n")
-		calcMetrics, _ := client.ListCalculatedMetrics(project.PropertyID)
-		for _, calc := range calcMetrics {
-			fmt.Printf("  %s %s: %s\n", yellow("○"), calc.DisplayName, calc.Formula)
-		}
-		fmt.Printf("  ℹ️  Calculated metrics must be created manually in GA4 UI\n")
+		// Create and execute orchestrator
+		orchestrator := setup.NewSetupOrchestrator(cfg, cfgPath, ga4Client, gscClient, logger, setupDryRun)
 
-		// Note about audiences
-		fmt.Printf("\n👥 Audiences (manual setup required):\n")
-		for _, aud := range project.Audiences {
-			fmt.Printf("  %s %s\n", yellow("○"), aud.Name)
+		if err := orchestrator.Execute(); err != nil {
+			return err
 		}
-		fmt.Printf("  ℹ️  Audiences must be created manually in GA4 UI\n")
+
+		// Add spacing between multiple setups
+		if i < len(configs)-1 {
+			fmt.Println()
+			fmt.Println("═══════════════════════════════════════════════")
+			fmt.Println()
+		}
 	}
-
-	fmt.Println()
-	fmt.Println("═══════════════════════════════════════════════")
-	if setupDryRun {
-		fmt.Printf("%s Dry-run complete! No changes were applied.\n", blue("ℹ️"))
-		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Println("1. Review the configuration above")
-		fmt.Println("2. Run without --dry-run to apply changes")
-	} else {
-		fmt.Printf("%s Setup complete!\n", green("✅"))
-		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Println("1. Verify in GA4: https://analytics.google.com")
-		fmt.Println("2. Implement event tracking in your apps")
-		fmt.Println("3. Test events in GA4 DebugView")
-	}
-	fmt.Println()
 
 	return nil
+}
+
+// loadProjectConfigs loads ProjectConfig(s) based on command flags
+// Returns configs and their paths for reference in orchestrator
+func loadProjectConfigs(configPath, projectName string, loadAll bool) ([]*config.ProjectConfig, []string, error) {
+	// Priority 1: Load from config file path
+	if configPath != "" {
+		cfg, err := config.LoadConfig(configPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load config: %w", err)
+		}
+		return []*config.ProjectConfig{cfg}, []string{configPath}, nil
+	}
+
+	// Priority 2: Load all available configs (for --all flag)
+	if loadAll {
+		availableConfigs, err := config.ListAvailableConfigs()
+		if err != nil || len(availableConfigs) == 0 {
+			return nil, nil, fmt.Errorf("no config files found in configs/ or configs/examples/")
+		}
+
+		var configs []*config.ProjectConfig
+		var paths []string
+		for _, name := range availableConfigs {
+			cfg, err := config.LoadConfigByName(name)
+			if err != nil {
+				continue // Skip configs that fail to load
+			}
+			configs = append(configs, cfg)
+			paths = append(paths, fmt.Sprintf("configs/%s.yaml", name))
+		}
+
+		if len(configs) == 0 {
+			return nil, nil, fmt.Errorf("no valid config files found")
+		}
+
+		return configs, paths, nil
+	}
+
+	// Priority 3: Load by project name from config files
+	if projectName != "" {
+		cfg, err := config.LoadConfigByName(projectName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("config file not found: %s (use --config to specify a YAML config file)", projectName)
+		}
+		return []*config.ProjectConfig{cfg}, []string{fmt.Sprintf("configs/%s.yaml", projectName)}, nil
+	}
+
+	return nil, nil, fmt.Errorf("specify --project <name>, --config <path>, or --all")
 }

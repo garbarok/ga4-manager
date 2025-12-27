@@ -95,9 +95,12 @@ func validateConfig(config *ProjectConfig) error {
 		return fmt.Errorf("project.name is required")
 	}
 
-	// Validate GA4 config
-	if config.GA4.PropertyID == "" {
-		return fmt.Errorf("ga4.property_id is required")
+	// Validate GA4 config (only if GA4 features are configured)
+	hasGA4Config := config.GA4.PropertyID != "" || len(config.Conversions) > 0 ||
+		len(config.Dimensions) > 0 || len(config.Metrics) > 0
+
+	if hasGA4Config && config.GA4.PropertyID == "" {
+		return fmt.Errorf("ga4.property_id is required when using GA4 features")
 	}
 
 	// Validate conversions
@@ -162,6 +165,60 @@ func validateConfig(config *ProjectConfig) error {
 		}
 		if !validRetentions[config.DataRetention.EventDataRetention] {
 			return fmt.Errorf("data_retention.event_data_retention must be one of: TWO_MONTHS, FOURTEEN_MONTHS, TWENTY_SIX_MONTHS, THIRTY_EIGHT_MONTHS, FIFTY_MONTHS")
+		}
+	}
+
+	// Validate SearchConsole configuration
+	if config.SearchConsole != nil {
+		if err := validateSearchConsoleConfig(config.SearchConsole); err != nil {
+			return fmt.Errorf("search_console validation failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateSearchConsoleConfig validates Search Console configuration
+func validateSearchConsoleConfig(sc *SearchConsoleConfig) error {
+	// Validate site URL
+	if sc.SiteURL == "" {
+		return fmt.Errorf("site_url is required")
+	}
+
+	// Validate site URL format (supports both sc-domain: and https://)
+	if strings.HasPrefix(sc.SiteURL, "sc-domain:") {
+		domain := strings.TrimPrefix(sc.SiteURL, "sc-domain:")
+		if domain == "" {
+			return fmt.Errorf("domain property must include domain after 'sc-domain:': %s", sc.SiteURL)
+		}
+	} else {
+		// URL prefix property must end with /
+		if !strings.HasSuffix(sc.SiteURL, "/") {
+			return fmt.Errorf("URL prefix property must end with '/': %s", sc.SiteURL)
+		}
+		// Must be valid URL with http/https
+		if !strings.HasPrefix(sc.SiteURL, "http://") && !strings.HasPrefix(sc.SiteURL, "https://") {
+			return fmt.Errorf("URL prefix property must use http or https scheme: %s", sc.SiteURL)
+		}
+	}
+
+	// Validate URL inspection config
+	if sc.URLInspection != nil {
+		for i, url := range sc.URLInspection.PriorityURLs {
+			if url == "" {
+				return fmt.Errorf("url_inspection.priority_urls[%d] cannot be empty", i)
+			}
+			// Validate URL format
+			if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+				return fmt.Errorf("url_inspection.priority_urls[%d] must use http or https scheme: %s", i, url)
+			}
+		}
+
+		// Validate patterns (if any)
+		for i, pattern := range sc.URLInspection.Patterns {
+			if pattern.Pattern == "" {
+				return fmt.Errorf("url_inspection.patterns[%d].pattern is required", i)
+			}
 		}
 	}
 

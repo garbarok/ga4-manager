@@ -1,36 +1,62 @@
 package config
 
-// ProjectConfig represents a GA4 project configuration loaded from YAML
+// ProjectConfig represents a project configuration loaded from YAML
+// Supports GA4-only, GSC-only, or combined configurations
 type ProjectConfig struct {
 	// Basic project information
 	Project ProjectInfo `yaml:"project"`
 
-	// Google Analytics 4 configuration
-	GA4 GA4Config `yaml:"ga4"`
+	// Google Analytics 4 configuration (optional - for GA4-only or combined configs)
+	Analytics *AnalyticsConfig `yaml:"analytics,omitempty"`
 
-	// Conversion events to track
+	// Google Search Console configuration (optional - for GSC-only or combined configs)
+	SearchConsole *SearchConsoleConfig `yaml:"search_console,omitempty"`
+
+	// Legacy GA4 configuration (deprecated, use Analytics instead)
+	// Kept for backward compatibility with existing configs
+	GA4 GA4Config `yaml:"ga4,omitempty"`
+
+	// Conversion events to track (GA4)
 	Conversions []ConversionConfig `yaml:"conversions,omitempty"`
 
-	// Custom dimensions
+	// Custom dimensions (GA4)
 	Dimensions []DimensionConfig `yaml:"dimensions,omitempty"`
 
-	// Custom metrics
+	// Custom metrics (GA4)
 	Metrics []MetricConfig `yaml:"metrics,omitempty"`
 
-	// Calculated metrics
+	// Calculated metrics (GA4)
 	CalculatedMetrics []CalculatedMetricConfig `yaml:"calculated_metrics,omitempty"`
 
-	// Audiences (manual setup - API cannot create these)
+	// Audiences (GA4 - manual setup - API cannot create these)
 	Audiences []AudienceConfig `yaml:"audiences,omitempty"`
 
-	// Cleanup configuration
+	// Cleanup configuration (GA4)
 	Cleanup CleanupYAMLConfig `yaml:"cleanup,omitempty"`
 
-	// Data retention settings
+	// Data retention settings (GA4)
 	DataRetention *DataRetentionConfig `yaml:"data_retention,omitempty"`
 
-	// Enhanced measurement settings
+	// Enhanced measurement settings (GA4)
 	EnhancedMeasurement *EnhancedMeasurementConfig `yaml:"enhanced_measurement,omitempty"`
+}
+
+// HasAnalytics returns true if this config includes GA4 analytics setup
+func (pc *ProjectConfig) HasAnalytics() bool {
+	return pc.Analytics != nil || pc.GA4.PropertyID != ""
+}
+
+// HasSearchConsole returns true if this config includes GSC setup
+func (pc *ProjectConfig) HasSearchConsole() bool {
+	return pc.SearchConsole != nil
+}
+
+// GetPropertyID returns the GA4 property ID from either Analytics or legacy GA4 config
+func (pc *ProjectConfig) GetPropertyID() string {
+	if pc.Analytics != nil {
+		return pc.Analytics.PropertyID
+	}
+	return pc.GA4.PropertyID
 }
 
 // ProjectInfo contains basic project metadata
@@ -38,14 +64,102 @@ type ProjectInfo struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
 	Version     string `yaml:"version,omitempty"`
+	URL         string `yaml:"url,omitempty"` // Project URL for reference
 }
 
-// GA4Config contains GA4-specific identifiers
+// AnalyticsConfig contains Google Analytics 4 configuration
+type AnalyticsConfig struct {
+	PropertyID    string `yaml:"property_id"`
+	MeasurementID string `yaml:"measurement_id,omitempty"`
+	DataStreamID  string `yaml:"data_stream_id,omitempty"`
+	Tier          string `yaml:"tier,omitempty"` // "standard" (free) or "360" (paid)
+}
+
+// GA4Config contains GA4-specific identifiers (legacy, use AnalyticsConfig)
 type GA4Config struct {
 	PropertyID    string `yaml:"property_id"`
 	MeasurementID string `yaml:"measurement_id,omitempty"`
 	DataStreamID  string `yaml:"data_stream_id,omitempty"`
 	Tier          string `yaml:"tier,omitempty"` // "standard" (free) or "360" (paid)
+}
+
+// SearchConsoleConfig contains Google Search Console configuration
+type SearchConsoleConfig struct {
+	// Site URL (must match verified property in GSC)
+	SiteURL string `yaml:"site_url"`
+
+	// Sitemaps to manage
+	Sitemaps []SitemapConfig `yaml:"sitemaps,omitempty"`
+
+	// URL inspection configuration
+	URLInspection *URLInspectionConfig `yaml:"url_inspection,omitempty"`
+
+	// Search analytics configuration
+	SearchAnalytics *SearchAnalyticsConfig `yaml:"search_analytics,omitempty"`
+}
+
+// SitemapConfig defines a sitemap to submit to GSC
+type SitemapConfig struct {
+	URL         string `yaml:"url"`
+	AutoSubmit  bool   `yaml:"auto_submit,omitempty"`
+	Description string `yaml:"description,omitempty"`
+}
+
+// URLInspectionConfig defines URLs to monitor for indexing issues
+type URLInspectionConfig struct {
+	// Priority URLs to check regularly
+	PriorityURLs []string `yaml:"priority_urls,omitempty"`
+
+	// URL patterns to monitor (e.g., "/blog/*")
+	Patterns []URLPatternConfig `yaml:"patterns,omitempty"`
+
+	// Issues to alert on
+	Alerts []string `yaml:"alerts,omitempty"`
+}
+
+// URLPatternConfig defines a URL pattern to monitor
+type URLPatternConfig struct {
+	Pattern     string `yaml:"pattern"`
+	Description string `yaml:"description,omitempty"`
+}
+
+// SearchAnalyticsConfig defines search analytics reporting settings
+type SearchAnalyticsConfig struct {
+	// Date range for reports
+	DateRange *DateRangeConfig `yaml:"date_range,omitempty"`
+
+	// Dimensions to include in reports
+	Dimensions []string `yaml:"dimensions,omitempty"`
+
+	// Metrics to track
+	Metrics []string `yaml:"metrics,omitempty"`
+
+	// Filters for focused reporting
+	Filters []SearchFilterConfig `yaml:"filters,omitempty"`
+
+	// Alert thresholds
+	Alerts []SearchAlertConfig `yaml:"alerts,omitempty"`
+}
+
+// DateRangeConfig defines a date range for reports
+type DateRangeConfig struct {
+	Days int `yaml:"days"` // Last N days
+}
+
+// SearchFilterConfig defines a filter for search analytics
+type SearchFilterConfig struct {
+	Dimension   string   `yaml:"dimension"`
+	Operator    string   `yaml:"operator"`
+	Expression  string   `yaml:"expression,omitempty"`
+	Expressions []string `yaml:"expressions,omitempty"` // For "in" operator
+}
+
+// SearchAlertConfig defines an alert threshold for search metrics
+type SearchAlertConfig struct {
+	Metric    string  `yaml:"metric"`
+	Condition string  `yaml:"condition"`
+	Value     float64 `yaml:"value"`
+	Message   string  `yaml:"message"`
 }
 
 // ConversionConfig defines a conversion event
@@ -161,7 +275,7 @@ func (pc *ProjectConfig) ConvertToLegacyProject() Project {
 
 	return Project{
 		Name:        pc.Project.Name,
-		PropertyID:  pc.GA4.PropertyID,
+		PropertyID:  pc.GetPropertyID(), // Use helper to get from Analytics or GA4
 		Conversions: conversions,
 		Dimensions:  dimensions,
 		Metrics:     metrics,
