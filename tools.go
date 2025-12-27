@@ -8,11 +8,6 @@
 package main
 
 import (
-	// golangci-lint is a fast linter aggregator written in Go.
-	// Used for code quality checks across the project.
-	// See: https://golangci-lint.run
-	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
-
 	// govulncheck scans Go code for known vulnerabilities in dependencies.
 	// Essential for security auditing and compliance.
 	// See: https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
