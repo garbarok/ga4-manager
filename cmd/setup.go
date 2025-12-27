@@ -80,6 +80,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to create GA4 client: %w", err)
 			}
+			defer ga4Client.Close()
 		}
 
 		// Create GSC client if needed
@@ -88,6 +89,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to create GSC client: %w", err)
 			}
+			defer gscClient.Close()
 		}
 
 		// Create and execute orchestrator

@@ -202,19 +202,28 @@ func (so *SetupOrchestrator) SetupGA4() error {
 	fmt.Println("───────────────────────────────────────────────")
 
 	// Get existing resources to detect duplicates
-	existingConversions, _ := so.ga4Client.ListConversions(propertyID)
+	existingConversions, err := so.ga4Client.ListConversions(propertyID)
+	if err != nil {
+		so.logger.Warn("failed to list existing conversions", "error", err)
+	}
 	conversionMap := make(map[string]bool)
 	for _, conv := range existingConversions {
 		conversionMap[conv.EventName] = true
 	}
 
-	existingDimensions, _ := so.ga4Client.ListDimensions(propertyID)
+	existingDimensions, err := so.ga4Client.ListDimensions(propertyID)
+	if err != nil {
+		so.logger.Warn("failed to list existing dimensions", "error", err)
+	}
 	dimensionMap := make(map[string]bool)
 	for _, dim := range existingDimensions {
 		dimensionMap[dim.ParameterName] = true
 	}
 
-	existingMetrics, _ := so.ga4Client.ListCustomMetrics(propertyID)
+	existingMetrics, err := so.ga4Client.ListCustomMetrics(propertyID)
+	if err != nil {
+		so.logger.Warn("failed to list existing metrics", "error", err)
+	}
 	metricMap := make(map[string]bool)
 	for _, metric := range existingMetrics {
 		metricMap[metric.ParameterName] = true
