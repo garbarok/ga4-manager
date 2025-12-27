@@ -183,7 +183,7 @@ func (rm *RollbackManager) PromptForRollback() bool {
 	fmt.Printf("%s Do you want to rollback the changes? (y/N): ", blue("?"))
 
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"

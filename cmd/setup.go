@@ -89,7 +89,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to create GSC client: %w", err)
 			}
-			defer gscClient.Close()
+			defer func() {
+				if err := gscClient.Close(); err != nil {
+					logger.Warn("failed to close GSC client", slog.String("error", err.Error()))
+				}
+			}()
 		}
 
 		// Create and execute orchestrator

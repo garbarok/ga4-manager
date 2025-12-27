@@ -146,7 +146,7 @@ func WithConfig(cfg *config.ClientConfig) ClientOption {
 func WithCredentials(credentialsJSON string) ClientOption {
 	return func(c *Client) error {
 		service, err := searchconsole.NewService(c.ctx,
-			option.WithCredentialsJSON([]byte(credentialsJSON)),
+			option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(credentialsJSON)),
 			option.WithScopes(searchconsole.WebmastersScope))
 		if err != nil {
 			return fmt.Errorf("failed to create service with credentials: %w", err)

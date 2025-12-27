@@ -10,6 +10,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/gsc"
@@ -297,7 +299,7 @@ func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) {
 	// Build header based on dimensions
 	header := make([]string, 0, len(report.Metadata.Dimensions)+4)
 	for _, dim := range report.Metadata.Dimensions {
-		header = append(header, strings.Title(dim))
+		header = append(header, cases.Title(language.English).String(dim))
 	}
 	header = append(header, "Clicks", "Impressions", "CTR", "Position")
 	table.SetHeader(header)
@@ -356,7 +358,7 @@ func displayAnalyticsCSV(report *gsc.SearchAnalyticsReport) {
 	// Write header
 	header := make([]string, 0, len(report.Metadata.Dimensions)+4)
 	for _, dim := range report.Metadata.Dimensions {
-		header = append(header, strings.Title(dim))
+		header = append(header, cases.Title(language.English).String(dim))
 	}
 	header = append(header, "Clicks", "Impressions", "CTR", "Position")
 	_ = writer.Write(header)
@@ -412,7 +414,7 @@ func displayAnalyticsMarkdown(report *gsc.SearchAnalyticsReport) {
 	headerRow := "|"
 	separatorRow := "|"
 	for _, dim := range report.Metadata.Dimensions {
-		headerRow += fmt.Sprintf(" %s |", strings.Title(dim))
+		headerRow += fmt.Sprintf(" %s |", cases.Title(language.English).String(dim))
 		separatorRow += " --- |"
 	}
 	headerRow += " Clicks | Impressions | CTR | Position |"
