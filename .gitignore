@@ -68,3 +68,4 @@ Thumbs.db
 # Private documentation and planning (local only)
 thoughts/
 docs/internal/
+!tools
