@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ga4SetupInputSchema, buildSetupArgs, parseSetupOutput, GA4SetupInput } from './ga4-setup';
+import { ga4SetupInputSchema, buildSetupArgs, parseSetupOutput, GA4SetupInput } from './ga4-setup.js';
 
 describe('ga4_setup tool', () => {
   describe('input schema validation', () => {

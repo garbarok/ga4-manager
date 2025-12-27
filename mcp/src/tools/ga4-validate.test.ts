@@ -4,7 +4,7 @@ import {
   buildValidateArgs,
   parseValidateOutput,
   GA4ValidateInput,
-} from './ga4-validate';
+} from './ga4-validate.js';
 
 describe('ga4_validate tool', () => {
   describe('input schema validation', () => {

@@ -1,4 +1,4 @@
-import type { CLIResult, CLIError } from '../types/cli';
+import type { CLIResult, CLIError } from '../types/cli.js';
 
 /**
  * Map CLI execution result to structured error object

@@ -4,7 +4,7 @@ import {
   buildInspectUrlArgs,
   parseInspectUrlOutput,
   GscInspectUrlInput,
-} from './gsc-inspect';
+} from './gsc-inspect.js';
 
 describe('gsc_inspect_url tool', () => {
   describe('input schema validation', () => {

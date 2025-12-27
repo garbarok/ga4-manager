@@ -4,7 +4,7 @@ import {
   buildReportArgs,
   parseReportOutput,
   GA4ReportInput,
-} from './ga4-report';
+} from './ga4-report.js';
 
 describe('ga4_report tool', () => {
   describe('input schema validation', () => {

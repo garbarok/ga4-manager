@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ga4CleanupInputSchema, buildCleanupArgs, parseCleanupOutput, GA4CleanupInput } from './ga4-cleanup';
+import { ga4CleanupInputSchema, buildCleanupArgs, parseCleanupOutput, GA4CleanupInput } from './ga4-cleanup.js';
 
 describe('ga4_cleanup tool', () => {
   describe('input schema validation', () => {

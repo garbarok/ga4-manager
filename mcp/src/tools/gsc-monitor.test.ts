@@ -4,7 +4,7 @@ import {
   buildMonitorUrlsArgs,
   parseMonitorUrlsOutput,
   GscMonitorUrlsInput,
-} from './gsc-monitor';
+} from './gsc-monitor.js';
 
 describe('gsc_monitor_urls tool', () => {
   describe('input schema validation', () => {

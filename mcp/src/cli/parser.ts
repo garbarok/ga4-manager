@@ -1,5 +1,5 @@
 import { parse as parseCSV } from 'csv-parse/sync';
-import type { ParsedOutput } from '../types/cli';
+import type { ParsedOutput } from '../types/cli.js';
 
 /**
  * Parses CLI output into structured data

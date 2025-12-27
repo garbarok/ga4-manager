@@ -4,7 +4,7 @@ import {
   buildLinkArgs,
   parseLinkOutput,
   GA4LinkInput,
-} from './ga4-link';
+} from './ga4-link.js';
 
 describe('ga4_link tool', () => {
   describe('input schema validation', () => {

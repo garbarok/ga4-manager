@@ -416,9 +416,7 @@ export const ga4ValidateTool = {
         description: 'Show detailed validation results including config summary'
       },
     },
-    oneOf: [
-      { required: ['config_file'] },
-      { required: ['all'] },
-    ],
+    // Note: Zod schema handles mutual exclusivity validation
+    // MCP doesn't support oneOf at top level
   },
 };

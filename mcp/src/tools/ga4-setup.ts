@@ -328,10 +328,7 @@ export const ga4SetupTool = {
         description: 'Preview changes without applying'
       },
     },
-    oneOf: [
-      { required: ['config_path'] },
-      { required: ['project_name'] },
-      { required: ['all'] },
-    ],
+    // Note: Zod schema handles mutual exclusivity validation
+    // MCP doesn't support oneOf at top level
   },
 };

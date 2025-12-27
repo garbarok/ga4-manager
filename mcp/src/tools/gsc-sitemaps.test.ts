@@ -16,7 +16,7 @@ import {
   GscSitemapsSubmitInput,
   GscSitemapsDeleteInput,
   GscSitemapsGetInput,
-} from './gsc-sitemaps';
+} from './gsc-sitemaps.js';
 
 describe('gsc_sitemaps_list tool', () => {
   describe('input schema validation', () => {

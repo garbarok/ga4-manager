@@ -8,7 +8,7 @@ import {
   VALID_DIMENSIONS,
   VALID_FORMATS,
   GscAnalyticsRunInput,
-} from './gsc-analytics';
+} from './gsc-analytics.js';
 
 // ============================================================================
 // Input Schema Validation Tests
@@ -675,7 +675,7 @@ describe('gscAnalyticsRunTool definition', () => {
     expect(gscAnalyticsRunTool.inputSchema.type).toBe('object');
     expect(gscAnalyticsRunTool.inputSchema.properties.site).toBeDefined();
     expect(gscAnalyticsRunTool.inputSchema.properties.config).toBeDefined();
-    expect(gscAnalyticsRunTool.inputSchema.oneOf).toBeDefined();
+    // Note: oneOf removed - Zod schema handles validation
   });
 
   it('defines all optional parameters', () => {

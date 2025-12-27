@@ -486,10 +486,7 @@ export const ga4ReportTool = {
         description: 'Report on all available configs'
       },
     },
-    oneOf: [
-      { required: ['config_path'] },
-      { required: ['project_name'] },
-      { required: ['all'] },
-    ],
+    // Note: Zod schema handles mutual exclusivity validation
+    // MCP doesn't support oneOf at top level
   },
 };

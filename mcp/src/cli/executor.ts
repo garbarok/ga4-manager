@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
-import type { CLIResult, CLIExecuteParams } from '../types/cli';
-import { stripANSI } from '../utils/ansi-strip';
+import type { CLIResult, CLIExecuteParams } from '../types/cli.js';
+import { stripANSI } from '../utils/ansi-strip.js';
 
 /**
  * Executes CLI commands and captures output

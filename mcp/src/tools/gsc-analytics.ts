@@ -551,10 +551,8 @@ export const gscAnalyticsRunTool = {
         default: false,
       },
     },
-    oneOf: [
-      { required: ['site'] },
-      { required: ['config'] },
-    ],
+    // Note: Zod schema handles mutual exclusivity validation
+    // MCP doesn't support oneOf at top level
   },
 };
 
