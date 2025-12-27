@@ -1,0 +1,94 @@
+# E-commerce Analytics Configuration
+# Complete setup for online stores and product sites
+
+project:
+  name: "Online Store"
+  property_id: "YOUR_PROPERTY_ID"
+  timezone: "America/New_York"
+
+ga4:
+  # E-commerce conversion funnel
+  conversions:
+    - name: "purchase"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "add_to_cart"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "begin_checkout"
+      counting_method: "ONCE_PER_SESSION"
+
+    - name: "add_payment_info"
+      counting_method: "ONCE_PER_SESSION"
+
+    - name: "add_shipping_info"
+      counting_method: "ONCE_PER_SESSION"
+
+    - name: "view_item"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "search"
+      counting_method: "ONCE_PER_EVENT"
+
+  # Product and customer dimensions
+  dimensions:
+    - parameter: "product_category"
+      display_name: "Product Category"
+      scope: "EVENT"
+
+    - parameter: "product_brand"
+      display_name: "Product Brand"
+      scope: "EVENT"
+
+    - parameter: "payment_method"
+      display_name: "Payment Method"
+      scope: "EVENT"
+
+    - parameter: "shipping_method"
+      display_name: "Shipping Method"
+      scope: "EVENT"
+
+    - parameter: "customer_type"
+      display_name: "Customer Type"
+      scope: "USER"
+
+    - parameter: "discount_code_used"
+      display_name: "Discount Code Used"
+      scope: "EVENT"
+
+  # E-commerce metrics
+  metrics:
+    - parameter: "cart_value"
+      display_name: "Cart Value"
+      scope: "EVENT"
+      unit: "CURRENCY"
+
+    - parameter: "shipping_cost"
+      display_name: "Shipping Cost"
+      scope: "EVENT"
+      unit: "CURRENCY"
+
+    - parameter: "checkout_time"
+      display_name: "Checkout Time"
+      scope: "EVENT"
+      unit: "SECONDS"
+
+    - parameter: "product_views"
+      display_name: "Product Views"
+      scope: "EVENT"
+      unit: "STANDARD"
+
+# Google Search Console for product pages
+gsc:
+  sites:
+    - url: "https://store.example.com"
+      sitemaps:
+        - "https://store.example.com/sitemap-products.xml"
+        - "https://store.example.com/sitemap-categories.xml"
+        - "https://store.example.com/sitemap-pages.xml"
+
+  # Monitor key product and category pages
+  monitor_urls:
+    - "https://store.example.com/"
+    - "https://store.example.com/products/"
+    - "https://store.example.com/categories/"

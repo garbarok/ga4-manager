@@ -6,7 +6,6 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { CLIExecutor } from './cli/executor.js'
-import { OutputParser } from './cli/parser.js'
 import { mapCLIError } from './utils/errors.js'
 
 // Import GA4 tools
@@ -37,9 +36,8 @@ import { gscMonitorUrlsTool } from './tools/gsc-monitor.js'
 // Get binary path from environment or use default
 const binaryPath = process.env.GA4_BINARY_PATH || '../ga4'
 
-// Initialize CLI executor and parser
+// Initialize CLI executor
 const executor = new CLIExecutor(binaryPath)
-const parser = new OutputParser()
 
 // Create MCP server
 const server = new Server(
