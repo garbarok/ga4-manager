@@ -188,7 +188,11 @@ func (pt *ProgressTracker) Finish() {
 func (pt *ProgressTracker) Duration() time.Duration {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
+	return pt.durationUnlocked()
+}
 
+// durationUnlocked calculates duration without acquiring the lock (internal use)
+func (pt *ProgressTracker) durationUnlocked() time.Duration {
 	if pt.endTime.IsZero() {
 		return time.Since(pt.startTime)
 	}
@@ -336,8 +340,8 @@ func (pt *ProgressTracker) GenerateSummary() string {
 		sb.WriteString(fmt.Sprintf("  %s %d steps failed\n", red("✗"), failed))
 	}
 
-	// Duration
-	duration := pt.Duration()
+	// Duration (use unlocked version since we already hold the lock)
+	duration := pt.durationUnlocked()
 	sb.WriteString(fmt.Sprintf("  Duration: %.1f seconds\n", duration.Seconds()))
 
 	return sb.String()
