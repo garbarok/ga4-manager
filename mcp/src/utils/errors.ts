@@ -17,11 +17,17 @@ export function mapCLIError(result: CLIResult, toolName: string): CLIError {
   if (
     stderr.includes('google_application_credentials') ||
     stderr.includes('authentication failed') ||
+    stderr.includes('authentication required') ||
     stderr.includes('invalid credentials') ||
     stderr.includes('credentials not found') ||
     stderr.includes('unauthorized') ||
     stderr.includes('unauthenticated') ||
+    stderr.includes('not authenticated') ||
     stderr.includes('token expired') ||
+    stderr.includes('access token') ||
+    stderr.includes('oauth') ||
+    stderr.includes('service account') ||
+    stderr.includes('login required') ||
     stderr.includes('401') ||
     stderr.includes('403 forbidden')
   ) {

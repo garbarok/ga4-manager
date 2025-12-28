@@ -371,7 +371,7 @@ npm run lint         # ESLint check
 
 ## Architecture
 
-```
+```text
 mcp/
 ├── src/
 │   ├── index.ts              # MCP server entry point

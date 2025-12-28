@@ -38,9 +38,7 @@ describe('ga4_report tool', () => {
       const input = { config_path: 'test.yaml' };
       const result = ga4ReportInputSchema.safeParse(input);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual({ config_path: 'test.yaml' });
-      }
+      expect(result.data).toEqual({ config_path: 'test.yaml' });
     });
   });
 

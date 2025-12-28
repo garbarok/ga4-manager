@@ -138,7 +138,8 @@ func (c *Client) ListDimensions(propertyID string) ([]*admin.GoogleAnalyticsAdmi
 }
 
 // findDimensionByParameterName searches for dimension by parameter name.
-func (c *Client) findDimensionByParameterName(propertyID, parameterName string) (*admin.GoogleAnalyticsAdminV1alphaCustomDimension, bool) {
+// Returns (dimension, nil) if found, (nil, nil) if not found, (nil, err) on API failure.
+func (c *Client) findDimensionByParameterName(propertyID, parameterName string) (*admin.GoogleAnalyticsAdminV1alphaCustomDimension, error) {
 	dimensions, err := c.ListDimensions(propertyID)
 	if err != nil {
 		c.logger.Error("list failed",
@@ -146,16 +147,16 @@ func (c *Client) findDimensionByParameterName(propertyID, parameterName string) 
 			slog.String("parameter_name", parameterName),
 			slog.String("error", err.Error()),
 		)
-		return nil, false
+		return nil, fmt.Errorf("failed to list dimensions: %w", err)
 	}
 
 	for _, dim := range dimensions {
 		if dim.ParameterName == parameterName {
-			return dim, true
+			return dim, nil
 		}
 	}
 
-	return nil, false
+	return nil, nil
 }
 
 func (c *Client) DeleteDimension(propertyID, parameterName string) error {
@@ -181,8 +182,11 @@ func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 		slog.String("parameter_name", parameterName),
 	)
 
-	dim, found := c.findDimensionByParameterName(propertyID, parameterName)
-	if !found {
+	dim, err := c.findDimensionByParameterName(propertyID, parameterName)
+	if err != nil {
+		return fmt.Errorf("failed to find dimension '%s': %w", parameterName, err)
+	}
+	if dim == nil {
 		c.logger.Warn("dimension not found",
 			slog.String("parameter_name", parameterName),
 			slog.String("property_id", propertyID),
@@ -194,7 +198,7 @@ func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 		return err
 	}
 
-	_, err := c.admin.Properties.CustomDimensions.Archive(dim.Name, &admin.GoogleAnalyticsAdminV1alphaArchiveCustomDimensionRequest{}).Context(c.ctx).Do()
+	_, err = c.admin.Properties.CustomDimensions.Archive(dim.Name, &admin.GoogleAnalyticsAdminV1alphaArchiveCustomDimensionRequest{}).Context(c.ctx).Do()
 	if err != nil {
 		c.logger.Error("failed to archive dimension",
 			slog.String("parameter_name", parameterName),

@@ -148,7 +148,7 @@ claude mcp remove ga4-manager
 Use the [MCP Extension](https://marketplace.visualstudio.com/items?itemName=modelcontextprotocol.mcp-vscode)
 
 1. **Install MCP extension**:
-   ```
+   ```bash
    code --install-extension modelcontextprotocol.mcp-vscode
    ```
 
@@ -484,7 +484,7 @@ gsc:
 Manage multiple GA4 properties with separate configs:
 
 **Directory structure:**
-```
+```text
 configs/
 ├── prod-site.yaml          # Production property
 ├── dev-site.yaml           # Development property

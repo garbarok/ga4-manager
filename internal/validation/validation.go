@@ -153,16 +153,17 @@ func ValidateMeasurementUnit(unit string) error {
 	unit = normalizeInput(unit)
 
 	validUnits := map[string]bool{
-		"STANDARD":     true,
-		"CURRENCY":     true,
-		"FEET":         true,
-		"METERS":       true,
-		"KILOMETERS":   true,
-		"MILES":        true,
-		"MILLISECONDS": true,
-		"SECONDS":      true,
-		"MINUTES":      true,
-		"HOURS":        true,
+		"MEASUREMENT_UNIT_UNSPECIFIED": true,
+		"STANDARD":                     true,
+		"CURRENCY":                     true,
+		"FEET":                         true,
+		"METERS":                       true,
+		"KILOMETERS":                   true,
+		"MILES":                        true,
+		"MILLISECONDS":                 true,
+		"SECONDS":                      true,
+		"MINUTES":                      true,
+		"HOURS":                        true,
 	}
 
 	if !validUnits[unit] {

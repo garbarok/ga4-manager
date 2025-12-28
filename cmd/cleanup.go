@@ -53,7 +53,7 @@ func init() {
 	cleanupCmd.Flags().BoolVarP(&cleanupAllProjects, "all", "a", false, "Cleanup all projects")
 	cleanupCmd.Flags().StringVarP(&cleanupConfigPath, "config", "c", "", "Path to configuration file")
 	cleanupCmd.Flags().BoolVar(&cleanupDryRun, "dry-run", false, "Preview changes without applying them")
-	cleanupCmd.Flags().StringVarP(&cleanupType, "type", "t", "all", "What to cleanup: conversions, dimensions, all")
+	cleanupCmd.Flags().StringVarP(&cleanupType, "type", "t", "all", "What to cleanup: conversions, dimensions, metrics, all")
 	cleanupCmd.Flags().BoolVarP(&cleanupYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
