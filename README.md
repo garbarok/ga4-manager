@@ -1,8 +1,8 @@
 # GA4 Manager
 
-> Production-ready CLI for managing Google Analytics 4 properties
+> **Automate Google Analytics 4 configuration at scale**
 
-A comprehensive command-line tool for automating GA4 configuration, including conversion events, custom dimensions, custom metrics, and external service integrations.
+A production-ready CLI tool for managing GA4 properties and Google Search Console integration. Configure conversion events, custom dimensions, metrics, sitemaps, and search analytics from simple YAML files.
 
 [![Test Status](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml)
 [![Security](https://github.com/garbarok/ga4-manager/actions/workflows/security.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/security.yml)
@@ -12,81 +12,31 @@ A comprehensive command-line tool for automating GA4 configuration, including co
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 
-## Features
+---
 
-### Core Capabilities
-- **🎯 Conversion Events** - Automate creation and management of GA4 conversion events
-- **📊 Custom Dimensions** - Define and deploy custom dimensions with proper scoping (USER/EVENT)
-- **📈 Custom Metrics** - Create custom metrics with measurement units (CURRENCY, SECONDS, STANDARD, etc.)
-- **🧹 Cleanup Management** - Remove unused events, dimensions, and metrics to free up quota
-- **🔗 External Integrations** - Setup guides for Search Console, BigQuery, and Channel Groups
-- **✅ Validation** - Validate YAML configuration files before deployment
+## Why GA4 Manager?
 
-### Google Search Console Integration (Phase 4)
-- **🗺️ Sitemap Management** - Automated sitemap submission and verification
-- **🔍 URL Inspection** - Inspect URLs for indexing status and issues
-- **📊 Search Analytics** - Query search performance data (impressions, clicks, CTR, position)
-- **⚡ Unified Setup** - Single command configures both GA4 and GSC from one YAML file
+Managing GA4 properties through the web UI is time-consuming and error-prone. GA4 Manager solves this by:
 
-### Production-Ready Features
-- **🛡️ Pre-flight Validation** - Comprehensive checks before any API calls
-  - Credential validation
-  - Property access verification
-  - Resource conflict detection
-  - Quota availability checking
-- **📈 Progress Tracking** - Real-time status with color-coded indicators
-- **🔄 Rollback Mechanism** - Automatic rollback on setup failures
-- **🏭 Enterprise Features**:
-  - Rate limiting (10 RPS, configurable)
-  - Structured logging (JSON/text with slog)
-  - Input validation (GA4 naming rules, reserved prefixes)
-  - Dry-run mode (preview changes without applying)
-  - Configuration profiles (dev/prod/default)
-  - Multi-project support
+- **Automating configuration** - Define your analytics setup in YAML, apply it with one command
+- **Ensuring consistency** - Same configuration across dev/staging/production environments
+- **Saving time** - Bulk operations instead of clicking through the UI for each item
+- **Version control** - Track analytics changes in git alongside your application code
+- **Unified workflow** - Configure both GA4 and Google Search Console from a single file
 
-## MCP Server Integration
+**Perfect for:**
+- Development teams managing multiple GA4 properties
+- Agencies handling analytics for many clients
+- DevOps/CI pipelines requiring automated analytics setup
+- Anyone tired of manual GA4 configuration
 
-GA4 Manager includes a **Model Context Protocol (MCP) server** that exposes all CLI commands as structured tools for AI assistants and development environments.
+---
 
-### Supported Clients
-- **Claude Desktop** - Native integration with Claude
-- **Claude CLI** - Command-line Claude interface
-- **VS Code** - Via MCP extension
-- **Cursor** - AI-powered code editor
-- **Cline** - VS Code extension
+## Quick Start
 
-### Features
-- ✅ **12 MCP Tools** - Complete CLI coverage (5 GA4 + 7 GSC tools)
-- ✅ **Structured JSON** - Machine-readable responses for agents
-- ✅ **593 Passing Tests** - Production-ready reliability
-- ✅ **Smart Parsing** - Automatic format detection (JSON, tables, CSV, markdown)
-- ✅ **Dry-Run Support** - Safe previews before applying changes
-- ✅ **Quota Tracking** - Monitor GSC API usage
+Get up and running in 5 minutes:
 
-### Quick Setup (Claude CLI)
-
-```bash
-claude mcp add \
-  --name ga4-manager \
-  --transport stdio \
-  --command "node" \
-  --args "/absolute/path/to/ga4-manager/mcp/dist/index.js" \
-  --env "GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json" \
-  --env "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" \
-  --env "GA4_BINARY_PATH=/absolute/path/to/ga4-manager/ga4" \
-  --env "GA4_DEFAULT_PROPERTY_ID=123456789"
-```
-
-### Documentation
-- **[MCP Server README](mcp/README.md)** - Complete tool documentation
-- **[Configuration Guide](mcp/CONFIGURATION.md)** - Multi-client setup
-- **[Example Configs](mcp/examples/)** - Ready-to-use templates
-
-## Installation
-
-### Download Pre-built Binary
-
-Download the latest release for your platform:
+### 1. Install
 
 ```bash
 # macOS (Apple Silicon)
@@ -102,7 +52,132 @@ curl -L https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-lin
 sudo mv ga4-linux-amd64 /usr/local/bin/ga4
 ```
 
+### 2. Configure Google Cloud Credentials
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+```
+
+See [INSTALL.md](INSTALL.md) for detailed credential setup instructions.
+
+### 3. Create a Configuration File
+
+```bash
+# Start with an example template
+cp configs/examples/basic-ecommerce.yaml configs/example-site.yaml
+
+# Edit with your GA4 property ID and site URL
+vim configs/example-site.yaml
+```
+
+**Minimal configuration:**
+
+```yaml
+project:
+  name: Example Site
+  version: 1.0.0
+
+ga4:
+  property_id: "123456789"
+  tier: standard
+
+conversions:
+  - name: purchase
+    counting_method: ONCE_PER_EVENT
+    description: User completed purchase
+
+search_console:
+  site_url: "https://example.com"
+
+sitemaps:
+  - url: "https://example.com/sitemap.xml"
+```
+
+### 4. Validate and Apply
+
+```bash
+# Validate configuration
+ga4 validate configs/example-site.yaml
+
+# Preview changes (dry run)
+ga4 setup --config configs/example-site.yaml --dry-run
+
+# Apply configuration
+ga4 setup --config configs/example-site.yaml
+```
+
+**Output:**
+
+```
+🚀 GA4 Manager - Unified Setup
+═══════════════════════════════════════════════
+
+✓ Pre-flight validation passed
+
+[1/2] ✓ Google Analytics 4 Setup
+  ✓ purchase (conversion created)
+
+[2/2] ✓ Google Search Console Setup
+  ✓ Submitted sitemap: https://example.com/sitemap.xml
+
+Setup Summary:
+  ✓ 2 steps completed
+  Duration: 4.2 seconds
+```
+
+---
+
+## Features
+
+### Google Analytics 4
+
+- **🎯 Conversion Events** - Create and manage GA4 conversion events
+- **📊 Custom Dimensions** - Define custom dimensions with proper scoping (USER/EVENT)
+- **📈 Custom Metrics** - Create metrics with units (CURRENCY, SECONDS, STANDARD, etc.)
+- **🧹 Cleanup** - Remove unused events, dimensions, and metrics to free up quota
+- **✅ Validation** - Validate YAML files before deployment
+- **🔗 External Links** - Setup guides for Search Console, BigQuery, and Channel Groups
+
+### Google Search Console
+
+- **🗺️ Sitemap Management** - Submit and verify sitemaps automatically
+- **🔍 URL Inspection** - Check indexing status, mobile usability, and rich results
+- **📊 Search Analytics** - Query performance data (impressions, clicks, CTR, position)
+- **📋 Index Coverage** - Monitor indexed vs. excluded pages
+- **⚡ Batch Monitoring** - Track multiple priority URLs at once
+
+### Production-Ready
+
+- **🛡️ Pre-flight Validation** - Verify credentials, permissions, and quota before making changes
+- **🔄 Rollback** - Automatic cleanup if setup fails
+- **📈 Progress Tracking** - Real-time status with color-coded indicators
+- **🏭 Enterprise Features**
+  - Rate limiting (10 RPS, configurable)
+  - Structured logging (JSON/text with slog)
+  - Input validation (GA4 naming rules, reserved prefixes)
+  - Dry-run mode (preview without applying)
+  - Multi-project support
+
+---
+
+## Installation
+
+### Pre-built Binaries (Recommended)
+
+Download for your platform:
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| macOS | Apple Silicon (M1/M2/M3) | [ga4-darwin-arm64.tar.gz](https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-darwin-arm64.tar.gz) |
+| macOS | Intel | [ga4-darwin-amd64.tar.gz](https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-darwin-amd64.tar.gz) |
+| Linux | x86_64 | [ga4-linux-amd64.tar.gz](https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-linux-amd64.tar.gz) |
+| Linux | ARM64 | [ga4-linux-arm64.tar.gz](https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-linux-arm64.tar.gz) |
+| Windows | x86_64 | [ga4-windows-amd64.zip](https://github.com/garbarok/ga4-manager/releases/latest/download/ga4-windows-amd64.zip) |
+
 ### Build from Source
+
+Requires Go 1.25+:
 
 ```bash
 git clone https://github.com/garbarok/ga4-manager.git
@@ -111,192 +186,111 @@ make build
 sudo make install
 ```
 
-For detailed installation instructions, see [INSTALL.md](INSTALL.md).
-
-## Quick Start
-
-### 1. Setup Google Cloud Credentials
+### Verify Installation
 
 ```bash
-# Set environment variables
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
-export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+ga4 --version
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed credential setup.
+For detailed setup including Google Cloud credentials, see [INSTALL.md](INSTALL.md).
 
-### 2. Create Configuration File
+---
 
-```bash
-# Copy an example template
-cp configs/examples/basic-ecommerce.yaml configs/my-store.yaml
+## Usage
 
-# Edit with your GA4 property ID
-vim configs/my-store.yaml
-```
+### Unified Setup (GA4 + Search Console)
 
-### 3. Validate Configuration
+Configure both GA4 and GSC with a single command:
 
 ```bash
-ga4 validate configs/my-store.yaml
-```
+# Setup from configuration file
+ga4 setup --config configs/example-site.yaml
 
-### 4. Preview Changes (Dry Run)
+# Preview changes first
+ga4 setup --config configs/example-site.yaml --dry-run
 
-```bash
-ga4 setup --config configs/my-store.yaml --dry-run
-```
-
-### 5. Apply Configuration
-
-```bash
-ga4 setup --config configs/my-store.yaml
-```
-
-## Unified Setup Workflow (Phase 4)
-
-GA4 Manager now provides a single command to configure both Google Analytics 4 and Google Search Console:
-
-```bash
-# Single command for complete site instrumentation
-ga4 setup --config configs/mysite.yaml
+# Setup multiple projects
+ga4 setup --all
 ```
 
 **What happens during setup:**
 
-1. **Pre-flight Validation** ✅
-   - Verifies credentials and permissions
-   - Validates configuration schema
-   - Checks resource availability
-   - Detects conflicts with existing resources
+1. ✅ **Pre-flight validation** - Verifies credentials, permissions, and detects conflicts
+2. 📊 **GA4 setup** - Creates conversions, dimensions, and metrics (skips duplicates)
+3. 🔍 **Search Console setup** - Submits sitemaps and configures monitoring
+4. 📈 **Progress tracking** - Real-time status with duration
+5. 🔄 **Rollback on error** - Automatic cleanup if anything fails
 
-2. **GA4 Setup** (if configured)
-   - Creates conversion events
-   - Creates custom dimensions
-   - Creates custom metrics
-   - Skips duplicates automatically
-
-3. **Google Search Console Setup** (if configured)
-   - Submits sitemaps for indexing
-   - Configures URL monitoring
-   - Enables search analytics
-
-4. **Progress Tracking**
-   - Real-time status updates
-   - Color-coded indicators
-   - Duration tracking
-
-5. **Rollback on Error**
-   - Automatic cleanup if setup fails
-   - User confirmation prompt
-   - Clean state guaranteed
-
-**Example Output:**
-```
-🚀 GA4 Manager - Unified Setup
-═══════════════════════════════════════════════
-
-✓ Pre-flight validation passed
-
-[1/2] ◐ Google Analytics 4 Setup
-  Creating conversions... (5/5 created)
-  ✓ page_view
-  ✓ contact_submit
-  ○ newsletter_signup (already exists, skipping)
-
-[2/2] ✓ Google Search Console Setup
-  ✓ Submitted sitemap: https://mysite.com/sitemap.xml
-
-Setup Summary:
-  ✓ 2 steps completed
-  Duration: 8.2 seconds
-
-Next Steps:
-  1. Verify in GA4: https://analytics.google.com
-  2. Check Search Console: https://search.google.com/search-console
-```
-
-## Usage
-
-### Setup Commands
+### View Current Configuration
 
 ```bash
-# Setup from configuration file
-ga4 setup --config configs/my-blog.yaml
+# Show GA4 configuration for a project
+ga4 report --config configs/example-site.yaml
 
-# Preview setup without making changes
-ga4 setup --config configs/my-blog.yaml --dry-run
-
-# Setup all available configs
-ga4 setup --all
-```
-
-### Report Commands
-
-```bash
-# View current GA4 configuration
-ga4 report --config configs/my-store.yaml
-
-# Report on all configured projects
+# Report on all projects
 ga4 report --all
 ```
 
-### Cleanup Commands
+### Cleanup Unused Resources
 
 ```bash
-# Preview cleanup (dry-run)
-ga4 cleanup --config configs/my-blog.yaml --dry-run
+# Preview cleanup (safe)
+ga4 cleanup --config configs/example-site.yaml --dry-run
 
-# Remove unused conversions only
-ga4 cleanup --config configs/my-blog.yaml --type conversions
+# Remove unused conversions
+ga4 cleanup --config configs/example-site.yaml --type conversions
 
-# Remove unused dimensions only
-ga4 cleanup --config configs/my-blog.yaml --type dimensions
+# Remove unused dimensions
+ga4 cleanup --config configs/example-site.yaml --type dimensions
 
-# Remove unused metrics only
-ga4 cleanup --config configs/my-blog.yaml --type metrics
+# Remove unused metrics
+ga4 cleanup --config configs/example-site.yaml --type metrics
 
-# Remove everything (conversions, dimensions, and metrics)
-ga4 cleanup --config configs/my-blog.yaml --type all
+# Remove everything
+ga4 cleanup --config configs/example-site.yaml --type all
 ```
 
-### Link Commands
+**Important:** Archived dimensions/metrics reserve their parameter names permanently (GA4 limitation). Consider using new names (e.g., `user_type_v2`) for future use.
+
+### External Service Links
 
 ```bash
-# List existing external service links
-ga4 link --project my-store --list
+# List existing links
+ga4 link --project example-site --list
 
-# Generate Search Console setup guide
-ga4 link --project my-store --service search-console
+# Setup Search Console integration
+ga4 link --project example-site --service search-console
 
-# Setup custom channel groups
-ga4 link --project my-store --service channels
+# Configure custom channel groups
+ga4 link --project example-site --service channels
 ```
 
-### Validation
+### Validate Configuration
 
 ```bash
-# Validate a specific config file
-ga4 validate configs/my-project.yaml
+# Validate a specific file
+ga4 validate configs/example-site.yaml
 
-# Validate all example configs
+# Validate all configs
 ga4 validate --all
 ```
 
+---
+
 ## Configuration
 
-GA4 Manager uses YAML configuration files to define your analytics setup. Example templates are provided in `configs/examples/`:
+GA4 Manager uses YAML files to define your analytics setup. Templates are provided in `configs/examples/`:
 
-- **basic-ecommerce.yaml** - E-commerce store template
-- **content-site.yaml** - Blog/content site template
 - **template.yaml** - Minimal starter template
+- **basic-ecommerce.yaml** - E-commerce store configuration
+- **content-site.yaml** - Blog/content site configuration
 
 ### Configuration Structure
 
 ```yaml
 project:
-  name: My Project
-  description: Project description
+  name: Example Site
+  description: Production analytics configuration
   version: 1.0.0
 
 # Google Analytics 4 Configuration (optional)
@@ -309,73 +303,153 @@ conversions:
     counting_method: ONCE_PER_EVENT
     description: User completed purchase
 
+  - name: signup
+    counting_method: ONCE_PER_SESSION
+    description: User created account
+
 dimensions:
-  - parameter: user_type
-    display_name: User Type
-    description: Customer classification
+  - parameter: user_tier
+    display_name: User Tier
+    description: User subscription level
     scope: USER
+
+  - parameter: product_category
+    display_name: Product Category
+    description: Category of purchased product
+    scope: EVENT
 
 metrics:
   - parameter: cart_value
     display_name: Cart Value
-    description: Cart total value
+    description: Total cart value in USD
     unit: CURRENCY
+    scope: EVENT
+
+  - parameter: session_duration_custom
+    display_name: Session Duration
+    description: Custom session duration tracking
+    unit: SECONDS
     scope: EVENT
 
 # Google Search Console Configuration (optional)
 search_console:
-  site_url: "https://example.com"  # Your verified site URL
+  site_url: "https://example.com"
 
 sitemaps:
   - url: "https://example.com/sitemap.xml"
     priority: true
 
+  - url: "https://example.com/news-sitemap.xml"
+
 monitoring:
   priority_urls:
     - url: "https://example.com/"
       label: "Homepage"
+
     - url: "https://example.com/products/"
-      label: "Products Page"
+      label: "Products Landing Page"
 ```
 
-**Flexible Configuration Options:**
-- **GA4-only**: Omit `search_console` section for analytics-only setup
-- **GSC-only**: Omit `ga4` section for search visibility monitoring
-- **Combined**: Include both sections for complete site instrumentation
+**Flexible Configuration:**
+- **GA4-only** - Omit `search_console` section for analytics-only
+- **GSC-only** - Omit `ga4` section for search visibility monitoring
+- **Combined** - Include both for complete instrumentation
 
-See [configs/examples/README.md](configs/examples/README.md) for complete documentation.
+See [configs/examples/README.md](configs/examples/README.md) for complete documentation and all available options.
 
-## Production Features
+---
 
-### Rate Limiting
-Protects against API quota exhaustion with configurable requests per second (default: 10 RPS).
+## MCP Server Integration
 
-### Structured Logging
-Production-grade logging with `log/slog` supporting JSON and text formats.
+GA4 Manager includes a **Model Context Protocol (MCP) server** that exposes all CLI commands as structured tools for AI assistants and development environments.
 
-### Input Validation
-Validates all inputs against GA4 naming rules, reserved prefixes, and character limits.
+### What is MCP?
 
-### Dry-Run Mode
-Preview changes before applying them to your GA4 property.
+MCP (Model Context Protocol) lets AI assistants like Claude Code interact with external tools and data sources. The GA4 Manager MCP server provides 13 tools that AI assistants can use to:
 
-### Configuration Profiles
-Pre-configured profiles for development, production, and default environments.
+- Configure GA4 properties
+- Manage Search Console
+- Query analytics data
+- Inspect URLs for indexing issues
+- Submit sitemaps
+- And more
+
+### Supported Clients
+
+- ✅ **Claude Desktop** - Native MCP integration
+- ✅ **Claude CLI** - Command-line interface
+- ✅ **Claude Code** - VS Code extension
+- ✅ **Cursor** - AI-powered editor
+- ✅ **Cline** - VS Code extension
+
+### Quick Setup
+
+```bash
+# Using Claude CLI
+claude mcp add \
+  --name ga4-manager \
+  --transport stdio \
+  --command "node" \
+  --args "/absolute/path/to/ga4-manager/mcp/dist/index.js" \
+  --env "GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json" \
+  --env "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" \
+  --env "GA4_BINARY_PATH=/absolute/path/to/ga4-manager/ga4"
+```
+
+### Available Tools (13)
+
+**GA4 Tools (5):**
+- `ga4_setup` - Setup from YAML configuration
+- `ga4_report` - View current configuration
+- `ga4_cleanup` - Remove unused resources
+- `ga4_link` - External service integration
+- `ga4_validate` - Validate configuration files
+
+**Search Console Tools (8):**
+- `gsc_sitemaps_list` - List sitemaps
+- `gsc_sitemaps_submit` - Submit new sitemap
+- `gsc_sitemaps_delete` - Delete sitemap
+- `gsc_sitemaps_get` - Get sitemap details
+- `gsc_inspect_url` - Inspect URL indexing status
+- `gsc_analytics_run` - Query search analytics
+- `gsc_monitor_urls` - Batch URL monitoring
+- `gsc_index_coverage` - Index coverage report
+
+### Documentation
+
+- **[MCP Server README](mcp/README.md)** - Complete tool documentation and examples
+- **[Configuration Guide](mcp/CONFIGURATION.md)** - Setup for all MCP clients
+- **[Example Configs](mcp/examples/)** - Ready-to-use templates
+
+---
 
 ## Documentation
 
-- [Installation Guide](INSTALL.md) - Detailed setup instructions
-- [Configuration Guide](configs/examples/README.md) - YAML configuration reference
-- [Error Reference](docs/ERRORS_AND_FAQ.md) - Troubleshooting guide
-- [GA4 Tier Limits](docs/TIER_LIMITS_QUICK_REF.md) - Property quota limits
-- [Security Policy](SECURITY.md) - Credential management
-- [Contributing Guide](CONTRIBUTING.md) - Development setup
-- [CI/CD Documentation](docs/development/CI_CD.md) - Continuous integration and deployment
-- [Development Docs](docs/development/) - For contributors
+- **[Installation Guide](INSTALL.md)** - Detailed setup and credential configuration
+- **[Configuration Reference](configs/examples/README.md)** - Complete YAML structure
+- **[Error Reference](docs/ERRORS_AND_FAQ.md)** - Troubleshooting common issues
+- **[GA4 Tier Limits](docs/TIER_LIMITS_QUICK_REF.md)** - Property quota limits
+- **[Security Policy](SECURITY.md)** - Credential management best practices
+- **[CI/CD Integration](docs/development/CI_CD.md)** - Automated deployment
+- **[MCP Server Docs](mcp/)** - AI assistant integration
+
+---
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Whether you're fixing bugs, adding features, or improving documentation.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`make test && make lint`)
+5. Commit your changes
+6. Push to your branch
+7. Open a Pull Request
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed guidelines.
 
 ### Development Setup
 
@@ -395,16 +469,36 @@ make lint
 
 # Build binary
 make build
+
+# MCP server development
+cd mcp
+npm install
+npm test  # 720+ tests
+npm run dev
 ```
 
-## Security
+---
 
-For security vulnerabilities, please see [SECURITY.md](SECURITY.md) for reporting instructions.
+## Support
+
+- **Issues** - [GitHub Issues](https://github.com/garbarok/ga4-manager/issues)
+- **Discussions** - [GitHub Discussions](https://github.com/garbarok/ga4-manager/discussions)
+- **Security** - See [SECURITY.md](SECURITY.md) for reporting vulnerabilities
+
+---
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+---
+
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
+---
+
+<p align="center">
+  Made with ❤️ for the GA4 community
+</p>
