@@ -88,10 +88,11 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.steps[msg.stepIndex].Status = msg.status
 			m.steps[msg.stepIndex].Message = msg.message
 
-			if msg.status == StepRunning {
+			switch msg.status {
+			case StepRunning:
 				m.steps[msg.stepIndex].StartTime = time.Now()
 				m.current = msg.stepIndex
-			} else if msg.status == StepCompleted || msg.status == StepFailed {
+			case StepCompleted, StepFailed:
 				m.steps[msg.stepIndex].Duration = time.Since(m.steps[msg.stepIndex].StartTime)
 			}
 

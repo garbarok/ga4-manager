@@ -8,27 +8,18 @@ import (
 
 // SetupProgressWrapper wraps the setup command with progress UI
 type SetupProgressWrapper struct {
-	program      *tea.Program
-	stepNames    []string
-	currentStep  int
-	setupFunc    func() error
-	setupDone    bool
-	setupError   error
-	progressChan chan progressUpdate
-}
-
-type progressUpdate struct {
-	stepIndex int
-	status    StepStatus
-	message   string
+	program    *tea.Program
+	stepNames  []string
+	setupFunc  func() error
+	setupDone  bool
+	setupError error
 }
 
 // NewSetupProgressWrapper creates a new setup progress wrapper
 func NewSetupProgressWrapper(stepNames []string, setupFunc func() error) *SetupProgressWrapper {
 	return &SetupProgressWrapper{
-		stepNames:    stepNames,
-		setupFunc:    setupFunc,
-		progressChan: make(chan progressUpdate, 10),
+		stepNames: stepNames,
+		setupFunc: setupFunc,
 	}
 }
 
@@ -61,9 +52,6 @@ func (w *SetupProgressWrapper) runSetup() {
 
 		// For now, we just mark steps as they would execute
 		// In the future, this could be integrated with the actual setup orchestrator
-		if i == 0 {
-			// Step 0 would be validation, etc.
-		}
 
 		// Mark as completed
 		w.program.Send(UpdateStep(i, StepCompleted, ""))
@@ -80,7 +68,7 @@ func (w *SetupProgressWrapper) runSetup() {
 
 // CreateStandardSetupSteps returns standard setup step names
 func CreateStandardSetupSteps(hasGA4, hasGSC bool) []string {
-	steps := []string{}
+	var steps []string
 
 	if hasGA4 && hasGSC {
 		steps = []string{

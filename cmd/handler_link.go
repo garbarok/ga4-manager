@@ -66,7 +66,7 @@ func showLinkManagementMenu(client *ga4.Client, project config.Project) {
 	fmt.Print("\nSelect option (1-6): ")
 
 	var choice string
-	fmt.Scanln(&choice)
+	_, _ = fmt.Scanln(&choice)
 
 	// Route to specific link operation
 	routeLinkOperation(client, project, choice)
@@ -95,7 +95,9 @@ func routeLinkOperation(client *ga4.Client, project config.Project, choice strin
 
 // handleViewLinks displays existing links and connections
 func handleViewLinks(client *ga4.Client, project config.Project) {
-	fmt.Println("\n🔍 Checking existing links...\n")
+	fmt.Println()
+	fmt.Println("🔍 Checking existing links...")
+	fmt.Println()
 	if err := listExistingLinks(client, project); err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing links: %v\n", err)
 	}
@@ -127,7 +129,7 @@ func handleSetupChannels(client *ga4.Client, project config.Project) {
 func handleSearchConsoleGuide(client *ga4.Client, project config.Project) {
 	fmt.Print("\n🔗 Enter your website URL (e.g., https://example.com): ")
 	var siteURL string
-	fmt.Scanln(&siteURL)
+	_, _ = fmt.Scanln(&siteURL)
 
 	if siteURL == "" {
 		fmt.Println("\n⚠️  No URL provided.")
@@ -145,7 +147,7 @@ func handleSearchConsoleGuide(client *ga4.Client, project config.Project) {
 func handleBigQueryGuide(client *ga4.Client, project config.Project) {
 	fmt.Print("\n📊 Enter GCP Project ID: ")
 	var gcpProject string
-	fmt.Scanln(&gcpProject)
+	_, _ = fmt.Scanln(&gcpProject)
 
 	if gcpProject == "" {
 		fmt.Println("\n⚠️  No GCP Project ID provided.")
@@ -154,7 +156,7 @@ func handleBigQueryGuide(client *ga4.Client, project config.Project) {
 
 	fmt.Printf("Enter BigQuery Dataset ID (default: analytics_%s): ", project.PropertyID)
 	var dataset string
-	fmt.Scanln(&dataset)
+	_, _ = fmt.Scanln(&dataset)
 
 	if dataset == "" {
 		dataset = fmt.Sprintf("analytics_%s", project.PropertyID)
@@ -222,7 +224,7 @@ func displayCustomChannelGroups(groups []channelGroupInfo) {
 func executeChannelGroupDeletion(client *ga4.Client, groups []channelGroupInfo) {
 	fmt.Print("\nEnter number to delete (or 'all' to delete all, 'cancel' to abort): ")
 	var choice string
-	fmt.Scanln(&choice)
+	_, _ = fmt.Scanln(&choice)
 
 	if choice == "cancel" || choice == "" {
 		fmt.Println("\n❌ Delete cancelled.")
@@ -276,7 +278,7 @@ func deleteSingleChannelGroup(client *ga4.Client, groups []channelGroupInfo, cho
 func confirmAction(prompt string) bool {
 	fmt.Print(prompt)
 	var confirm string
-	fmt.Scanln(&confirm)
+	_, _ = fmt.Scanln(&confirm)
 	return confirm == "y" || confirm == "Y" || confirm == "yes"
 }
 
@@ -284,6 +286,6 @@ func confirmAction(prompt string) bool {
 func confirmDangerous(prompt string) bool {
 	fmt.Print(prompt)
 	var confirm string
-	fmt.Scanln(&confirm)
+	_, _ = fmt.Scanln(&confirm)
 	return confirm == "yes"
 }

@@ -248,7 +248,11 @@ func writeCSV(filepath string, headers []string, data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create CSV file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
@@ -300,7 +304,7 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 	var md strings.Builder
 
 	// Header
-	md.WriteString(fmt.Sprintf("# GA4 Configuration Report\n\n"))
+	md.WriteString("# GA4 Configuration Report\n\n")
 	md.WriteString(fmt.Sprintf("**Project:** %s  \n", data.ProjectName))
 	md.WriteString(fmt.Sprintf("**Property ID:** %s  \n", data.PropertyID))
 	md.WriteString(fmt.Sprintf("**Generated:** %s  \n\n", data.Timestamp))

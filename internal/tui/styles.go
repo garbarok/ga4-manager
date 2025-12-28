@@ -6,12 +6,11 @@ import (
 
 var (
 	// Color palette
-	primaryColor   = lipgloss.Color("#FF6B6B")
-	secondaryColor = lipgloss.Color("#4ECDC4")
-	accentColor    = lipgloss.Color("#FFE66D")
-	textColor      = lipgloss.Color("#F7FFF7")
-	dimColor       = lipgloss.Color("#95A3A4")
-	borderColor    = lipgloss.Color("#6C5CE7")
+	primaryColor = lipgloss.Color("#FF6B6B")
+	accentColor  = lipgloss.Color("#FFE66D")
+	textColor    = lipgloss.Color("#F7FFF7")
+	dimColor     = lipgloss.Color("#95A3A4")
+	borderColor  = lipgloss.Color("#6C5CE7")
 
 	// Title style
 	titleStyle = lipgloss.NewStyle().
@@ -35,11 +34,4 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(dimColor).
 			Padding(1, 0)
-
-	// Info box style
-	infoStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(secondaryColor).
-			Padding(1, 2).
-			Margin(1, 0)
 )

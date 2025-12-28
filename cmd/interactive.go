@@ -62,7 +62,7 @@ func RunInteractive() {
 		// Pause before returning to menu
 		if selected != "link" && selected != "exit" {
 			fmt.Println("\nPress Enter to return to menu...")
-			fmt.Scanln()
+			_, _ = fmt.Scanln()
 		}
 	}
 }

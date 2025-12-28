@@ -70,9 +70,9 @@ func runInitWizard() {
 	// Success message
 	successStyle := color.New(color.FgGreen, color.Bold)
 	fmt.Println()
-	successStyle.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	successStyle.Println("🎉 Setup Complete!")
-	successStyle.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	_, _ = successStyle.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	_, _ = successStyle.Println("🎉 Setup Complete!")
+	_, _ = successStyle.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
 }
 
@@ -94,18 +94,19 @@ func testCredentials(config *tui.CredentialConfig) error {
 		credPath = homeDir + credPath[1:]
 	}
 
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credPath)
+	_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credPath)
 	if config.ProjectID != "" {
-		os.Setenv("GOOGLE_CLOUD_PROJECT", config.ProjectID)
+		_ = os.Setenv("GOOGLE_CLOUD_PROJECT", config.ProjectID)
 	}
 
 	// Restore original values after testing
 	defer func() {
-		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", originalCreds)
-		os.Setenv("GOOGLE_CLOUD_PROJECT", originalProject)
+		_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", originalCreds)
+		_ = os.Setenv("GOOGLE_CLOUD_PROJECT", originalProject)
 	}()
 
 	// Try to create Analytics Admin client
+	//nolint:staticcheck // We accept credentials from trusted user input
 	client, err := analyticsadmin.NewService(ctx, option.WithCredentialsFile(credPath))
 	if err != nil {
 		return fmt.Errorf("failed to create Analytics Admin client: %w", err)

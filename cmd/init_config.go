@@ -270,7 +270,7 @@ For more information:
 	fmt.Println("     " + cyan("./ga4"))
 	fmt.Println()
 	fmt.Println(yellow("Press Enter to continue to the main menu..."))
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 
 	return nil
 }

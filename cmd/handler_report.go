@@ -56,7 +56,7 @@ func promptReportExport(projectPath string) {
 	fmt.Print("\nSelect option (1-4): ")
 
 	var choice string
-	fmt.Scanln(&choice)
+	_, _ = fmt.Scanln(&choice)
 
 	switch choice {
 	case "1":

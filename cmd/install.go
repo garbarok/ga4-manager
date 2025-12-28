@@ -156,7 +156,7 @@ func performAutoInstall(execPath string) {
 
 	// Make sure it's executable
 	cmd = exec.Command("sudo", "chmod", "+x", installPath)
-	cmd.Run() // Ignore errors, likely already executable
+	_ = cmd.Run() // Ignore errors, likely already executable
 
 	fmt.Println()
 	fmt.Println(green("✓ Successfully installed to " + installPath))
@@ -169,7 +169,7 @@ func performAutoInstall(execPath string) {
 	fmt.Println(yellow("Note: ") + "You may need to open a new terminal for PATH changes to take effect.")
 	fmt.Println()
 	fmt.Println(yellow("Press Enter to continue..."))
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 }
 
 // showManualInstallInstructions displays manual installation steps
@@ -239,5 +239,5 @@ func showManualInstallInstructions(execPath string) {
 	fmt.Println()
 
 	fmt.Println(yellow("Press Enter to continue..."))
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 }
