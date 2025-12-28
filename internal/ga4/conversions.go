@@ -125,6 +125,28 @@ func (c *Client) ListConversions(propertyID string) ([]*admin.GoogleAnalyticsAdm
 	return resp.ConversionEvents, nil
 }
 
+// findConversionByEventName searches for conversion by event name.
+// Returns (event, nil) if found, (nil, nil) if not found, (nil, err) on API failure.
+func (c *Client) findConversionByEventName(propertyID, eventName string) (*admin.GoogleAnalyticsAdminV1alphaConversionEvent, error) {
+	conversions, err := c.ListConversions(propertyID)
+	if err != nil {
+		c.logger.Error("list failed",
+			slog.String("property_id", propertyID),
+			slog.String("event_name", eventName),
+			slog.String("error", err.Error()),
+		)
+		return nil, fmt.Errorf("failed to list conversions: %w", err)
+	}
+
+	for _, conv := range conversions {
+		if conv.EventName == eventName {
+			return conv, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func (c *Client) DeleteConversion(propertyID, eventName string) error {
 	// Validate inputs
 	if err := validation.ValidatePropertyID(propertyID); err != nil {
@@ -148,22 +170,11 @@ func (c *Client) DeleteConversion(propertyID, eventName string) error {
 		slog.String("event_name", eventName),
 	)
 
-	// First, list all conversions to find the resource name
-	conversions, err := c.ListConversions(propertyID)
+	conv, err := c.findConversionByEventName(propertyID, eventName)
 	if err != nil {
-		return fmt.Errorf("failed to list conversions for property %s: %w", propertyID, err)
+		return fmt.Errorf("failed to find conversion '%s': %w", eventName, err)
 	}
-
-	// Find the conversion with matching event name
-	var conversionName string
-	for _, conv := range conversions {
-		if conv.EventName == eventName {
-			conversionName = conv.Name
-			break
-		}
-	}
-
-	if conversionName == "" {
+	if conv == nil {
 		c.logger.Warn("conversion not found",
 			slog.String("event_name", eventName),
 			slog.String("property_id", propertyID),
@@ -171,13 +182,11 @@ func (c *Client) DeleteConversion(propertyID, eventName string) error {
 		return fmt.Errorf("conversion event '%s' not found in property %s", eventName, propertyID)
 	}
 
-	// Wait for rate limit
 	if err := c.waitForRateLimit(c.ctx, "DeleteConversion"); err != nil {
 		return err
 	}
 
-	// Delete the conversion
-	_, err = c.admin.Properties.ConversionEvents.Delete(conversionName).Context(c.ctx).Do()
+	_, err = c.admin.Properties.ConversionEvents.Delete(conv.Name).Context(c.ctx).Do()
 	if err != nil {
 		c.logger.Error("failed to delete conversion",
 			slog.String("event_name", eventName),

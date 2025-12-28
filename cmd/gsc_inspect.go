@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	gscInspectURL string
+	gscInspectURL      string
+	gscRichResultsOnly bool
 )
 
 var gscInspectCmd = &cobra.Command{
@@ -72,6 +73,9 @@ func init() {
 	// URL flag (required for url command)
 	gscInspectURLCmd.Flags().StringVarP(&gscInspectURL, "url", "u", "", "URL to inspect (e.g., https://example.com/page)")
 	_ = gscInspectURLCmd.MarkFlagRequired("url")
+
+	// Rich results only flag (optional)
+	gscInspectURLCmd.Flags().BoolVarP(&gscRichResultsOnly, "rich-results-only", "r", false, "Show only rich results information")
 }
 
 func runGSCInspectURL(cmd *cobra.Command, args []string) error {
@@ -95,22 +99,34 @@ func runGSCInspectURL(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display detailed results
-	displayInspectionResult(result)
+	displayInspectionResult(result, gscRichResultsOnly)
 
-	// Display quota status
-	displayInspectQuotaStatus(client)
+	// Display quota status (skip if rich-results-only mode)
+	if !gscRichResultsOnly {
+		displayInspectQuotaStatus(client)
+	}
 
 	return nil
 }
 
-func displayInspectionResult(result *gsc.URLInspectionResult) {
+func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bool) {
 	// Header
-	color.Cyan("═══ URL Inspection Results ═══")
+	if richResultsOnly {
+		color.Cyan("═══ Rich Results Validation ═══")
+	} else {
+		color.Cyan("═══ URL Inspection Results ═══")
+	}
 	fmt.Println()
 
 	// URL
 	fmt.Printf("URL: %s\n", result.URL)
 	fmt.Println()
+
+	// If rich-results-only mode, skip to rich results section
+	if richResultsOnly {
+		displayRichResults(result)
+		return
+	}
 
 	// Index Status
 	color.Cyan("Index Status:")
@@ -186,25 +202,7 @@ func displayInspectionResult(result *gsc.URLInspectionResult) {
 	fmt.Println()
 
 	// Rich Results
-	if result.RichResultsStatus != "" {
-		color.Cyan("Rich Results:")
-		switch result.RichResultsStatus {
-		case "PASS":
-			color.Green("  ✓ Valid (%s)", result.RichResultsStatus)
-		case "FAIL":
-			color.Red("  ✗ Invalid (%s)", result.RichResultsStatus)
-		default:
-			fmt.Printf("  Status: %s\n", result.RichResultsStatus)
-		}
-
-		if len(result.RichResultsIssues) > 0 {
-			color.Yellow("  Rich Results Issues:")
-			for _, issue := range result.RichResultsIssues {
-				fmt.Printf("    - %s\n", issue)
-			}
-		}
-		fmt.Println()
-	}
+	displayRichResults(result)
 
 	// Indexing Issues Summary
 	if len(result.IndexingIssues) > 0 {
@@ -238,6 +236,78 @@ func displayInspectionResult(result *gsc.URLInspectionResult) {
 		color.Green("✓ No issues detected")
 		fmt.Println()
 	}
+}
+
+// displayRichResults shows rich results information including types and detected items
+func displayRichResults(result *gsc.URLInspectionResult) {
+	if result.RichResultsStatus == "" {
+		color.Yellow("ℹ No rich results data available")
+		fmt.Println()
+		return
+	}
+
+	color.Cyan("Rich Results:")
+
+	// Display verdict
+	switch result.RichResultsStatus {
+	case "PASS":
+		color.Green("  ✓ Valid (%s)", result.RichResultsStatus)
+	case "FAIL":
+		color.Red("  ✗ Invalid (%s)", result.RichResultsStatus)
+	default:
+		fmt.Printf("  Status: %s\n", result.RichResultsStatus)
+	}
+
+	// Display detected types
+	if len(result.RichResultTypes) > 0 {
+		fmt.Printf("  Detected Types: %s\n", formatRichResultTypes(result.RichResultTypes))
+	}
+
+	// Display detected items with details
+	if len(result.RichResultItems) > 0 {
+		color.Cyan("\n  Detected Items:")
+		for i, item := range result.RichResultItems {
+			fmt.Printf("    %d. %s", i+1, item.Type)
+			if item.Name != "" {
+				fmt.Printf(" - %s", item.Name)
+			}
+			fmt.Println()
+
+			// Show item-specific issues
+			if len(item.Issues) > 0 {
+				color.Yellow("       Issues:")
+				for _, issue := range item.Issues {
+					fmt.Printf("         - %s\n", issue)
+				}
+			}
+		}
+	}
+
+	// Display legacy flat issues list (for backward compatibility)
+	if len(result.RichResultsIssues) > 0 && len(result.RichResultItems) == 0 {
+		color.Yellow("  Rich Results Issues:")
+		for _, issue := range result.RichResultsIssues {
+			fmt.Printf("    - %s\n", issue)
+		}
+	}
+
+	fmt.Println()
+}
+
+// formatRichResultTypes formats the types array for display
+func formatRichResultTypes(types []string) string {
+	if len(types) == 0 {
+		return "None"
+	}
+	if len(types) == 1 {
+		return types[0]
+	}
+	// Join with commas
+	result := types[0]
+	for i := 1; i < len(types); i++ {
+		result += ", " + types[i]
+	}
+	return result
 }
 
 func displayInspectQuotaStatus(client *gsc.Client) {
