@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/garbarok/ga4-manager/internal/tui"
@@ -86,12 +87,12 @@ func testCredentials(config *tui.CredentialConfig) error {
 
 	// Expand ~ if present
 	credPath := config.CredentialsPath
-	if credPath[0] == '~' {
+	if len(credPath) > 0 && credPath[0] == '~' {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("could not expand home directory: %w", err)
 		}
-		credPath = homeDir + credPath[1:]
+		credPath = filepath.Join(homeDir, credPath[1:])
 	}
 
 	_ = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credPath)

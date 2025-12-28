@@ -243,7 +243,7 @@ func exportToCSV(data *ReportData, outputPath string) error {
 }
 
 // writeCSV writes a slice of structs to CSV
-func writeCSV(filepath string, headers []string, data interface{}) error {
+func writeCSV(filepath string, headers []string, data interface{}) (err error) {
 	file, err := os.Create(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to create CSV file: %w", err)

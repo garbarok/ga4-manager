@@ -59,11 +59,18 @@ func isInstalledInSystemPath(execPath string) bool {
 }
 
 // isInGitRepo checks if the executable is in a git repository (development environment)
+// Returns true if the directory is in a git repository, false otherwise.
+// Note: This assumes any error (git not installed, permissions, etc.) means "not a git repo"
+// which is safe for our use case (skipping auto-install prompt in dev environments).
 func isInGitRepo(execPath string) bool {
 	dir := filepath.Dir(execPath)
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	cmd.Dir = dir
+	// Suppress output to avoid cluttering console
+	cmd.Stdout = nil
+	cmd.Stderr = nil
 	err := cmd.Run()
+	// Any error (git not found, not a repo, permission issues) = not in git repo
 	return err == nil
 }
 
