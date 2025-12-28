@@ -54,6 +54,21 @@ sudo mv ga4-linux-amd64 /usr/local/bin/ga4
 
 ### 2. Configure Google Cloud Credentials
 
+**Option A: Interactive Setup Wizard (Recommended)**
+
+```bash
+ga4 init
+```
+
+The wizard will:
+- Prompt for your service account credentials path
+- Prompt for your GCP project ID
+- Validate the credentials
+- Optionally save to `.env` file
+- Provide shell-specific export instructions
+
+**Option B: Manual Configuration**
+
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
@@ -94,7 +109,18 @@ sitemaps:
   - url: "https://example.com/sitemap.xml"
 ```
 
-### 4. Validate and Apply
+### 4. Run GA4 Manager
+
+**Option A: Interactive Mode (Recommended)**
+
+```bash
+# Launch interactive menu
+ga4
+```
+
+Navigate with arrow keys, select commands with Enter.
+
+**Option B: CLI Commands**
 
 ```bash
 # Validate configuration
@@ -197,6 +223,105 @@ For detailed setup including Google Cloud credentials, see [INSTALL.md](INSTALL.
 ---
 
 ## Usage
+
+### Interactive Mode ✨
+
+Launch an interactive terminal UI to navigate all GA4 Manager commands:
+
+```bash
+# Run without arguments to open interactive menu
+ga4
+
+# Or explicitly use interactive command
+ga4 interactive
+```
+
+**Navigation:**
+- `↑/k` - Move up
+- `↓/j` - Move down
+- `Enter/Space` - Select option
+- `q/Esc` - Quit
+- `/` - Filter/search (in project selector)
+
+**Available actions:**
+- 🔧 Initial Setup (Credentials)
+- 📊 View Reports
+- ⚙️ Setup Projects
+- 🧹 Cleanup Unused Items
+- 🔗 Manage Links
+- ✅ Validate Configs
+- ❌ Exit
+
+**Workflow:**
+1. Select an action (e.g., "View Reports")
+2. Pick a project from the selector:
+   - Shows all `.yaml` files in `configs/`
+   - Displays project name and GA4 Property ID
+   - Includes "All Projects" option
+   - Searchable with `/` key
+3. Command runs automatically with selected project
+
+**Example:**
+```
+Select a Project
+  All Projects
+  My E-commerce Store (Property: 123456789)
+→ My Blog (Property: 987654321)
+  My SaaS App (Property: 456789123)
+```
+
+### Initial Setup (Credentials)
+
+Configure your Google Cloud credentials interactively:
+
+```bash
+ga4 init
+```
+
+**Features:**
+- 📝 Interactive form for credentials path and project ID
+- ✅ Real-time file path validation
+- 🔍 Credential testing (verifies API access)
+- 💾 Optional .env file creation
+- 📚 Shell-specific export instructions (Bash/Zsh/Fish)
+
+**Example workflow:**
+
+```
+🚀 GA4 Manager Setup Wizard
+
+Let's configure your Google Cloud credentials!
+
+┃ Google Cloud Credentials Path
+┃ /Users/you/Downloads/ga4-credentials.json
+┃
+┃ Google Cloud Project ID
+┃ my-gcp-project-123
+┃
+┃ Save to .env file? Yes
+┃
+┃ Shell Type: Zsh (~/.zshrc)
+
+💾 Saving configuration to .env file...
+✓ Configuration saved to .env
+
+🔍 Testing credentials...
+✓ Credentials are valid!
+
+📝 Shell Configuration
+Add these lines to ~/.zshrc:
+
+  export GOOGLE_APPLICATION_CREDENTIALS="/Users/you/Downloads/ga4-credentials.json"
+  export GOOGLE_CLOUD_PROJECT="my-gcp-project-123"
+
+Then run: source ~/.zshrc
+
+✅ Next Steps
+  1. Add the environment variables to your shell config
+  2. Source your shell config or restart your terminal
+  3. Run: ga4 validate --all
+  4. Start using: ga4
+```
 
 ### Unified Setup (GA4 + Search Console)
 
