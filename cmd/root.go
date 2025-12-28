@@ -37,19 +37,18 @@ func Execute() {
 }
 
 func init() {
-	// Set version on root command
 	rootCmd.Version = Version
+	loadEnvironmentConfig()
+	validateCredentials()
+}
 
-	// Load .env file if it exists
+// loadEnvironmentConfig loads environment from .env if present.
+func loadEnvironmentConfig() {
 	if err := godotenv.Load(); err != nil {
-		// Only log if the error is not about missing .env file
 		if !os.IsNotExist(err) {
 			log.Printf("Warning: Error loading .env file: %v\n", err)
 		}
 	}
-
-	// Validate required environment variables
-	validateCredentials()
 }
 
 // validateCredentials ensures credentials are properly configured and not empty

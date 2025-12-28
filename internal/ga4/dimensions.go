@@ -137,6 +137,27 @@ func (c *Client) ListDimensions(propertyID string) ([]*admin.GoogleAnalyticsAdmi
 	return resp.CustomDimensions, nil
 }
 
+// findDimensionByParameterName searches for dimension by parameter name.
+func (c *Client) findDimensionByParameterName(propertyID, parameterName string) (*admin.GoogleAnalyticsAdminV1alphaCustomDimension, bool) {
+	dimensions, err := c.ListDimensions(propertyID)
+	if err != nil {
+		c.logger.Error("list failed",
+			slog.String("property_id", propertyID),
+			slog.String("parameter_name", parameterName),
+			slog.String("error", err.Error()),
+		)
+		return nil, false
+	}
+
+	for _, dim := range dimensions {
+		if dim.ParameterName == parameterName {
+			return dim, true
+		}
+	}
+
+	return nil, false
+}
+
 func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 	// Validate inputs
 	if err := validation.ValidatePropertyID(propertyID); err != nil {
@@ -160,22 +181,8 @@ func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 		slog.String("parameter_name", parameterName),
 	)
 
-	// First, list all dimensions to find the resource name
-	dimensions, err := c.ListDimensions(propertyID)
-	if err != nil {
-		return fmt.Errorf("failed to list dimensions for property %s: %w", propertyID, err)
-	}
-
-	// Find the dimension with matching parameter name
-	var dimensionName string
-	for _, dim := range dimensions {
-		if dim.ParameterName == parameterName {
-			dimensionName = dim.Name
-			break
-		}
-	}
-
-	if dimensionName == "" {
+	dim, found := c.findDimensionByParameterName(propertyID, parameterName)
+	if !found {
 		c.logger.Warn("dimension not found",
 			slog.String("parameter_name", parameterName),
 			slog.String("property_id", propertyID),
@@ -183,13 +190,11 @@ func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 		return fmt.Errorf("dimension '%s' not found in property %s", parameterName, propertyID)
 	}
 
-	// Wait for rate limit
 	if err := c.waitForRateLimit(c.ctx, "DeleteDimension"); err != nil {
 		return err
 	}
 
-	// Archive the dimension (GA4 doesn't allow permanent deletion, only archiving)
-	_, err = c.admin.Properties.CustomDimensions.Archive(dimensionName, &admin.GoogleAnalyticsAdminV1alphaArchiveCustomDimensionRequest{}).Context(c.ctx).Do()
+	_, err := c.admin.Properties.CustomDimensions.Archive(dim.Name, &admin.GoogleAnalyticsAdminV1alphaArchiveCustomDimensionRequest{}).Context(c.ctx).Do()
 	if err != nil {
 		c.logger.Error("failed to archive dimension",
 			slog.String("parameter_name", parameterName),

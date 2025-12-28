@@ -57,6 +57,40 @@ func init() {
 	cleanupCmd.Flags().BoolVarP(&cleanupYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
+// validateCleanupType ensures cleanup type is valid.
+func validateCleanupType(cleanupType string) error {
+	validTypes := []string{"conversions", "dimensions", "metrics", "all"}
+	for _, vt := range validTypes {
+		if cleanupType == vt {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid type '%s': must be one of %v", cleanupType, validTypes)
+}
+
+// shouldProceedWithCleanup determines if cleanup should proceed.
+func shouldProceedWithCleanup(hasItems, skipConfirmation bool, yellow func(a ...interface{}) string) bool {
+	if !hasItems {
+		return false
+	}
+
+	if skipConfirmation {
+		return true
+	}
+
+	fmt.Printf("\n%s This will permanently remove/archive the items shown above.\n", yellow("⚠"))
+	fmt.Print("Do you want to continue? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes"
+}
+
 func runCleanup(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
@@ -68,10 +102,8 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	fmt.Println("═══════════════════════════════════════════════")
 	fmt.Println()
 
-	// Validate cleanup type
-	validTypes := map[string]bool{"conversions": true, "dimensions": true, "metrics": true, "all": true}
-	if !validTypes[cleanupType] {
-		return fmt.Errorf("invalid cleanup type: %s (use 'conversions', 'dimensions', 'metrics', or 'all')", cleanupType)
+	if err := validateCleanupType(cleanupType); err != nil {
+		return err
 	}
 
 	// Create GA4 client
@@ -95,12 +127,12 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s %s\n\n", blue("ℹ️"), project.Cleanup.Reason)
 		}
 
-		// Check if there's anything to cleanup
 		hasConversions := len(project.Cleanup.ConversionsToRemove) > 0 && (cleanupType == "conversions" || cleanupType == "all")
 		hasDimensions := len(project.Cleanup.DimensionsToRemove) > 0 && (cleanupType == "dimensions" || cleanupType == "all")
 		hasMetrics := len(project.Cleanup.MetricsToRemove) > 0 && (cleanupType == "metrics" || cleanupType == "all")
+		hasItems := hasConversions || hasDimensions || hasMetrics
 
-		if !hasConversions && !hasDimensions && !hasMetrics {
+		if !hasItems {
 			fmt.Printf("%s No cleanup configured for this project\n", yellow("⚠"))
 			continue
 		}
@@ -145,28 +177,14 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 			table.Render()
 		}
 
-		// Dry-run mode - just show what would be done
 		if cleanupDryRun {
 			fmt.Printf("\n%s Dry-run mode enabled - no changes applied\n", yellow("ℹ️"))
 			continue
 		}
 
-		// Confirmation prompt
-		if !cleanupYes {
-			fmt.Printf("\n%s This will permanently remove/archive the items shown above.\n", yellow("⚠"))
-			fmt.Print("Do you want to continue? [y/N]: ")
-
-			reader := bufio.NewReader(os.Stdin)
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
-			}
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
-				fmt.Println("Cleanup cancelled.")
-				continue
-			}
+		if !shouldProceedWithCleanup(hasItems, cleanupYes, yellow) {
+			fmt.Println("Cleanup cancelled.")
+			continue
 		}
 
 		// Perform cleanup

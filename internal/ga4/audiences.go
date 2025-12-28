@@ -14,7 +14,7 @@ func (c *Client) GenerateAudienceGuide(project config.Project, outputPath string
 	// Get audiences from project configuration
 	// Note: Audiences should be defined in the YAML config file
 	var audiences []config.EnhancedAudience
-	// TODO: Load audiences from project.Audiences or config file
+	// TODO(#16): Audience configuration YAML support
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
@@ -269,7 +269,7 @@ func (c *Client) generateRelatedAudiences(audience config.EnhancedAudience, proj
 	related.WriteString(fmt.Sprintf("Other audiences in the **%s** category:\n\n", audience.Category))
 
 	// Get related audiences from same category
-	// TODO: Load audiences from project configuration or config file
+	// TODO(#16): Audience configuration YAML support
 	var audiences []config.EnhancedAudience
 
 	count := 0
@@ -335,7 +335,7 @@ func (c *Client) ValidateAudienceDefinition(audience config.EnhancedAudience) []
 
 // ListAudiencesByCategory returns audiences grouped by category
 func ListAudiencesByCategory(project config.Project) map[string][]config.EnhancedAudience {
-	// TODO: Load audiences from project configuration or config file
+	// TODO(#16): Audience configuration YAML support
 	var audiences []config.EnhancedAudience
 
 	categories := make(map[string][]config.EnhancedAudience)
@@ -348,7 +348,7 @@ func ListAudiencesByCategory(project config.Project) map[string][]config.Enhance
 
 // GetAudienceSummary returns a summary of all audiences
 func GetAudienceSummary(project config.Project) string {
-	// TODO: Load audiences from project configuration or config file
+	// TODO(#16): Audience configuration YAML support
 	var audiences []config.EnhancedAudience
 
 	categories := make(map[string]int)

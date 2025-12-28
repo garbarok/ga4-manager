@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// normalizeInput trims and uppercases for consistent validation.
+func normalizeInput(input string) string {
+	return strings.ToUpper(strings.TrimSpace(input))
+}
+
 // PropertyIDRegex matches valid GA4 property ID format (numeric only)
 var PropertyIDRegex = regexp.MustCompile(`^[0-9]+$`)
 
@@ -108,6 +113,8 @@ func ValidateDisplayName(displayName string) error {
 
 // ValidateCountingMethod validates a GA4 conversion counting method
 func ValidateCountingMethod(method string) error {
+	method = normalizeInput(method)
+
 	validMethods := map[string]bool{
 		"ONCE_PER_EVENT":   true,
 		"ONCE_PER_SESSION": true,
@@ -122,6 +129,8 @@ func ValidateCountingMethod(method string) error {
 
 // ValidateScope validates a GA4 dimension scope
 func ValidateScope(scope string) error {
+	scope = normalizeInput(scope)
+
 	validScopes := map[string]bool{
 		"EVENT": true,
 		"USER":  true,
@@ -138,8 +147,10 @@ func ValidateScope(scope string) error {
 // ValidateMeasurementUnit validates a GA4 metric measurement unit
 func ValidateMeasurementUnit(unit string) error {
 	if unit == "" {
-		return nil // Optional field
+		return nil
 	}
+
+	unit = normalizeInput(unit)
 
 	validUnits := map[string]bool{
 		"STANDARD":     true,
@@ -163,6 +174,8 @@ func ValidateMeasurementUnit(unit string) error {
 
 // ValidateMetricType validates a GA4 metric type
 func ValidateMetricType(metricType string) error {
+	metricType = normalizeInput(metricType)
+
 	validTypes := map[string]bool{
 		"METRIC_TYPE_UNSPECIFIED": true,
 		"TYPE_INTEGER":            true,
