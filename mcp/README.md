@@ -141,7 +141,7 @@ Manage BigQuery, Search Console, and Channel Group links.
 
 ```typescript
 {
-  "project_name": "snapcompress",
+  "project_name": "my-project",
   "service": "channels",    // "search-console" | "bigquery" | "channels"
   "list": true              // List existing links
 }
@@ -502,25 +502,25 @@ Common error codes:
 ```typescript
 // 1. Validate config
 ga4_validate({
-  config_file: 'configs/snapcompress.yaml',
+  config_file: 'configs/my-project.yaml',
   verbose: true,
 })
 
 // 2. Preview setup
 ga4_setup({
-  config_path: 'configs/snapcompress.yaml',
+  config_path: 'configs/my-project.yaml',
   dry_run: true,
 })
 
 // 3. Apply setup
 ga4_setup({
-  config_path: 'configs/snapcompress.yaml',
+  config_path: 'configs/my-project.yaml',
   dry_run: false,
 })
 
 // 4. Verify with report
 ga4_report({
-  config_path: 'configs/snapcompress.yaml',
+  config_path: 'configs/my-project.yaml',
 })
 ```
 
@@ -529,7 +529,7 @@ ga4_report({
 ```typescript
 // Get 30-day search performance
 gsc_analytics_run({
-  site: 'sc-domain:snapcompress.io',
+  site: 'sc-domain:example.com',
   days: 30,
   dimensions: 'query,page',
   limit: 100,
@@ -538,7 +538,7 @@ gsc_analytics_run({
 
 // Monitor critical pages
 gsc_monitor_urls({
-  config: 'configs/snapcompress.yaml',
+  config: 'configs/my-project.yaml',
   format: 'json',
 })
 ```

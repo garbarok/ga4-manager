@@ -291,7 +291,7 @@ Ensure your service account has:
 cat .env | grep GOOGLE_APPLICATION_CREDENTIALS
 
 # Test authentication
-./ga4 report --project snapcompress
+./ga4 report --config configs/my-project.yaml
 ```
 
 ---
@@ -559,14 +559,14 @@ parameter: 2fa_enabled    # Can't start with number
 3. Deploy to test property first
 
 ```yaml
-# configs/snapcompress-test.yaml
+# configs/my-test-project.yaml
 ga4:
   property_id: 'YOUR_TEST_PROPERTY_ID'
   tier: standard
 ```
 
 ```bash
-./ga4 setup --config configs/snapcompress-test.yaml
+./ga4 setup --config configs/my-test-project.yaml
 ```
 
 ---

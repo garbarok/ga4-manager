@@ -82,7 +82,7 @@ Complete guide for configuring the GA4 Manager MCP server across different clien
         "GOOGLE_APPLICATION_CREDENTIALS": "/absolute/path/to/credentials.json",
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GA4_BINARY_PATH": "/absolute/path/to/ga4-manager/ga4",
-        "GA4_DEFAULT_PROPERTY_ID": "513421535",
+        "GA4_DEFAULT_PROPERTY_ID": "123456789",
         "GSC_DEFAULT_SITE": "sc-domain:example.com"
       }
     }
@@ -119,7 +119,7 @@ claude mcp add \
   --env "GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json" \
   --env "GOOGLE_CLOUD_PROJECT=your-gcp-project-id" \
   --env "GA4_BINARY_PATH=/absolute/path/to/ga4-manager/ga4" \
-  --env "GA4_DEFAULT_PROPERTY_ID=513421535" \
+  --env "GA4_DEFAULT_PROPERTY_ID=123456789" \
   --env "GSC_DEFAULT_SITE=sc-domain:example.com"
 ```
 
@@ -167,7 +167,7 @@ Use the [MCP Extension](https://marketplace.visualstudio.com/items?itemName=mode
            "GOOGLE_APPLICATION_CREDENTIALS": "/absolute/path/to/credentials.json",
            "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
            "GA4_BINARY_PATH": "/absolute/path/to/ga4-manager/ga4",
-           "GA4_DEFAULT_PROPERTY_ID": "513421535"
+           "GA4_DEFAULT_PROPERTY_ID": "123456789"
          }
        }
      }
@@ -244,7 +244,7 @@ For Cline (VS Code extension), configure via Cline settings:
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `GA4_DEFAULT_PROPERTY_ID` | Default GA4 property ID | None | `513421535` |
+| `GA4_DEFAULT_PROPERTY_ID` | Default GA4 property ID | None | `123456789` |
 | `GSC_DEFAULT_SITE` | Default GSC site URL | None | `sc-domain:example.com` |
 | `GA4_CONFIG_DIR` | Directory for YAML configs | `./configs` | `/path/to/configs` |
 | `GA4_TIMEOUT` | CLI execution timeout (ms) | `30000` | `60000` |
@@ -284,7 +284,7 @@ ga4_report({})
 {
   "env": {
     "GOOGLE_APPLICATION_CREDENTIALS": "/dev/credentials.json",
-    "GA4_DEFAULT_PROPERTY_ID": "513885304",
+    "GA4_DEFAULT_PROPERTY_ID": "987654321",
     "GSC_DEFAULT_SITE": "sc-domain:dev.example.com"
   }
 }
@@ -300,7 +300,7 @@ ga4_report({})
 # Project metadata
 project:
   name: "My Website"                    # Required: Project name
-  property_id: "513421535"              # Required: GA4 property ID
+  property_id: "123456789"              # Required: GA4 property ID
   timezone: "America/New_York"          # Optional: Property timezone
 
 # GA4 configuration
@@ -373,7 +373,7 @@ gsc:
 ```yaml
 project:
   name: "My Site"
-  property_id: "513421535"
+  property_id: "123456789"
 
 ga4:
   conversions:
@@ -386,7 +386,7 @@ ga4:
 ```yaml
 project:
   name: "Tech Blog"
-  property_id: "513421535"
+  property_id: "123456789"
   timezone: "America/New_York"
 
 ga4:
@@ -435,7 +435,7 @@ gsc:
 ```yaml
 project:
   name: "Online Store"
-  property_id: "513885304"
+  property_id: "987654321"
 
 ga4:
   conversions:
