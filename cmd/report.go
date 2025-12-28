@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"os"
 
@@ -22,6 +23,8 @@ var reportCmd = &cobra.Command{
 var (
 	reportAll        bool
 	reportConfigPath string
+	reportExport     string
+	reportOutput     string
 )
 
 func init() {
@@ -29,14 +32,12 @@ func init() {
 	reportCmd.Flags().StringVarP(&projectName, "project", "p", "", "Config file name (e.g., basic-ecommerce, content-site)")
 	reportCmd.Flags().BoolVarP(&reportAll, "all", "a", false, "Report on all projects")
 	reportCmd.Flags().StringVarP(&reportConfigPath, "config", "c", "", "Path to configuration file")
+	reportCmd.Flags().StringVarP(&reportExport, "export", "e", "", "Export format: csv, json, or markdown")
+	reportCmd.Flags().StringVarP(&reportOutput, "output", "o", "", "Output file path (default: stdout or auto-generated filename)")
 }
 
 func runReport(cmd *cobra.Command, args []string) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
-
-	fmt.Printf("%s GA4 Configuration Report\n", cyan("📊"))
-	fmt.Println("═══════════════════════════════════════════════")
-	fmt.Println()
 
 	// Create GA4 client
 	client, err := ga4.NewClient()
@@ -50,6 +51,16 @@ func runReport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Handle export mode
+	if reportExport != "" {
+		return exportReports(client, projects, reportExport, reportOutput)
+	}
+
+	// Normal display mode
+	fmt.Printf("%s GA4 Configuration Report\n", cyan("📊"))
+	fmt.Println("═══════════════════════════════════════════════")
+	fmt.Println()
+
 	// Report on each project
 	for i, project := range projects {
 		if i > 0 {
@@ -62,6 +73,62 @@ func runReport(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return nil
+}
+
+// exportReports handles exporting reports in various formats
+func exportReports(client *ga4.Client, projects []config.Project, format, outputPath string) error {
+	format = strings.ToLower(format)
+
+	// Validate format
+	if format != "csv" && format != "json" && format != "markdown" && format != "md" {
+		return fmt.Errorf("invalid export format: %s (supported: csv, json, markdown)", format)
+	}
+
+	// Normalize markdown format
+	if format == "md" {
+		format = "markdown"
+	}
+
+	fmt.Printf("📤 Exporting reports in %s format...\n\n", strings.ToUpper(format))
+
+	// Export each project
+	for _, project := range projects {
+		fmt.Printf("Collecting data for %s...\n", project.Name)
+
+		data, err := collectReportData(client, project)
+		if err != nil {
+			return fmt.Errorf("failed to collect report data for %s: %w", project.Name, err)
+		}
+
+		// Generate output path if not specified
+		output := outputPath
+		if output == "" && len(projects) > 1 {
+			output = generateDefaultFilename(project.Name, format)
+		} else if output == "" {
+			output = generateDefaultFilename(project.Name, format)
+		}
+
+		// Export based on format
+		switch format {
+		case "json":
+			if err := exportToJSON(data, output); err != nil {
+				return err
+			}
+		case "csv":
+			if err := exportToCSV(data, output); err != nil {
+				return err
+			}
+		case "markdown":
+			if err := exportToMarkdown(data, output); err != nil {
+				return err
+			}
+		}
+
+		fmt.Println()
+	}
+
+	fmt.Println("✓ Export completed successfully!")
 	return nil
 }
 

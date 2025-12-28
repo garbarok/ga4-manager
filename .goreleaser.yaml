@@ -75,33 +75,39 @@ release:
   header: |
     ## GA4 Manager {{.Version}}
 
-    ### Installation
+    ### Quick Start (Easiest Method)
 
-    **macOS (Homebrew)**:
-    ```bash
-    brew tap garbarok/homebrew-tap
-    brew install ga4
-    ```
-
-    **Manual Installation**:
-    Download the appropriate binary for your platform below, extract it, and add it to your PATH.
+    Download and run - the binary will offer to install itself automatically:
 
     **Linux (amd64)**:
     ```bash
     curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-linux-amd64.tar.gz
     tar -xzf ga4.tar.gz
-    sudo mv ga4 /usr/local/bin/
+    ./ga4
     ```
 
     **macOS (Apple Silicon)**:
     ```bash
     curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-darwin-arm64.tar.gz
     tar -xzf ga4.tar.gz
-    sudo mv ga4 /usr/local/bin/
+    ./ga4
     ```
 
+    **macOS (Intel)**:
+    ```bash
+    curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-darwin-amd64.tar.gz
+    tar -xzf ga4.tar.gz
+    ./ga4
+    ```
+
+    On first run, GA4 Manager will:
+    - ✅ Create configuration directories automatically
+    - ✅ Offer to install itself to `/usr/local/bin` (optional, with sudo)
+    - ✅ Provide manual installation instructions if you decline
+
     **Windows**:
-    Download `ga4-{{.Version}}-windows-amd64.zip`, extract it, and add the directory to your PATH.
+    Download `ga4-{{.Version}}-windows-amd64.zip`, extract it, and run `ga4.exe`.
+    Follow the on-screen instructions for installation options.
 
   footer: |
     ### Verify Your Installation

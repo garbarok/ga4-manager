@@ -3,6 +3,7 @@ package ga4
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/validation"
@@ -77,6 +78,13 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetri
 	property := fmt.Sprintf("properties/%s", propertyID)
 	_, err := c.admin.Properties.CustomMetrics.Create(property, customMetric).Context(c.ctx).Do()
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "alreadyExists") {
+			c.logger.Debug("custom metric already exists",
+				slog.String("display_name", metric.DisplayName),
+				slog.String("parameter_name", metric.EventParameter),
+			)
+			return nil // Already exists, not an error
+		}
 		c.logger.Error("failed to create custom metric",
 			slog.String("display_name", metric.DisplayName),
 			slog.String("property_id", propertyID),

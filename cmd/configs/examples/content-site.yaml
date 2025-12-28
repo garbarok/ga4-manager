@@ -1,0 +1,37 @@
+# Content/Blog Site Configuration Example
+
+project:
+  name: "Content Site"
+  description: "Content and blog tracking setup"
+
+ga4:
+  property_id: "YOUR_PROPERTY_ID"
+
+conversions:
+  - name: "subscribe"
+    counting_method: "ONCE_PER_SESSION"
+  
+  - name: "download"
+    counting_method: "ONCE_PER_EVENT"
+  
+  - name: "share"
+    counting_method: "ONCE_PER_EVENT"
+
+dimensions:
+  - parameter: "content_category"
+    display_name: "Content Category"
+    scope: "EVENT"
+  
+  - parameter: "author"
+    display_name: "Author"
+    scope: "EVENT"
+  
+  - parameter: "user_type"
+    display_name: "User Type"
+    scope: "USER"
+
+metrics:
+  - parameter: "read_time"
+    display_name: "Read Time"
+    scope: "EVENT"
+    unit: "SECONDS"

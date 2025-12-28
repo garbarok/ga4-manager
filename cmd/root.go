@@ -27,6 +27,10 @@ It helps you automate:
 - Cleaning up unused configurations
 
 Configure your projects using YAML config files.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// If no subcommand is provided, launch interactive mode
+		RunInteractive()
+	},
 }
 
 func Execute() {
@@ -40,6 +44,15 @@ func init() {
 	rootCmd.Version = Version
 	loadEnvironmentConfig()
 	validateCredentials()
+
+	// Ensure config directory exists for all commands
+	// This is especially important for users who download the binary
+	// without cloning the repository
+	if err := ensureConfigDirectoryExists(); err != nil {
+		// Don't exit here - let commands that need configs handle the error
+		// This allows commands like --help and --version to work
+		log.Printf("Note: %v\n", err)
+	}
 }
 
 // loadEnvironmentConfig loads environment from .env if present.
