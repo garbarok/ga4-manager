@@ -5,6 +5,54 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-12-28
+
+### Added
+
+- **gsc_index_coverage** - New tool for analyzing index coverage from Search Console
+  - Impression-based classification (≥10 = indexed, 1-9 = low visibility, 0 = not indexed)
+  - Sample limit of 1,000 pages for performance
+  - Supports multiple date ranges and aggregations
+
+### Changed
+
+- **BREAKING**: Enhanced mobile usability structure in `gsc_inspect_url`
+  - Mobile issues now return structured `MobileUsabilityIssue[]` with `issue_type`, `severity`, `message`
+  - Previous format: flat array of strings
+  - Migration: Update code expecting mobile_issues to handle new object structure
+
+- **Enhanced**: `gsc_inspect_url` now includes rich results validation
+  - Added `rich_result_types: string[]` - List of detected rich result types
+  - Added `rich_result_items: RichResultItem[]` - Detailed items with type, name, and issues
+  - Backward compatible: Legacy `rich_results_issues` field maintained
+
+- **Enhanced**: Dual-mode URL monitoring in `gsc_monitor_urls`
+  - Now supports direct URL array: `{ site: string, urls: string[] }` (max 50 URLs)
+  - Config file mode still supported for larger batches
+  - Both modes support dry-run preview
+
+### Fixed
+
+- Improved error handling in Go backend helper functions
+  - `findConversionByEventName` now returns explicit errors instead of masking API failures
+  - `findDimensionByParameterName` distinguishes between "not found" and API errors
+  - Better error context for debugging
+
+- Broadened authentication error detection
+  - Added 5 new patterns: `authentication required`, `not authenticated`, `access token`, `oauth`, `service account`, `login required`
+  - More reliable error identification and suggestions
+
+- Fixed cleanup command flag documentation to include "metrics" option
+- Added `MEASUREMENT_UNIT_UNSPECIFIED` validation for GA4 metrics
+- Simplified redundant test conditionals
+- Added language specifiers to all documentation code blocks for better syntax highlighting
+
+### Technical
+
+- All 721 MCP tests passing
+- Go build successful with 0 lint issues
+- CodeRabbitAI review: All 34 issues resolved (9 actionable + 25 documentation)
+
 ## [1.0.0] - 2024-12-27
 
 ### Added

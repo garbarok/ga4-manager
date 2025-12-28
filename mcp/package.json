@@ -1,6 +1,6 @@
 {
   "name": "ga4-manager-mcp",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "MCP server for GA4 Manager - Analytics and Search Console tools",
   "type": "module",
   "main": "dist/index.js",
