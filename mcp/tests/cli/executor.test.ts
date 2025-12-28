@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CLIExecutor } from '../../src/cli/executor';
 import type { CLIResult } from '../../src/types/cli';
+import path from 'path';
 
 describe('CLIExecutor', () => {
   let executor: CLIExecutor;
-  // Binary is in parent directory (ga4-manager/ga4)
-  const testBinaryPath = '../ga4';
+  // Binary path: use env var or resolve from project root
+  const testBinaryPath = process.env.GA4_BINARY_PATH || path.resolve(__dirname, '../../../ga4');
 
   beforeEach(() => {
     executor = new CLIExecutor(testBinaryPath);
@@ -57,9 +58,17 @@ describe('CLIExecutor', () => {
       expect(result.stderr).not.toMatch(/\x1b\[[0-9;]*m/);
     });
 
-    it.skip('should handle timeout', async () => {
-      // Skipping: Requires a long-running command which ga4 doesn't provide
-      // Timeout functionality is tested implicitly through other tests
+    it('should handle timeout', async () => {
+      // Use a separate executor with /bin/sleep to test timeout
+      const sleepExecutor = new CLIExecutor('/bin/sleep');
+
+      await expect(
+        sleepExecutor.execute({
+          command: '5', // sleep for 5 seconds
+          args: [],
+          timeout: 100 // but timeout after 100ms
+        })
+      ).rejects.toThrow('Command execution timeout after 100ms');
     });
 
     it('should track execution duration', async () => {

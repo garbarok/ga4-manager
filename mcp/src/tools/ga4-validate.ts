@@ -19,7 +19,7 @@ export const ga4ValidateInputSchema = z.object({
 }).refine(
   (data) => data.config_file || data.all,
   {
-    message: 'At least one of config_file or all must be provided',
+    error: 'At least one of config_file or all must be provided',
   }
 );
 

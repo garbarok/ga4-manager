@@ -20,7 +20,7 @@ export const ga4ReportInputSchema = z.object({
 }).refine(
   (data) => data.config_path || data.project_name || data.all,
   {
-    message: 'At least one of config_path, project_name, or all must be provided',
+    error: 'At least one of config_path, project_name, or all must be provided',
   }
 );
 

@@ -36,7 +36,7 @@ describe('gsc_monitor_urls tool', () => {
       const input = { config: 'configs/mysite.yaml', dry_run: true, format: 'markdown' };
       const result = gscMonitorUrlsInputSchema.safeParse(input);
       expect(result.success).toBe(true);
-      if (result.success) {
+      if (result.success && 'config' in result.data) {
         expect(result.data.config).toBe('configs/mysite.yaml');
         expect(result.data.dry_run).toBe(true);
         expect(result.data.format).toBe('markdown');
@@ -69,6 +69,71 @@ describe('gsc_monitor_urls tool', () => {
         expect(result.data.dry_run).toBe(false);
         expect(result.data.format).toBe('json');
       }
+    });
+
+    // NEW: URL array mode tests (v2.0.0)
+    it('accepts direct URL array with site', () => {
+      const input = {
+        site: 'sc-domain:example.com',
+        urls: ['https://example.com/', 'https://example.com/about'],
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(true);
+      if (result.success && 'urls' in result.data) {
+        expect(result.data.site).toBe('sc-domain:example.com');
+        expect(result.data.urls).toHaveLength(2);
+        expect(result.data.urls[0]).toBe('https://example.com/');
+      }
+    });
+
+    it('accepts URL array with optional parameters', () => {
+      const input = {
+        site: 'https://example.com/',
+        urls: ['https://example.com/page1'],
+        dry_run: true,
+        format: 'json',
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(true);
+      if (result.success && 'urls' in result.data) {
+        expect(result.data.dry_run).toBe(true);
+        expect(result.data.format).toBe('json');
+      }
+    });
+
+    it('rejects URL array without site', () => {
+      const input = {
+        urls: ['https://example.com/'],
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects empty URL array', () => {
+      const input = {
+        site: 'sc-domain:example.com',
+        urls: [],
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects URL array exceeding 50 URLs', () => {
+      const input = {
+        site: 'sc-domain:example.com',
+        urls: Array(51).fill('https://example.com/page'),
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects invalid URLs in array', () => {
+      const input = {
+        site: 'sc-domain:example.com',
+        urls: ['not-a-url', 'https://example.com/'],
+      };
+      const result = gscMonitorUrlsInputSchema.safeParse(input);
+      expect(result.success).toBe(false);
     });
   });
 

@@ -26,6 +26,24 @@ export interface IndexingIssue {
 }
 
 /**
+ * Mobile usability issue (BREAKING CHANGE in v2.0.0)
+ */
+export interface MobileUsabilityIssue {
+  issue_type: string;
+  severity: 'ERROR' | 'WARNING';
+  message: string;
+}
+
+/**
+ * Rich result item detected on the page (NEW in v2.0.0)
+ */
+export interface RichResultItem {
+  type: string;        // Rich result type (e.g., "Recipe", "FAQ", "Breadcrumb")
+  name?: string;       // Item name (e.g., "Chocolate Cake Recipe")
+  issues: string[];    // Validation issues for this specific item
+}
+
+/**
  * Quota status for URL inspection API
  */
 export interface InspectQuotaStatus {
@@ -51,9 +69,11 @@ export interface InspectUrlOutput {
   indexing_allowed?: boolean;
   robots_blocked?: boolean;
   mobile_usability?: 'PASS' | 'FAIL';
-  mobile_issues?: string[];
+  mobile_issues?: MobileUsabilityIssue[]; // BREAKING CHANGE in v2.0.0: Changed from string[]
   rich_results_status?: 'PASS' | 'FAIL';
   rich_results_issues?: string[];
+  rich_result_types?: string[];          // NEW in v2.0.0: Detected rich result types
+  rich_result_items?: RichResultItem[];  // NEW in v2.0.0: Detailed rich result items
   issues: IndexingIssue[];
   quota?: InspectQuotaStatus;
   error?: string;
@@ -129,28 +149,6 @@ function parseIssues(output: string): IndexingIssue[] {
   return issues;
 }
 
-/**
- * Parse mobile issues from output
- */
-function parseMobileIssues(output: string): string[] {
-  const issues: string[] = [];
-
-  // Look for Mobile Issues section
-  const mobileSection = output.match(/Mobile Issues:\s*([\s\S]*?)(?=\n\n|Rich Results:|Issues Found:|$)/);
-  if (mobileSection) {
-    const issueLines = mobileSection[1].match(/-\s*(.+)/g);
-    if (issueLines) {
-      for (const line of issueLines) {
-        const issueMatch = line.match(/-\s*(.+)/);
-        if (issueMatch) {
-          issues.push(issueMatch[1].trim());
-        }
-      }
-    }
-  }
-
-  return issues;
-}
 
 /**
  * Parse rich results issues from output
@@ -173,6 +171,93 @@ function parseRichResultsIssues(output: string): string[] {
   }
 
   return issues;
+}
+
+/**
+ * Parse rich result types from output
+ * Example: "Detected Types: Recipe, FAQ, Breadcrumb"
+ */
+function parseRichResultTypes(output: string): string[] {
+  const types: string[] = [];
+
+  // Match "Detected Types: TYPE1, TYPE2, ..."
+  const typesMatch = output.match(/Detected Types:\s*([^\n]+)/);
+  if (typesMatch) {
+    const typesStr = typesMatch[1].trim();
+    if (typesStr !== 'None' && typesStr !== '') {
+      // Split by comma and trim each type
+      const detectedTypes = typesStr.split(',').map(t => t.trim());
+      types.push(...detectedTypes);
+    }
+  }
+
+  return types;
+}
+
+/**
+ * Parse rich result items from output
+ * Example format:
+ *   Detected Items:
+ *     1. Recipe - Chocolate Cake Recipe
+ *        Issues:
+ *          - Missing required field 'recipeYield'
+ */
+function parseRichResultItems(output: string): RichResultItem[] {
+  const items: RichResultItem[] = [];
+
+  // Look for "Detected Items:" section
+  const detectedSection = output.match(/Detected Items:\s*([\s\S]*?)(?=\n\n|Rich Results Issues:|Issues Found:|Daily Quota|$)/);
+  if (!detectedSection) {
+    return items;
+  }
+
+  const itemsText = detectedSection[1];
+
+  // Split by numbered items (look for pattern like "1.", "2.", etc. at start of line)
+  const lines = itemsText.split('\n');
+  let currentItem: RichResultItem | null = null;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+
+    // Check if this is a numbered item line
+    const itemMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+    if (itemMatch) {
+      // Save previous item if exists
+      if (currentItem) {
+        items.push(currentItem);
+      }
+
+      // Parse new item: "Type - Name" or just "Type"
+      const itemContent = itemMatch[2];
+      const nameSplit = itemContent.split(' - ');
+      const type = nameSplit[0].trim();
+      const name = nameSplit.length > 1 ? nameSplit.slice(1).join(' - ').trim() : undefined;
+
+      currentItem = {
+        type,
+        name,
+        issues: [],
+      };
+    } else if (trimmedLine.startsWith('Issues:')) {
+      // Skip the "Issues:" header
+      continue;
+    } else if (trimmedLine.startsWith('-')) {
+      // This is an issue line
+      const issueText = trimmedLine.substring(1).trim();
+      if (currentItem && issueText) {
+        currentItem.issues.push(issueText);
+      }
+    }
+  }
+
+  // Don't forget to add the last item
+  if (currentItem) {
+    items.push(currentItem);
+  }
+
+  return items;
 }
 
 /**
@@ -296,12 +381,6 @@ export function parseInspectUrlOutput(output: string): InspectUrlOutput {
   // Extract mobile usability
   result.mobile_usability = parseMobileUsability(output);
 
-  // Extract mobile issues
-  const mobileIssues = parseMobileIssues(output);
-  if (mobileIssues.length > 0) {
-    result.mobile_issues = mobileIssues;
-  }
-
   // Extract rich results status
   if (output.includes('Rich Results:')) {
     if (output.includes('Valid (PASS)') || /✓\s*Valid\s*\(PASS\)/.test(output)) {
@@ -317,8 +396,36 @@ export function parseInspectUrlOutput(output: string): InspectUrlOutput {
     result.rich_results_issues = richIssues;
   }
 
+  // Extract rich result types (NEW in v2.0.0)
+  const richTypes = parseRichResultTypes(output);
+  if (richTypes.length > 0) {
+    result.rich_result_types = richTypes;
+  }
+
+  // Extract rich result items (NEW in v2.0.0)
+  const richItems = parseRichResultItems(output);
+  if (richItems.length > 0) {
+    result.rich_result_items = richItems;
+  }
+
   // Parse indexing issues from table
   result.issues = parseIssues(output);
+
+  // Extract mobile issues from parsed issues array (v2.0.0 breaking change)
+  // Mobile issues have issue_type starting with "MOBILE_"
+  const mobileIssues: MobileUsabilityIssue[] = [];
+  for (const issue of result.issues) {
+    if (issue.issue_type.startsWith('MOBILE_')) {
+      mobileIssues.push({
+        issue_type: issue.issue_type.substring(7), // Remove "MOBILE_" prefix
+        severity: issue.severity,
+        message: issue.message.replace(/^Mobile usability issue:\s*/i, ''), // Clean message
+      });
+    }
+  }
+  if (mobileIssues.length > 0) {
+    result.mobile_issues = mobileIssues;
+  }
 
   // Parse quota status
   result.quota = parseQuotaStatus(output);

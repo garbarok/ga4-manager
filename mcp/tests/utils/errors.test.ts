@@ -14,7 +14,7 @@ describe('mapCLIError', () => {
     const error: CLIError = mapCLIError(result, 'ga4_setup');
 
     expect(error.code).toBe('AUTH_ERROR');
-    expect(error.message).toContain('Google credentials');
+    expect(error.message).toContain('Authentication failed');
     expect(error.details.suggestion).toContain('GOOGLE_APPLICATION_CREDENTIALS');
   });
 

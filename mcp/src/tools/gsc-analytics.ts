@@ -53,7 +53,7 @@ export const gscAnalyticsRunInputSchema = z.object({
 }).refine(
   (data) => data.site || data.config,
   {
-    message: 'Either site or config must be provided',
+    error: 'Either site or config must be provided',
   }
 );
 

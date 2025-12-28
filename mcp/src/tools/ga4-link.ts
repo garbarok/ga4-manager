@@ -31,7 +31,7 @@ export const ga4LinkInputSchema = z.object({
 }).refine(
   (data) => data.service || data.list || data.unlink,
   {
-    message: 'At least one of service, list, or unlink must be provided',
+    error: 'At least one of service, list, or unlink must be provided',
   }
 ).refine(
   (data) => {
@@ -42,7 +42,7 @@ export const ga4LinkInputSchema = z.object({
     return true;
   },
   {
-    message: 'url is required when service is search-console',
+    error: 'url is required when service is search-console',
   }
 ).refine(
   (data) => {
@@ -53,7 +53,7 @@ export const ga4LinkInputSchema = z.object({
     return true;
   },
   {
-    message: 'gcp_project and dataset are required when service is bigquery',
+    error: 'gcp_project and dataset are required when service is bigquery',
   }
 );
 

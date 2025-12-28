@@ -7,6 +7,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { CLIExecutor } from './cli/executor.js'
 import { mapCLIError } from './utils/errors.js'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
 // Import GA4 tools
 import { ga4SetupTool } from './tools/ga4-setup.js'
@@ -25,6 +27,7 @@ import {
 import { gscInspectUrlTool } from './tools/gsc-inspect.js'
 import { gscAnalyticsRunTool } from './tools/gsc-analytics.js'
 import { gscMonitorUrlsTool } from './tools/gsc-monitor.js'
+import { gscIndexCoverageTool } from './tools/gsc-coverage.js'
 
 /**
  * GA4 Manager MCP Server
@@ -33,8 +36,12 @@ import { gscMonitorUrlsTool } from './tools/gsc-monitor.js'
  * and Claude Code CLI.
  */
 
-// Get binary path from environment or use default
-const binaryPath = process.env.GA4_BINARY_PATH || '../ga4'
+// Get current file's directory for reliable path resolution
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Get binary path from environment or use default (relative to dist/)
+const binaryPath = process.env.GA4_BINARY_PATH || join(__dirname, '../../ga4')
 
 // Initialize CLI executor
 const executor = new CLIExecutor(binaryPath)
@@ -65,7 +72,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       ga4LinkTool,
       ga4ValidateTool,
 
-      // GSC Tools (7)
+      // GSC Tools (8)
       gscSitemapsListTool,
       gscSitemapsSubmitTool,
       gscSitemapsDeleteTool,
@@ -73,6 +80,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       gscInspectUrlTool,
       gscAnalyticsRunTool,
       gscMonitorUrlsTool,
+      gscIndexCoverageTool,
     ],
   }
 })
@@ -380,25 +388,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const {
           buildMonitorUrlsArgs,
           parseMonitorUrlsOutput,
+          processUrlArrayMode,
           gscMonitorUrlsInputSchema,
         } = await import('./tools/gsc-monitor.js')
         const input = gscMonitorUrlsInputSchema.parse(args)
-        const cliArgs = buildMonitorUrlsArgs(input)
+
+        // Check which mode: config-based or URL array
+        if ('urls' in input) {
+          // NEW v2.0.0: Direct URL array mode
+          const output = await processUrlArrayMode(input, async (site, url) => {
+            // Execute gsc inspect url command for each URL
+            const inspectResult = await executor.execute({
+              command: 'gsc',
+              args: ['inspect', 'url', '--site', site, '--url', url],
+            })
+            return inspectResult
+          })
+
+          return {
+            content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+            isError: !output.success,
+          }
+        } else {
+          // Existing config-based mode
+          const cliArgs = buildMonitorUrlsArgs(input)
+          const result = await executor.execute({
+            command: 'gsc',
+            args: cliArgs.slice(1),
+          })
+
+          if (result.exitCode !== 0) {
+            const error = mapCLIError(result, 'gsc_monitor_urls')
+            return {
+              content: [{ type: 'text', text: JSON.stringify(error, null, 2) }],
+              isError: true,
+            }
+          }
+
+          // NOTE: parseMonitorUrlsOutput takes TWO parameters (output, input)
+          const output = parseMonitorUrlsOutput(result.stdout, input)
+          return {
+            content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          }
+        }
+      }
+
+      case 'gsc_index_coverage': {
+        const {
+          buildIndexCoverageArgs,
+          parseIndexCoverageOutput,
+          gscIndexCoverageInputSchema,
+        } = await import('./tools/gsc-coverage.js')
+        const input = gscIndexCoverageInputSchema.parse(args)
+        const cliArgs = buildIndexCoverageArgs(input)
         const result = await executor.execute({
           command: 'gsc',
           args: cliArgs.slice(1),
         })
 
         if (result.exitCode !== 0) {
-          const error = mapCLIError(result, 'gsc_monitor_urls')
+          const error = mapCLIError(result, 'gsc_index_coverage')
           return {
             content: [{ type: 'text', text: JSON.stringify(error, null, 2) }],
             isError: true,
           }
         }
 
-        // NOTE: parseMonitorUrlsOutput takes TWO parameters (output, input)
-        const output = parseMonitorUrlsOutput(result.stdout, input)
+        const output = parseIndexCoverageOutput(result.stdout)
         return {
           content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
         }

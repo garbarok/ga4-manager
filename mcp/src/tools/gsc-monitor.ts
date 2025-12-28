@@ -6,15 +6,32 @@ import { z } from 'zod';
 
 /**
  * Input schema for gsc_monitor_urls tool
+ * Supports two modes:
+ * 1. Config-based: { config: string, dry_run?: boolean, format?: string }
+ * 2. Direct URL array (NEW in v2.0.0): { site: string, urls: string[], dry_run?: boolean, format?: string }
  */
-export const gscMonitorUrlsInputSchema = z.object({
-  /** Path to configuration file with URLs to monitor */
-  config: z.string().min(1, 'Config file path is required'),
-  /** Preview without making API calls */
-  dry_run: z.boolean().optional().default(false),
-  /** Output format: json, table, or markdown */
-  format: z.string().optional().default('json'),
-});
+export const gscMonitorUrlsInputSchema = z.union([
+  // Existing config-based approach
+  z.object({
+    /** Path to configuration file with URLs to monitor */
+    config: z.string().min(1, 'Config file path is required'),
+    /** Preview without making API calls */
+    dry_run: z.boolean().optional().default(false),
+    /** Output format: json, table, or markdown */
+    format: z.string().optional().default('json'),
+  }),
+  // NEW: Direct URL array approach (v2.0.0)
+  z.object({
+    /** Site URL: domain property (sc-domain:example.com) or URL prefix (https://example.com/) */
+    site: z.string().min(1, 'Site URL is required'),
+    /** URLs to monitor (max 50) */
+    urls: z.array(z.string().url()).min(1, 'At least one URL required').max(50, 'Maximum 50 URLs allowed'),
+    /** Preview without making API calls */
+    dry_run: z.boolean().optional().default(false),
+    /** Output format: json, table, or markdown */
+    format: z.string().optional().default('json'),
+  }),
+]);
 
 /** Input type for gsc_monitor_urls (with optional fields) */
 export type GscMonitorUrlsInput = z.input<typeof gscMonitorUrlsInputSchema>;
@@ -100,8 +117,14 @@ export interface MonitorUrlsOutput {
 
 /**
  * Build CLI arguments for monitor URLs
+ * Only works for config-based input (not URL array mode)
  */
 export function buildMonitorUrlsArgs(input: GscMonitorUrlsInput): string[] {
+  // Type guard: only config-based input can use CLI
+  if (!('config' in input)) {
+    throw new Error('buildMonitorUrlsArgs() requires config-based input');
+  }
+
   const args = ['gsc', 'monitor', 'run', '--config', input.config];
 
   if (input.dry_run) {
@@ -270,13 +293,13 @@ function parseTableOutput(output: string): URLInspectionResult[] {
       robots_blocked: false,
       indexing_allowed: indexStatus !== 'FAIL',
       mobile_usable: mobileUsable,
-      mobile_issues: mobileIssuesCount > 0 ? new Array(mobileIssuesCount).fill('Mobile issue detected') : [],
+      mobile_issues: mobileIssuesCount > 0 ? Array.from({ length: mobileIssuesCount }, () => 'Mobile issue detected') : [],
       rich_results_issues: [],
-      indexing_issues: issuesCount > 0 ? new Array(issuesCount).fill({
+      indexing_issues: issuesCount > 0 ? Array.from({ length: issuesCount }, () => ({
         severity: 'WARNING' as const,
         message: 'Issue detected',
         issue_type: 'UNKNOWN',
-      }) : [],
+      })) : [],
     };
 
     results.push(result);
@@ -382,6 +405,92 @@ function parseQuotaStatus(output: string): QuotaStatus | null {
   }
 
   return null;
+}
+
+/**
+ * Process URL array mode by inspecting each URL individually
+ * This is the internal handler for v2.0.0 direct URL array feature
+ */
+export async function processUrlArrayMode(
+  input: { site: string; urls: string[]; dry_run?: boolean; format?: string },
+  executeInspect: (site: string, url: string) => Promise<{ stdout: string; exitCode: number }>
+): Promise<MonitorUrlsOutput> {
+  const result: MonitorUrlsOutput = {
+    success: true,
+    operation: 'monitor',
+    site: input.site,
+    dry_run: input.dry_run || false,
+    format: input.format || 'json',
+  };
+
+  // Handle dry-run mode
+  if (input.dry_run) {
+    result.preview = {
+      site: input.site,
+      urls_to_inspect: input.urls,
+      url_count: input.urls.length,
+      estimated_quota_usage: input.urls.length,
+    };
+    return result;
+  }
+
+  // Inspect each URL
+  const results: URLInspectionResult[] = [];
+  for (const url of input.urls) {
+    try {
+      const inspectResult = await executeInspect(input.site, url);
+
+      if (inspectResult.exitCode !== 0) {
+        // If any URL fails, return error
+        result.success = false;
+        result.error = `Failed to inspect URL: ${url}`;
+        return result;
+      }
+
+      // Parse the inspection output using gsc-inspect parser
+      // We'll need to import this dynamically to avoid circular dependency
+      const { parseInspectUrlOutput } = await import('./gsc-inspect.js');
+      const inspectOutput = parseInspectUrlOutput(inspectResult.stdout);
+
+      if (!inspectOutput.success) {
+        result.success = false;
+        result.error = inspectOutput.error || `Failed to inspect URL: ${url}`;
+        return result;
+      }
+
+      // Transform to URLInspectionResult format
+      results.push({
+        url: inspectOutput.url || url,
+        index_status: inspectOutput.verdict || 'NEUTRAL',
+        coverage_state: inspectOutput.coverage_state || '',
+        last_crawl_time: inspectOutput.last_crawl,
+        google_canonical: inspectOutput.google_canonical,
+        user_canonical: inspectOutput.user_canonical,
+        robots_blocked: inspectOutput.robots_blocked || false,
+        indexing_allowed: inspectOutput.indexing_allowed !== false,
+        mobile_usable: inspectOutput.mobile_usability === 'PASS',
+        mobile_issues: inspectOutput.mobile_issues?.map(issue =>
+          `${issue.severity}: ${issue.message}`
+        ) || [],
+        rich_results_status: inspectOutput.rich_results_status,
+        rich_results_issues: inspectOutput.rich_results_issues || [],
+        indexing_issues: inspectOutput.issues.map(issue => ({
+          severity: issue.severity,
+          message: issue.message,
+          issue_type: issue.issue_type,
+        })),
+      });
+    } catch (error) {
+      result.success = false;
+      result.error = `Error inspecting URL ${url}: ${error instanceof Error ? error.message : String(error)}`;
+      return result;
+    }
+  }
+
+  result.results = results;
+  result.summary = calculateSummary(results);
+
+  return result;
 }
 
 /**
@@ -499,27 +608,60 @@ export function parseMonitorUrlsOutput(output: string, input: GscMonitorUrlsInpu
  */
 export const gscMonitorUrlsTool = {
   name: 'gsc_monitor_urls',
-  description: 'Monitor multiple URLs for indexing issues using configuration from a YAML file. Returns inspection results with index status, mobile usability, and any issues detected.',
+  description: 'Monitor multiple URLs for indexing issues. Supports two modes: 1) Config-based: Load URLs from YAML file, 2) Direct array (NEW v2.0.0): Pass URLs directly as array (max 50 URLs). Returns inspection results with index status, mobile usability, and any issues detected.',
   inputSchema: {
     type: 'object',
-    properties: {
-      config: {
-        type: 'string',
-        description: 'Path to configuration file with URLs to monitor (YAML format with search_console.url_inspection.priority_urls)',
+    oneOf: [
+      {
+        type: 'object',
+        properties: {
+          config: {
+            type: 'string',
+            description: 'Path to configuration file with URLs to monitor (YAML format with search_console.url_inspection.priority_urls)',
+          },
+          dry_run: {
+            type: 'boolean',
+            description: 'Preview URLs without making API calls (recommended first step)',
+            default: false,
+          },
+          format: {
+            type: 'string',
+            enum: ['json', 'table', 'markdown'],
+            description: 'Output format for results',
+            default: 'json',
+          },
+        },
+        required: ['config'],
       },
-      dry_run: {
-        type: 'boolean',
-        description: 'Preview URLs without making API calls (recommended first step)',
-        default: false,
+      {
+        type: 'object',
+        properties: {
+          site: {
+            type: 'string',
+            description: 'Site URL: domain property (sc-domain:example.com) or URL prefix (https://example.com/)',
+          },
+          urls: {
+            type: 'array',
+            items: { type: 'string', format: 'uri' },
+            minItems: 1,
+            maxItems: 50,
+            description: 'URLs to monitor (max 50 URLs)',
+          },
+          dry_run: {
+            type: 'boolean',
+            description: 'Preview URLs without making API calls',
+            default: false,
+          },
+          format: {
+            type: 'string',
+            enum: ['json', 'table', 'markdown'],
+            description: 'Output format for results',
+            default: 'json',
+          },
+        },
+        required: ['site', 'urls'],
       },
-      format: {
-        type: 'string',
-        enum: ['json', 'table', 'markdown'],
-        description: 'Output format for results',
-        default: 'json',
-      },
-    },
-    required: ['config'],
+    ],
   },
 };
 

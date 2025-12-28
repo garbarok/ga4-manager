@@ -22,7 +22,16 @@ type URLInspectionResult struct {
 	MobileIssues      []string
 	RichResultsStatus string
 	RichResultsIssues []string
+	RichResultTypes   []string         // e.g., ["Recipe", "FAQ", "Breadcrumb"]
+	RichResultItems   []RichResultItem // Individual detected items with details
 	IndexingIssues    []IndexingIssue
+}
+
+// RichResultItem represents a detected rich result item
+type RichResultItem struct {
+	Type   string   // Rich result type (e.g., "Recipe", "FAQ")
+	Name   string   // Item name (e.g., "Chocolate Cake Recipe")
+	Issues []string // Validation issues for this specific item
 }
 
 // IndexingIssue represents a specific indexing problem
@@ -133,6 +142,8 @@ func transformInspectionResponse(response *searchconsole.InspectUrlIndexResponse
 		IndexingIssues:    make([]IndexingIssue, 0),
 		MobileIssues:      make([]string, 0),
 		RichResultsIssues: make([]string, 0),
+		RichResultTypes:   make([]string, 0),
+		RichResultItems:   make([]RichResultItem, 0),
 	}
 
 	// Extract inspection result
@@ -204,14 +215,34 @@ func transformInspectionResponse(response *searchconsole.InspectUrlIndexResponse
 		richResults := inspectionResult.RichResultsResult
 		result.RichResultsStatus = richResults.Verdict
 
-		// Extract rich results issues
+		// Extract detected rich result types and items
 		if richResults.DetectedItems != nil {
-			for _, item := range richResults.DetectedItems {
-				if item.Items != nil {
-					for _, richItem := range item.Items {
+			for _, detectedItem := range richResults.DetectedItems {
+				// Add the rich result type (e.g., "Recipe", "FAQ", "Breadcrumb")
+				if detectedItem.RichResultType != "" {
+					result.RichResultTypes = append(result.RichResultTypes, detectedItem.RichResultType)
+				}
+
+				// Extract individual items with their details
+				if detectedItem.Items != nil {
+					for _, richItem := range detectedItem.Items {
+						// Create a RichResultItem for each detected item
+						item := RichResultItem{
+							Type:   detectedItem.RichResultType,
+							Name:   richItem.Name,
+							Issues: make([]string, 0),
+						}
+
+						// Extract issues for this specific item
 						if richItem.Issues != nil {
 							for _, issue := range richItem.Issues {
+								// Add to item-specific issues
+								item.Issues = append(item.Issues, issue.IssueMessage)
+
+								// Also add to legacy flat issues array (for backward compatibility)
 								result.RichResultsIssues = append(result.RichResultsIssues, issue.IssueMessage)
+
+								// Add to general indexing issues array
 								result.IndexingIssues = append(result.IndexingIssues, IndexingIssue{
 									Severity:  severityFromString(issue.Severity),
 									Message:   issue.IssueMessage,
@@ -219,6 +250,9 @@ func transformInspectionResponse(response *searchconsole.InspectUrlIndexResponse
 								})
 							}
 						}
+
+						// Add the item to the results
+						result.RichResultItems = append(result.RichResultItems, item)
 					}
 				}
 			}

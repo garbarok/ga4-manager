@@ -31,7 +31,7 @@ export interface ParsedOutput {
   /** Detected format */
   format: 'json' | 'table' | 'csv' | 'markdown' | 'text';
   /** Parsed data */
-  data: any;
+  data: unknown;
   /** Optional parse error message if parsing failed */
   parseError?: string;
 }

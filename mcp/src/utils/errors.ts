@@ -13,15 +13,25 @@ import type { CLIResult, CLIError } from '../types/cli.js';
 export function mapCLIError(result: CLIResult, toolName: string): CLIError {
   const stderr = result.stderr.toLowerCase();
 
-  // Check for authentication errors
-  if (stderr.includes('google_application_credentials')) {
+  // Check for authentication errors (broader pattern matching)
+  if (
+    stderr.includes('google_application_credentials') ||
+    stderr.includes('authentication failed') ||
+    stderr.includes('invalid credentials') ||
+    stderr.includes('credentials not found') ||
+    stderr.includes('unauthorized') ||
+    stderr.includes('unauthenticated') ||
+    stderr.includes('token expired') ||
+    stderr.includes('401') ||
+    stderr.includes('403 forbidden')
+  ) {
     return {
       code: 'AUTH_ERROR',
-      message: 'Missing Google credentials',
+      message: 'Authentication failed',
       details: {
         stderr: result.stderr,
         exitCode: result.exitCode,
-        suggestion: 'Set GOOGLE_APPLICATION_CREDENTIALS environment variable to path of your service account JSON file'
+        suggestion: 'Set GOOGLE_APPLICATION_CREDENTIALS environment variable to path of your service account JSON file, or verify that your credentials are valid and not expired'
       }
     };
   }

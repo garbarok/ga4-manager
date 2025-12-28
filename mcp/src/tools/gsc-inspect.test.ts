@@ -164,12 +164,13 @@ Mobile Usability:
     - VIEWPORT_NOT_SET
 
 Issues Found:
-+----------+-------------+----------------------------------+
-| SEVERITY | ISSUE TYPE  | MESSAGE                          |
-+----------+-------------+----------------------------------+
-| ERROR    | ROBOTS_TXT  | URL is blocked by robots.txt     |
-| WARNING  | MOBILE_USABILITY | Text too small to read     |
-+----------+-------------+----------------------------------+
++----------+------------------------+------------------------------------------+
+| SEVERITY | ISSUE TYPE             | MESSAGE                                  |
++----------+------------------------+------------------------------------------+
+| ERROR    | ROBOTS_TXT             | URL is blocked by robots.txt             |
+| WARNING  | MOBILE_TEXT_TOO_SMALL  | Mobile usability issue: TEXT_TOO_SMALL   |
+| WARNING  | MOBILE_VIEWPORT_NOT_SET| Mobile usability issue: VIEWPORT_NOT_SET |
++----------+------------------------+------------------------------------------+
 
 Daily Quota Status
 
@@ -185,9 +186,19 @@ Inspections: 50 / 2000 (2.5% used, 1950 remaining)
       expect(result.indexing_allowed).toBe(false);
       expect(result.robots_blocked).toBe(true);
       expect(result.mobile_usability).toBe('FAIL');
-      expect(result.mobile_issues).toContain('TEXT_TOO_SMALL');
-      expect(result.mobile_issues).toContain('VIEWPORT_NOT_SET');
-      expect(result.issues).toHaveLength(2);
+      expect(result.mobile_issues).toHaveLength(2);
+      expect(result.mobile_issues).toBeDefined();
+      expect(result.mobile_issues![0]).toMatchObject({
+        issue_type: 'TEXT_TOO_SMALL',
+        severity: 'WARNING',
+        message: expect.stringContaining('TEXT_TOO_SMALL'),
+      });
+      expect(result.mobile_issues![1]).toMatchObject({
+        issue_type: 'VIEWPORT_NOT_SET',
+        severity: 'WARNING',
+        message: expect.stringContaining('VIEWPORT_NOT_SET'),
+      });
+      expect(result.issues).toHaveLength(3); // 1 robots issue + 2 mobile issues
       expect(result.issues[0]).toMatchObject({
         severity: 'ERROR',
         issue_type: 'ROBOTS_TXT',
@@ -642,6 +653,318 @@ Inspections: 95 / 2000 (4.8% used, 1905 remaining)
       expect(result.success).toBe(true);
       expect(result.coverage_state).toBe('Discovered - currently not indexed');
       expect(result.issues[0].issue_type).toBe('DISCOVERED_NOT_INDEXED');
+    });
+
+    // NEW in v2.0.0: Rich Results Enhancement Tests
+    describe('rich results types and items (v2.0.0)', () => {
+      it('parses rich result types', () => {
+        const output = `
+Inspecting URL: https://example.com/recipe
+
+URL Inspection Results
+
+URL: https://example.com/recipe
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: Recipe, Breadcrumb
+
+No issues detected
+
+Daily Quota Status
+
+Date: 2024-12-28
+Inspections: 10 / 2000 (0.5% used, 1990 remaining)
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.success).toBe(true);
+        expect(result.rich_results_status).toBe('PASS');
+        expect(result.rich_result_types).toBeDefined();
+        expect(result.rich_result_types).toEqual(['Recipe', 'Breadcrumb']);
+      });
+
+      it('parses single rich result type', () => {
+        const output = `
+Inspecting URL: https://example.com/faq
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: FAQ
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_result_types).toBeDefined();
+        expect(result.rich_result_types).toEqual(['FAQ']);
+      });
+
+      it('parses rich result items without issues', () => {
+        const output = `
+Inspecting URL: https://example.com/recipe
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: Recipe
+
+  Detected Items:
+    1. Recipe - Chocolate Cake Recipe
+    2. Recipe - Vanilla Cupcakes
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_results_status).toBe('PASS');
+        expect(result.rich_result_items).toBeDefined();
+        expect(result.rich_result_items).toHaveLength(2);
+
+        expect(result.rich_result_items![0]).toMatchObject({
+          type: 'Recipe',
+          name: 'Chocolate Cake Recipe',
+          issues: [],
+        });
+
+        expect(result.rich_result_items![1]).toMatchObject({
+          type: 'Recipe',
+          name: 'Vanilla Cupcakes',
+          issues: [],
+        });
+      });
+
+      it('parses rich result items with issues', () => {
+        const output = `
+Inspecting URL: https://example.com/recipe
+
+Rich Results:
+  Invalid (FAIL)
+  Detected Types: Recipe
+
+  Detected Items:
+    1. Recipe - Chocolate Cake Recipe
+       Issues:
+         - Missing required field 'recipeYield'
+         - Invalid value for 'prepTime'
+    2. Recipe - Vanilla Cupcakes
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_results_status).toBe('FAIL');
+        expect(result.rich_result_items).toHaveLength(2);
+
+        // First item has issues
+        expect(result.rich_result_items![0]).toMatchObject({
+          type: 'Recipe',
+          name: 'Chocolate Cake Recipe',
+        });
+        expect(result.rich_result_items![0].issues).toHaveLength(2);
+        expect(result.rich_result_items![0].issues).toContain('Missing required field \'recipeYield\'');
+        expect(result.rich_result_items![0].issues).toContain('Invalid value for \'prepTime\'');
+
+        // Second item has no issues
+        expect(result.rich_result_items![1]).toMatchObject({
+          type: 'Recipe',
+          name: 'Vanilla Cupcakes',
+          issues: [],
+        });
+      });
+
+      it('parses mixed rich result types with items', () => {
+        const output = `
+Inspecting URL: https://example.com/blog-post
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: Article, Breadcrumb, FAQ
+
+  Detected Items:
+    1. Article - How to Bake Perfect Cookies
+    2. Breadcrumb
+    3. FAQ - Common Baking Questions
+       Issues:
+         - Missing 'acceptedAnswer' for question 2
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_results_status).toBe('PASS');
+        expect(result.rich_result_types).toEqual(['Article', 'Breadcrumb', 'FAQ']);
+        expect(result.rich_result_items).toHaveLength(3);
+
+        // Article item
+        expect(result.rich_result_items![0]).toMatchObject({
+          type: 'Article',
+          name: 'How to Bake Perfect Cookies',
+          issues: [],
+        });
+
+        // Breadcrumb item (no name)
+        expect(result.rich_result_items![1]).toMatchObject({
+          type: 'Breadcrumb',
+          issues: [],
+        });
+        expect(result.rich_result_items![1].name).toBeUndefined();
+
+        // FAQ item with issues
+        expect(result.rich_result_items![2]).toMatchObject({
+          type: 'FAQ',
+          name: 'Common Baking Questions',
+        });
+        expect(result.rich_result_items![2].issues).toHaveLength(1);
+        expect(result.rich_result_items![2].issues[0]).toContain('Missing \'acceptedAnswer\'');
+      });
+
+      it('parses rich result item without name', () => {
+        const output = `
+Inspecting URL: https://example.com/page
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: Breadcrumb
+
+  Detected Items:
+    1. Breadcrumb
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_result_items).toHaveLength(1);
+        expect(result.rich_result_items![0]).toMatchObject({
+          type: 'Breadcrumb',
+          issues: [],
+        });
+        expect(result.rich_result_items![0].name).toBeUndefined();
+      });
+
+      it('handles no rich results data', () => {
+        const output = `
+Inspecting URL: https://example.com/page
+
+URL Inspection Results
+
+URL: https://example.com/page
+
+Index Status:
+  Indexed (PASS)
+
+No rich results data available
+
+No issues detected
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.success).toBe(true);
+        expect(result.rich_results_status).toBeUndefined();
+        expect(result.rich_result_types).toBeUndefined();
+        expect(result.rich_result_items).toBeUndefined();
+      });
+
+      it('parses rich results with backward compatible legacy issues', () => {
+        const output = `
+Inspecting URL: https://example.com/article
+
+Rich Results:
+  Invalid (FAIL)
+  Rich Results Issues:
+    - Missing required property "author"
+    - Invalid date format in "datePublished"
+
+Issues Found:
++----------+--------------+----------------------------------------+
+| SEVERITY | ISSUE TYPE   | MESSAGE                                |
++----------+--------------+----------------------------------------+
+| ERROR    | RICH_RESULTS | Missing required property "author"     |
+| WARNING  | RICH_RESULTS | Invalid date format in "datePublished" |
++----------+--------------+----------------------------------------+
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.rich_results_status).toBe('FAIL');
+        // Legacy flat issues array should still work
+        expect(result.rich_results_issues).toHaveLength(2);
+        expect(result.rich_results_issues).toContain('Missing required property "author"');
+        expect(result.rich_results_issues).toContain('Invalid date format in "datePublished"');
+
+        // New structured issues
+        expect(result.issues).toHaveLength(2);
+        expect(result.issues[0]).toMatchObject({
+          severity: 'ERROR',
+          issue_type: 'RICH_RESULTS',
+          message: 'Missing required property "author"',
+        });
+      });
+
+      it('parses complete rich results output with all fields', () => {
+        const output = `
+Inspecting URL: https://example.com/recipe-collection
+
+Rich Results:
+  Valid (PASS)
+  Detected Types: Recipe, Breadcrumb, ItemList
+
+  Detected Items:
+    1. Recipe - Chocolate Chip Cookies
+    2. Recipe - Oatmeal Raisin Cookies
+       Issues:
+         - Missing 'nutrition' information
+    3. Breadcrumb
+    4. ItemList - Cookie Recipes Collection
+
+No issues detected
+
+Daily Quota Status
+
+Date: 2024-12-28
+Inspections: 50 / 2000 (2.5% used, 1950 remaining)
+`;
+
+        const result = parseInspectUrlOutput(output);
+
+        expect(result.success).toBe(true);
+        expect(result.rich_results_status).toBe('PASS');
+
+        // Types
+        expect(result.rich_result_types).toEqual(['Recipe', 'Breadcrumb', 'ItemList']);
+
+        // Items
+        expect(result.rich_result_items).toHaveLength(4);
+
+        expect(result.rich_result_items![0]).toMatchObject({
+          type: 'Recipe',
+          name: 'Chocolate Chip Cookies',
+          issues: [],
+        });
+
+        expect(result.rich_result_items![1]).toMatchObject({
+          type: 'Recipe',
+          name: 'Oatmeal Raisin Cookies',
+        });
+        expect(result.rich_result_items![1].issues).toEqual(['Missing \'nutrition\' information']);
+
+        expect(result.rich_result_items![2]).toMatchObject({
+          type: 'Breadcrumb',
+          issues: [],
+        });
+
+        expect(result.rich_result_items![3]).toMatchObject({
+          type: 'ItemList',
+          name: 'Cookie Recipes Collection',
+          issues: [],
+        });
+      });
     });
   });
 });

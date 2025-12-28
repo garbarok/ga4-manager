@@ -32,13 +32,15 @@ describe('ga4_report tool', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects dry_run flag (not applicable to report)', () => {
-      // Report doesn't support dry_run - it's read-only
+    it('confirms dry_run not applicable to report (read-only operation)', () => {
+      // Report is read-only, so dry_run doesn't make sense
+      // This test documents that the schema intentionally excludes dry_run
       const input = { config_path: 'test.yaml' };
       const result = ga4ReportInputSchema.safeParse(input);
       expect(result.success).toBe(true);
-      // Ensure the schema doesn't have dry_run
-      expect((result as any).data.dry_run).toBeUndefined();
+      if (result.success) {
+        expect(result.data).toEqual({ config_path: 'test.yaml' });
+      }
     });
   });
 
