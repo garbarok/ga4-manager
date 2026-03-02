@@ -605,63 +605,42 @@ export function parseMonitorUrlsOutput(output: string, input: GscMonitorUrlsInpu
 
 /**
  * MCP Tool definition for gsc_monitor_urls
+ *
+ * Supports two modes:
+ * 1. Config-based: Provide `config` path (YAML file with search_console.url_inspection.priority_urls)
+ * 2. Direct URL array: Provide `site` + `urls` array (max 50 URLs)
  */
 export const gscMonitorUrlsTool = {
   name: 'gsc_monitor_urls',
   description: 'Monitor multiple URLs for indexing issues. Supports two modes: 1) Config-based: Load URLs from YAML file, 2) Direct array (NEW v2.0.0): Pass URLs directly as array (max 50 URLs). Returns inspection results with index status, mobile usability, and any issues detected.',
   inputSchema: {
-    type: 'object',
-    oneOf: [
-      {
-        type: 'object',
-        properties: {
-          config: {
-            type: 'string',
-            description: 'Path to configuration file with URLs to monitor (YAML format with search_console.url_inspection.priority_urls)',
-          },
-          dry_run: {
-            type: 'boolean',
-            description: 'Preview URLs without making API calls (recommended first step)',
-            default: false,
-          },
-          format: {
-            type: 'string',
-            enum: ['json', 'table', 'markdown'],
-            description: 'Output format for results',
-            default: 'json',
-          },
-        },
-        required: ['config'],
+    type: 'object' as const,
+    properties: {
+      config: {
+        type: 'string',
+        description: 'Path to configuration file with URLs to monitor (YAML format with search_console.url_inspection.priority_urls). Alternative to site parameter.',
       },
-      {
-        type: 'object',
-        properties: {
-          site: {
-            type: 'string',
-            description: 'Site URL: domain property (sc-domain:example.com) or URL prefix (https://example.com/)',
-          },
-          urls: {
-            type: 'array',
-            items: { type: 'string', format: 'uri' },
-            minItems: 1,
-            maxItems: 50,
-            description: 'URLs to monitor (max 50 URLs)',
-          },
-          dry_run: {
-            type: 'boolean',
-            description: 'Preview URLs without making API calls',
-            default: false,
-          },
-          format: {
-            type: 'string',
-            enum: ['json', 'table', 'markdown'],
-            description: 'Output format for results',
-            default: 'json',
-          },
-        },
-        required: ['site', 'urls'],
+      site: {
+        type: 'string',
+        description: 'Site URL: domain property (sc-domain:example.com) or URL prefix (https://example.com/). Required unless config is provided.',
       },
-    ],
+      urls: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'URLs to monitor (max 50 URLs)',
+      },
+      dry_run: {
+        type: 'boolean',
+        description: 'Preview URLs without making API calls (recommended first step)',
+        default: false,
+      },
+      format: {
+        type: 'string',
+        enum: ['json', 'table', 'markdown'],
+        description: 'Output format for results',
+        default: 'json',
+      },
+    },
   },
 };
 

@@ -22,6 +22,7 @@ type ChannelGroup struct {
 }
 
 // DefaultChannelGroups returns the default channel grouping configuration
+// Note: Field names must use session-scoped dimensions (sessionSource, sessionMedium, etc.)
 func DefaultChannelGroups() []ChannelGroup {
 	return []ChannelGroup{
 		{
@@ -30,15 +31,15 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Google Organic",
-					Expression:  "source == 'google' AND medium == 'organic'",
+					Expression:  "sessionSource == 'google' AND sessionMedium == 'organic'",
 				},
 				{
 					DisplayName: "Bing Organic",
-					Expression:  "source == 'bing' AND medium == 'organic'",
+					Expression:  "sessionSource == 'bing' AND sessionMedium == 'organic'",
 				},
 				{
 					DisplayName: "DuckDuckGo Organic",
-					Expression:  "source == 'duckduckgo' AND medium == 'organic'",
+					Expression:  "sessionSource == 'duckduckgo' AND sessionMedium == 'organic'",
 				},
 			},
 		},
@@ -48,11 +49,11 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Google Ads",
-					Expression:  "source == 'google' AND medium IN ('cpc', 'ppc', 'paidsearch')",
+					Expression:  "sessionSource == 'google' AND sessionMedium IN ('cpc', 'ppc', 'paidsearch')",
 				},
 				{
 					DisplayName: "Bing Ads",
-					Expression:  "source == 'bing' AND medium IN ('cpc', 'ppc', 'paidsearch')",
+					Expression:  "sessionSource == 'bing' AND sessionMedium IN ('cpc', 'ppc', 'paidsearch')",
 				},
 			},
 		},
@@ -62,19 +63,19 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Facebook Organic",
-					Expression:  "source == 'facebook' AND medium == 'social'",
+					Expression:  "sessionSource == 'facebook' AND sessionMedium == 'social'",
 				},
 				{
 					DisplayName: "Twitter Organic",
-					Expression:  "source == 'twitter' AND medium == 'social'",
+					Expression:  "sessionSource == 'twitter' AND sessionMedium == 'social'",
 				},
 				{
 					DisplayName: "LinkedIn Organic",
-					Expression:  "source == 'linkedin' AND medium == 'social'",
+					Expression:  "sessionSource == 'linkedin' AND sessionMedium == 'social'",
 				},
 				{
 					DisplayName: "Reddit Organic",
-					Expression:  "source == 'reddit' AND medium == 'social'",
+					Expression:  "sessionSource == 'reddit' AND sessionMedium == 'social'",
 				},
 			},
 		},
@@ -84,11 +85,11 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Facebook Ads",
-					Expression:  "source == 'facebook' AND medium IN ('cpc', 'ppc', 'paid')",
+					Expression:  "sessionSource == 'facebook' AND sessionMedium IN ('cpc', 'ppc', 'paid')",
 				},
 				{
 					DisplayName: "LinkedIn Ads",
-					Expression:  "source == 'linkedin' AND medium IN ('cpc', 'ppc', 'paid')",
+					Expression:  "sessionSource == 'linkedin' AND sessionMedium IN ('cpc', 'ppc', 'paid')",
 				},
 			},
 		},
@@ -98,7 +99,7 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Direct Traffic",
-					Expression:  "source == '(direct)' AND medium == '(none)'",
+					Expression:  "sessionSource == '(direct)' AND sessionMedium == '(none)'",
 				},
 			},
 		},
@@ -108,7 +109,7 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Referral Traffic",
-					Expression:  "medium == 'referral'",
+					Expression:  "sessionMedium == 'referral'",
 				},
 			},
 		},
@@ -118,7 +119,7 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Email Campaigns",
-					Expression:  "medium == 'email'",
+					Expression:  "sessionMedium == 'email'",
 				},
 			},
 		},
@@ -128,7 +129,7 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Affiliate Traffic",
-					Expression:  "medium == 'affiliate'",
+					Expression:  "sessionMedium == 'affiliate'",
 				},
 			},
 		},
@@ -138,7 +139,7 @@ func DefaultChannelGroups() []ChannelGroup {
 			Rules: []ChannelRule{
 				{
 					DisplayName: "Display Ads",
-					Expression:  "medium IN ('display', 'banner', 'cpm')",
+					Expression:  "sessionMedium IN ('display', 'banner', 'cpm')",
 				},
 			},
 		},
@@ -146,11 +147,14 @@ func DefaultChannelGroups() []ChannelGroup {
 }
 
 // parseChannelGroupFilter parses a simple filter expression string into a structured FilterExpression
+// GA4 API requires: and_group at top level, containing or_group elements, each containing filters
 func parseChannelGroupFilter(expression string) (*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression, error) {
 	parts := strings.Split(expression, " AND ")
-	var expressions []*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression
+	var orGroupExpressions []*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression
 
 	for _, part := range parts {
+		var filterExpr *analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression
+
 		if strings.Contains(part, " IN ") {
 			rIn := regexp.MustCompile(`(\w+)\s+IN\s+\(([^)]+)\)`)
 			inMatches := rIn.FindStringSubmatch(part)
@@ -163,14 +167,14 @@ func parseChannelGroupFilter(expression string) (*analyticsadmin.GoogleAnalytics
 			for _, v := range strings.Split(valuesStr, ",") {
 				values = append(values, strings.Trim(strings.TrimSpace(v), "'"))
 			}
-			expressions = append(expressions, &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
+			filterExpr = &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
 				Filter: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilter{
 					FieldName: fieldName,
 					InListFilter: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterInListFilter{
 						Values: values,
 					},
 				},
-			})
+			}
 		} else if strings.Contains(part, " == ") {
 			rEq := regexp.MustCompile(`(\w+)\s*==\s*'([^']*)'`)
 			eqMatches := rEq.FindStringSubmatch(part)
@@ -185,7 +189,7 @@ func parseChannelGroupFilter(expression string) (*analyticsadmin.GoogleAnalytics
 
 			fieldName := eqMatches[1]
 			value := eqMatches[2]
-			expressions = append(expressions, &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
+			filterExpr = &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
 				Filter: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilter{
 					FieldName: fieldName,
 					StringFilter: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterStringFilter{
@@ -193,23 +197,30 @@ func parseChannelGroupFilter(expression string) (*analyticsadmin.GoogleAnalytics
 						Value:     value,
 					},
 				},
-			})
+			}
 		} else {
 			return nil, fmt.Errorf("unsupported expression part: %s", part)
 		}
+
+		// Wrap each filter in an or_group (even though it's a single filter)
+		// This satisfies GA4's requirement: and_group must only contain or_group
+		orGroupExpressions = append(orGroupExpressions, &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
+			OrGroup: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpressionList{
+				FilterExpressions: []*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
+					filterExpr,
+				},
+			},
+		})
 	}
 
-	if len(expressions) == 0 {
+	if len(orGroupExpressions) == 0 {
 		return nil, fmt.Errorf("no expressions parsed from: %s", expression)
 	}
 
-	if len(expressions) == 1 {
-		return expressions[0], nil
-	}
-
+	// Always wrap in and_group at top level (even for single expressions)
 	return &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpression{
 		AndGroup: &analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroupFilterExpressionList{
-			FilterExpressions: expressions,
+			FilterExpressions: orGroupExpressions,
 		},
 	}, nil
 }
