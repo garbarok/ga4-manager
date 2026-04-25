@@ -256,8 +256,10 @@ describe('extractSchemaTypes', () => {
 const baseSignals: SeoSignals = {
   title: 'A Good Page Title Here',
   title_length: 25,
+  title_estimated_pixels: 150,
   description: 'A good meta description for this page content.',
   description_length: 47,
+  description_estimated_pixels: 300,
   canonical: 'https://example.com/page',
   robots: null,
   noindex: false,
