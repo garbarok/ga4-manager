@@ -165,7 +165,7 @@ fi
   --verbose \
   --print \
   --output-format stream-json \
-  --permission-mode acceptEdits \
+  --dangerously-skip-permissions \
   "$prompt" \
 | grep --line-buffered '^{' \
 | tee "$tmpfile" \

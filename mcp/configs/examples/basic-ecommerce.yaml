@@ -1,0 +1,37 @@
+# Basic E-commerce Configuration Example
+
+project:
+  name: "Basic Ecommerce"
+  description: "Standard e-commerce tracking setup"
+
+ga4:
+  property_id: "YOUR_PROPERTY_ID"
+
+conversions:
+  - name: "purchase"
+    counting_method: "ONCE_PER_EVENT"
+  
+  - name: "add_to_cart"
+    counting_method: "ONCE_PER_EVENT"
+  
+  - name: "begin_checkout"
+    counting_method: "ONCE_PER_SESSION"
+
+dimensions:
+  - parameter: "user_type"
+    display_name: "User Type"
+    scope: "USER"
+  
+  - parameter: "product_category"
+    display_name: "Product Category"
+    scope: "EVENT"
+  
+  - parameter: "payment_method"
+    display_name: "Payment Method"
+    scope: "EVENT"
+
+metrics:
+  - parameter: "shipping_cost"
+    display_name: "Shipping Cost"
+    scope: "EVENT"
+    unit: "CURRENCY"

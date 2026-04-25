@@ -39,7 +39,9 @@ ONLY="${ONLY:-}"
 USE_SANDBOX="${USE_SANDBOX:-0}"
 
 # Topological order. #19 omitted (HITL — manual curl).
-ALL_ISSUES=(20 21 22 24 23 25 26 27 29 28)
+# #30 first: independent Go-side bug (tablewriter v1 break) that should land
+# before MCP work to keep `make build` green. PRD #18 issues follow.
+ALL_ISSUES=(30 20 21 22 24 23 25 26 27 29 28)
 
 # Per-issue dependency map. Used only for "skip if dep still OPEN" check.
 # Function-based to stay portable on macOS bash 3.2 (no associative arrays).
@@ -55,6 +57,7 @@ get_deps() {
     27) echo "25" ;;
     28) echo "19 25" ;;   # 19 is HITL — script will skip 28 if 19 still open
     29) echo "25" ;;
+    30) echo "" ;;        # tablewriter v1 build break — independent
   esac
 }
 
@@ -165,12 +168,20 @@ You are NOT done until every box can be checked truthfully. Do not redefine
    - Use existing utility shape in \`mcp/src/utils/\`
    - Types defined in \`mcp/src/types/\`
 
-6. **Run ALL feedback loops before committing.** All must pass:
+6. **Run ALL feedback loops appropriate to what you changed.** All must pass.
+
+   If you changed Go files (\`cmd/\`, \`internal/\`, \`go.mod\`):
+   - \`make build\`   (compiles \`./ga4\`; equivalent to \`go build ./...\`)
+   - \`make test\`    (\`go test ./...\`)
+   - \`make lint\`    (golangci-lint)
+
+   If you changed TypeScript / MCP files (\`mcp/\`):
    - \`cd mcp && npm run build\`     (TypeScript typecheck)
    - \`cd mcp && npm run test:run\`  (Vitest, single-shot)
    - \`cd mcp && npm run lint\`      (ESLint)
 
-   Do NOT commit if any feedback loop fails. Fix issues first.
+   If you changed both: run both sets. Do NOT commit if any feedback loop
+   fails. Fix issues first.
 
 7. **Update progress:** append a brief entry to \`progress-$n.txt\`:
    - Acceptance criterion completed (paraphrased)
@@ -283,7 +294,7 @@ for n in "${ALL_ISSUES[@]}"; do
         --verbose \
         --print \
         --output-format stream-json \
-        --permission-mode acceptEdits \
+        --dangerously-skip-permissions \
         "$prompt" \
       | grep --line-buffered '^{' \
       | tee "$tmpfile" \
