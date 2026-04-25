@@ -1,0 +1,26 @@
+## Iteration 1 — 2026-04-25
+
+AC done: utils/errors.ts exports ToolError, ErrorCode enum, errorResult(), successResult() per PRD contract
+
+Files touched:
+- mcp/src/utils/errors.ts — added ToolError class, ErrorCode enum, errorResult(), successResult(), ToolFailureResult, ToolSuccessResult interfaces. Preserved mapCLIError for legacy CLI tools.
+- mcp/src/tools/ga4-cleanup.ts — fix useless-escape lint error in regex
+- mcp/src/tools/ga4-consent-health.ts — remove unused daysAgoIso dead code
+- mcp/src/tools/seo-page-audit.ts — remove unused extractAttr, rename finalUrl to _finalUrl
+- mcp/src/tools/seo-page-audit.test.ts — remove unused extractSignals import
+
+Decisions:
+- Kept mapCLIError intact; new exports are additive only
+- ToolSuccessResult uses `data: T` wrapper rather than flattening to avoid key collisions with success/warnings
+- ErrorCode enum uses string values matching PRD (AUTH_DENIED, QUOTA_EXCEEDED, etc.)
+- Fixed 5 pre-existing lint issues that blocked clean commit
+
+## Iteration 2 complete — all ACs checked
+
+AC done: node-html-parser added to mcp/package.json dependencies
+
+Files touched:
+- mcp/package.json — added node-html-parser dependency
+- mcp/package-lock.json — updated lockfile
+
+All 15 acceptance criteria satisfied. Feedback loops: build ✓, tests 1102 ✓, lint ✓.

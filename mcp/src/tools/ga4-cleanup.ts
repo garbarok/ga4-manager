@@ -184,7 +184,7 @@ export function parseCleanupOutput(output: string, dryRun: boolean): CleanupOutp
  */
 function extractProjectInfo(output: string): ProjectInfo | undefined {
   // Match: "Project: MyWebsite (Property: 123456789)"
-  const projectMatch = output.match(/Project:\s*([^\(]+)\s*\(Property:\s*(\d+)\)/);
+  const projectMatch = output.match(/Project:\s*([^(]+)\s*\(Property:\s*(\d+)\)/);
   if (projectMatch) {
     return {
       name: projectMatch[1].trim(),
