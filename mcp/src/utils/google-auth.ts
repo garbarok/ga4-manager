@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises'
 import { createSign } from 'crypto'
+import { ToolError, ErrorCode } from './errors.js'
 
 /**
  * Service account credentials JSON structure
@@ -100,9 +101,10 @@ export async function getGoogleAuthHeaders(
   // Resolve credentials path
   const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
   if (!credPath) {
-    throw new Error(
-      'GOOGLE_APPLICATION_CREDENTIALS environment variable is not set. ' +
-        'Set it to the path of your service account JSON key file.',
+    throw new ToolError(
+      ErrorCode.AUTH_DENIED,
+      'GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.',
+      'Set GOOGLE_APPLICATION_CREDENTIALS to the path of your service account JSON key file.',
     )
   }
 

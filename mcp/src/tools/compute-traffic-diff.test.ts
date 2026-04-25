@@ -1,0 +1,188 @@
+import { describe, it, expect } from 'vitest'
+import { computeTrafficDiff, type GscRow } from './compute-traffic-diff.js'
+
+function row(
+  url: string,
+  clicks: number,
+  impressions = 1000,
+  ctr = 0.05,
+  position = 5.0,
+): GscRow {
+  return { keys: [url], clicks, impressions, ctr, position }
+}
+
+describe('computeTrafficDiff', () => {
+  // ── Basic classification ────────────────────────────────────────────────
+
+  it('classifies >5% click drop as a drop', () => {
+    const { drops, gains } = computeTrafficDiff(
+      [row('/a', 100)],
+      [row('/a', 80)], // -20%
+    )
+    expect(drops).toHaveLength(1)
+    expect(drops[0].url).toBe('/a')
+    expect(drops[0].clicks_delta).toBe(-20)
+    expect(gains).toHaveLength(0)
+  })
+
+  it('classifies >5% click gain as a gain', () => {
+    const { drops, gains } = computeTrafficDiff(
+      [row('/b', 100)],
+      [row('/b', 130)], // +30%
+    )
+    expect(gains).toHaveLength(1)
+    expect(gains[0].url).toBe('/b')
+    expect(gains[0].clicks_delta).toBe(30)
+    expect(drops).toHaveLength(0)
+  })
+
+  it('counts ±5% as unchanged', () => {
+    const { drops, gains, unchanged } = computeTrafficDiff(
+      [row('/c', 100)],
+      [row('/c', 103)], // +3%
+    )
+    expect(unchanged).toBe(1)
+    expect(drops).toHaveLength(0)
+    expect(gains).toHaveLength(0)
+  })
+
+  // ── Only-in-A / only-in-B ──────────────────────────────────────────────
+
+  it('counts URLs only in A and only in B', () => {
+    const { summary } = computeTrafficDiff(
+      [row('/only-a', 50), row('/common', 100)],
+      [row('/only-b', 50), row('/common', 90)],
+    )
+    expect(summary.urls_only_in_a).toBe(1)
+    expect(summary.urls_only_in_b).toBe(1)
+    expect(summary.urls_compared).toBe(1)
+  })
+
+  // ── Delta fields ───────────────────────────────────────────────────────
+
+  it('computes all delta fields', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/p', 200, 4000, 0.05, 3.0)],
+      [row('/p', 100, 2000, 0.03, 5.0)], // -50%, -2000 imp, -0.02 ctr, +2 pos
+    )
+    expect(drops[0].clicks_delta).toBe(-100)
+    expect(drops[0].clicks_pct).toBe(-50)
+    expect(drops[0].impressions_delta).toBe(-2000)
+    expect(drops[0].ctr_delta).toBeCloseTo(-0.02, 4)
+    expect(drops[0].position_delta).toBe(2)
+  })
+
+  it('includes ctr_delta and position_delta in output', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/p', 100, 1000, 0.1, 2.0)],
+      [row('/p', 50, 800, 0.0625, 3.5)],
+    )
+    expect(drops[0]).toHaveProperty('ctr_delta')
+    expect(drops[0]).toHaveProperty('position_delta')
+    expect(drops[0].position_delta).toBeCloseTo(1.5, 1)
+  })
+
+  // ── Filtering ──────────────────────────────────────────────────────────
+
+  it('min_clicks_a excludes URLs below threshold', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/low', 3), row('/high', 200)],
+      [row('/low', 1), row('/high', 150)],
+      { min_clicks_a: 10 },
+    )
+    expect(drops.every((d) => d.url !== '/low')).toBe(true)
+    expect(drops.some((d) => d.url === '/high')).toBe(true)
+  })
+
+  // ── Sort order ─────────────────────────────────────────────────────────
+
+  it('sorts drops by clicks_abs worst first (default)', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/big', 1000), row('/small', 100)],
+      [row('/big', 500), row('/small', 80)],
+    )
+    expect(drops[0].url).toBe('/big')
+  })
+
+  it('sorts drops by clicks_pct when sort_by=clicks_pct', () => {
+    // /pct: 100→10 = -90%; /abs: 1000→500 = -50%
+    const { drops } = computeTrafficDiff(
+      [row('/pct', 100), row('/abs', 1000)],
+      [row('/pct', 10), row('/abs', 500)],
+      { sort_by: 'clicks_pct' },
+    )
+    expect(drops[0].url).toBe('/pct')
+  })
+
+  it('sorts drops by impressions_abs when sort_by=impressions_abs', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/big-imp', 100, 5000), row('/small-imp', 100, 500)],
+      [row('/big-imp', 80, 1000), row('/small-imp', 80, 400)],
+      { sort_by: 'impressions_abs' },
+    )
+    expect(drops[0].url).toBe('/big-imp')
+  })
+
+  // ── Top-N truncation ───────────────────────────────────────────────────
+
+  it('truncates drops and gains to output_limit', () => {
+    const rowsA = Array.from({ length: 60 }, (_, i) => row(`/page-${i}`, 100))
+    const rowsB = Array.from({ length: 60 }, (_, i) => row(`/page-${i}`, 50))
+    const { drops } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(drops).toHaveLength(50)
+  })
+
+  it('default output_limit is 50', () => {
+    const rowsA = Array.from({ length: 60 }, (_, i) => row(`/p-${i}`, 100))
+    const rowsB = Array.from({ length: 60 }, (_, i) => row(`/p-${i}`, 50))
+    const { drops } = computeTrafficDiff(rowsA, rowsB)
+    expect(drops).toHaveLength(50)
+  })
+
+  // ── Edge cases ─────────────────────────────────────────────────────────
+
+  it('handles empty input', () => {
+    const { drops, gains, unchanged, summary } = computeTrafficDiff([], [])
+    expect(drops).toHaveLength(0)
+    expect(gains).toHaveLength(0)
+    expect(unchanged).toBe(0)
+    expect(summary.urls_compared).toBe(0)
+  })
+
+  it('handles zero clicks in period A (clicks_pct = 0 → unchanged)', () => {
+    const { unchanged } = computeTrafficDiff(
+      [row('/zero', 0)],
+      [row('/zero', 10)],
+    )
+    expect(unchanged).toBe(1)
+  })
+
+  it('computes clicks_pct correctly for -50%', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/p', 200)],
+      [row('/p', 100)],
+    )
+    expect(drops[0].clicks_pct).toBe(-50)
+  })
+
+  it('computes impressions_delta correctly', () => {
+    const { drops } = computeTrafficDiff(
+      [row('/p', 100, 2000)],
+      [row('/p', 80, 1500)],
+    )
+    expect(drops[0].impressions_delta).toBe(-500)
+  })
+
+  it('URLs not present in both periods are excluded from diff', () => {
+    const { summary, drops, gains, unchanged } = computeTrafficDiff(
+      [row('/only-a', 100)],
+      [row('/only-b', 100)],
+    )
+    expect(drops).toHaveLength(0)
+    expect(gains).toHaveLength(0)
+    expect(unchanged).toBe(0)
+    expect(summary.urls_compared).toBe(0)
+    expect(summary.urls_only_in_a).toBe(1)
+    expect(summary.urls_only_in_b).toBe(1)
+  })
+})
