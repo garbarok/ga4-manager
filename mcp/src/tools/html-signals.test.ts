@@ -122,6 +122,17 @@ describe('extractSchemaTypes', () => {
     expect(() => extractSchemaTypes(html)).not.toThrow()
     expect(extractSchemaTypes(html)).toHaveLength(0)
   })
+
+  it('extracts types from multiple <script> blocks with different types', () => {
+    const html = `
+      <script type="application/ld+json">{"@type":"Article"}</script>
+      <script type="application/ld+json">{"@type":"WebPage"}</script>
+    `
+    const types = extractSchemaTypes(html)
+    expect(types).toContain('Article')
+    expect(types).toContain('WebPage')
+    expect(types).toHaveLength(2)
+  })
 })
 
 // ============================================================================
@@ -136,6 +147,7 @@ describe('extractSignals — good-baseline.html', () => {
   it('extracts title text and length', () => {
     expect(signals.title).toBe('Best Practices for Web Performance')
     expect(signals.title_length).toBe(34)
+    expect(signals.title_estimated_pixels).toBeGreaterThan(0)
   })
 
   it('extracts meta description and length', () => {

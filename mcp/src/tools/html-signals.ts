@@ -2,11 +2,15 @@
 // html-signals.ts — pure HTML signal extraction, no I/O
 // ============================================================================
 
+import { estimatePixelWidth } from '../utils/pixel-width.js'
+
 export interface HtmlSignals {
   title: string | null
   title_length: number
+  title_estimated_pixels: number
   description: string | null
   description_length: number
+  description_estimated_pixels: number
   canonical: string | null
   robots: string | null
   noindex: boolean
@@ -116,8 +120,10 @@ export function extractSignals(html: string, baseUrl: string): HtmlSignals {
   return {
     title,
     title_length: title ? title.length : 0,
+    title_estimated_pixels: title ? estimatePixelWidth(title) : 0,
     description,
     description_length: description ? description.length : 0,
+    description_estimated_pixels: description ? estimatePixelWidth(description) : 0,
     canonical,
     robots,
     noindex,

@@ -5,8 +5,10 @@ import type { HtmlSignals } from './html-signals.js'
 const baseSignals: HtmlSignals = {
   title: 'A Good Page Title Here For Testing',
   title_length: 35,
+  title_estimated_pixels: 200,
   description: 'A good meta description for this page that is reasonable length.',
   description_length: 64,
+  description_estimated_pixels: 400,
   canonical: 'https://example.com/page',
   robots: null,
   noindex: false,
@@ -37,19 +39,27 @@ describe('runIssueRules', () => {
   })
 
   it('flags short title (<10 chars) as warning', () => {
-    const signals = { ...baseSignals, title: 'Hi', title_length: 2 }
+    const signals = { ...baseSignals, title: 'Hi', title_length: 2, title_estimated_pixels: 14 }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'title' && i.severity === 'warning')).toBe(true)
   })
 
   it('flags long title (>70 chars) as warning', () => {
-    const signals = { ...baseSignals, title: 'A'.repeat(71), title_length: 71 }
+    const signals = { ...baseSignals, title: 'A'.repeat(71), title_length: 71, title_estimated_pixels: 71 * 9 }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'title' && i.severity === 'warning')).toBe(true)
   })
 
-  it('accepts title at exactly 70 chars', () => {
-    const signals = { ...baseSignals, title: 'A'.repeat(70), title_length: 70 }
+  it('flags title exceeding pixel limit (>580px) as warning even when chars <= 70', () => {
+    // 70 'W' chars × 11px = 770px
+    const signals = { ...baseSignals, title: 'W'.repeat(70), title_length: 70, title_estimated_pixels: 770 }
+    const issues = runIssueRules(signals, finalUrl)
+    expect(issues.some((i: SeoIssue) => i.field === 'title' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('accepts title at exactly 70 chars and <=580px', () => {
+    // 70 'i' chars × 3px = 210px
+    const signals = { ...baseSignals, title: 'i'.repeat(70), title_length: 70, title_estimated_pixels: 210 }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'title')).toBe(false)
   })
@@ -62,34 +72,60 @@ describe('runIssueRules', () => {
   })
 
   it('flags description >160 chars as warning', () => {
-    const signals = { ...baseSignals, description: 'A'.repeat(161), description_length: 161 }
+    const signals = { ...baseSignals, description: 'A'.repeat(161), description_length: 161, description_estimated_pixels: 161 * 9 }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'description' && i.severity === 'warning')).toBe(true)
   })
 
-  it('accepts description at exactly 160 chars', () => {
-    const signals = { ...baseSignals, description: 'A'.repeat(160), description_length: 160 }
+  it('flags description exceeding pixel limit (>920px) as warning even when chars <= 160', () => {
+    // 160 'W' chars × 11px = 1760px
+    const signals = { ...baseSignals, description: 'W'.repeat(160), description_length: 160, description_estimated_pixels: 1760 }
+    const issues = runIssueRules(signals, finalUrl)
+    expect(issues.some((i: SeoIssue) => i.field === 'description' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('accepts description at exactly 160 chars and <=920px', () => {
+    // 160 'i' chars × 3px = 480px
+    const signals = { ...baseSignals, description: 'i'.repeat(160), description_length: 160, description_estimated_pixels: 480 }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'description')).toBe(false)
   })
 
-  // Canonical rules
+  // Canonical severity escalation
   it('flags missing canonical as warning', () => {
     const signals = { ...baseSignals, canonical: null }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'canonical' && i.severity === 'warning')).toBe(true)
   })
 
-  it('flags cross-domain canonical as error', () => {
+  it('no issue when canonical matches same host and path', () => {
+    const signals = { ...baseSignals, canonical: 'https://example.com/page' }
+    const issues = runIssueRules(signals, 'https://example.com/page')
+    expect(issues.some((i: SeoIssue) => i.field === 'canonical')).toBe(false)
+  })
+
+  it('info when same eTLD+1 but different path (intentional canonicalization)', () => {
+    const signals = { ...baseSignals, canonical: 'https://example.com/canonical-page' }
+    const issues = runIssueRules(signals, 'https://example.com/page')
+    expect(issues.some((i: SeoIssue) => i.field === 'canonical' && i.severity === 'info')).toBe(true)
+  })
+
+  it('warning when canonical uses different scheme (http vs https), same host', () => {
+    const signals = { ...baseSignals, canonical: 'http://example.com/page' }
+    const issues = runIssueRules(signals, 'https://example.com/page')
+    expect(issues.some((i: SeoIssue) => i.field === 'canonical' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('warning when canonical points to different subdomain, same eTLD+1', () => {
+    const signals = { ...baseSignals, canonical: 'https://www.example.com/page' }
+    const issues = runIssueRules(signals, 'https://example.com/page')
+    expect(issues.some((i: SeoIssue) => i.field === 'canonical' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('error when canonical resolves to different eTLD+1', () => {
     const signals = { ...baseSignals, canonical: 'https://other-domain.com/page' }
     const issues = runIssueRules(signals, finalUrl)
     expect(issues.some((i: SeoIssue) => i.field === 'canonical' && i.severity === 'error')).toBe(true)
-  })
-
-  it('accepts same-domain canonical', () => {
-    const signals = { ...baseSignals, canonical: 'https://example.com/page' }
-    const issues = runIssueRules(signals, finalUrl)
-    expect(issues.some((i: SeoIssue) => i.field === 'canonical')).toBe(false)
   })
 
   it('flags invalid canonical URL as warning', () => {

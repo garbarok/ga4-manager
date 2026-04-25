@@ -1,0 +1,39 @@
+## Iteration 1 — 2026-04-25
+
+### Criteria completed (all AC in one pass)
+
+AC1: mcp/src/utils/pixel-width.ts — exports estimatePixelWidth(text): number with inlined Arial-13px width table, default 8px for unmapped chars.
+
+AC2: HtmlSignals now includes title_estimated_pixels + description_estimated_pixels; extractSignals computes them via estimatePixelWidth.
+
+AC3: issue-rules.ts title rule fires if chars > 70 OR pixels > 580; description fires if chars > 160 OR pixels > 920. Short title (<10) check unchanged.
+
+AC4: JSON-LD extraction (extractSchemaTypes) already handled all variants (root @type, @graph, @type array, multi-script, malformed, dedupe). Added explicit multi-script-different-types test.
+
+AC5: Canonical severity escalation replaces binary check: missing→warning, same host+path→no issue, same eTLD+1 diff path→info, diff scheme same host→warning, diff subdomain same eTLD+1→warning, diff eTLD+1→error.
+
+AC6: mcp/src/utils/pixel-width.test.ts — golden value tests including emoji/CJK default fallback.
+
+AC7: html-signals.test.ts — added explicit multi-script test for different types; pixel fields verified.
+
+AC8: issue-rules.test.ts — full canonical severity suite (all 7 branches) + pixel OR threshold tests for title and description.
+
+AC9: npm run build, npm run test:run (1214 tests pass), npm run lint — all clean.
+
+### Files touched
+- mcp/src/utils/pixel-width.ts (new)
+- mcp/src/utils/pixel-width.test.ts (new)
+- mcp/src/tools/html-signals.ts
+- mcp/src/tools/html-signals.test.ts
+- mcp/src/tools/issue-rules.ts
+- mcp/src/tools/issue-rules.test.ts
+- mcp/src/tools/seo-page-audit.ts (emptySignals updated)
+- mcp/src/tools/seo-page-audit.test.ts (baseSignals updated)
+
+### Decisions
+- estimatePixelWidth: pure fn, for-of loop over chars handles emoji/multi-byte via default 8px.
+- Canonical escalation: uses tldts registrableDomain (already imported) for eTLD+1 comparison.
+- baseSignals in tests: added pixel fields with plausible values that don't trigger pixel thresholds.
+- "relative canonical resolved before comparison" criterion satisfied by existing extractCanonical(html, baseUrl) in extractSignals.
+
+### No blockers.

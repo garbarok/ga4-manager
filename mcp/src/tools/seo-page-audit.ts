@@ -207,8 +207,10 @@ const FETCH_TIMEOUT_MS = 10_000
 const emptySignals: HtmlSignals = {
   title: null,
   title_length: 0,
+  title_estimated_pixels: 0,
   description: null,
   description_length: 0,
+  description_estimated_pixels: 0,
   canonical: null,
   robots: null,
   noindex: false,

@@ -84,11 +84,11 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string, chain: Red
         severity: 'warning',
         message: `Title is too short (${signals.title_length} chars, minimum 10)`,
       })
-    } else if (signals.title_length > 70) {
+    } else if (signals.title_length > 70 || signals.title_estimated_pixels > 580) {
       issues.push({
         field: 'title',
         severity: 'warning',
-        message: `Title may be truncated in SERPs (${signals.title_length} chars, max 70)`,
+        message: `Title may be truncated in SERPs (${signals.title_length} chars / ~${signals.title_estimated_pixels}px, max 70 chars or 580px)`,
       })
     }
   }
@@ -97,11 +97,11 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string, chain: Red
 
   if (!signals.description) {
     issues.push({ field: 'description', severity: 'warning', message: 'Page is missing a meta description' })
-  } else if (signals.description_length > 160) {
+  } else if (signals.description_length > 160 || signals.description_estimated_pixels > 920) {
     issues.push({
       field: 'description',
       severity: 'warning',
-      message: `Meta description may be truncated (${signals.description_length} chars, max 160)`,
+      message: `Meta description may be truncated (${signals.description_length} chars / ~${signals.description_estimated_pixels}px, max 160 chars or 920px)`,
     })
   }
 
@@ -111,15 +111,43 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string, chain: Red
     issues.push({ field: 'canonical', severity: 'warning', message: 'Page is missing a canonical link tag' })
   } else {
     try {
-      const canonicalHost = new URL(signals.canonical).hostname
-      const finalHost = new URL(finalUrl).hostname
-      if (canonicalHost !== finalHost) {
+      const canonUrl = new URL(signals.canonical)
+      const pageUrl = new URL(finalUrl)
+      const canonEtld = registrableDomain(signals.canonical)
+      const pageEtld = registrableDomain(finalUrl)
+
+      if (!canonEtld || !pageEtld) {
+        issues.push({
+          field: 'canonical',
+          severity: 'warning',
+          message: `Canonical URL appears invalid: ${signals.canonical}`,
+        })
+      } else if (canonEtld !== pageEtld) {
         issues.push({
           field: 'canonical',
           severity: 'error',
           message: `Canonical points to different domain: ${signals.canonical}`,
         })
+      } else if (canonUrl.hostname !== pageUrl.hostname) {
+        issues.push({
+          field: 'canonical',
+          severity: 'warning',
+          message: `Canonical points to different subdomain: ${canonUrl.hostname} vs ${pageUrl.hostname}`,
+        })
+      } else if (canonUrl.protocol !== pageUrl.protocol) {
+        issues.push({
+          field: 'canonical',
+          severity: 'warning',
+          message: `Canonical uses different scheme (${canonUrl.protocol.replace(':', '')} vs ${pageUrl.protocol.replace(':', '')})`,
+        })
+      } else if (canonUrl.pathname !== pageUrl.pathname) {
+        issues.push({
+          field: 'canonical',
+          severity: 'info',
+          message: `Canonical points to different path: ${signals.canonical} (intentional, e.g. pagination)`,
+        })
       }
+      // same host + path → no issue
     } catch {
       issues.push({
         field: 'canonical',
