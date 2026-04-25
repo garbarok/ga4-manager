@@ -1,4 +1,52 @@
-// Pure URL normalization utilities for GSC traffic comparison.
+// Pure URL normalization utilities for GSC traffic comparison and GA4 property IDs.
+
+import { ToolError, ErrorCode } from './errors.js'
+
+/**
+ * Normalize a GA4 property identifier to "properties/N" form.
+ *
+ * Accepted:
+ *   properties/123456789  → returned as-is
+ *   123456789             → "properties/123456789"
+ *
+ * Rejected with INVALID_INPUT:
+ *   G-XXXXXX (Measurement ID)
+ *   UA-XXXXXX-X (Universal Analytics)
+ *   anything else
+ */
+export function normalizeGa4Property(input: string): string {
+  const trimmed = input.trim()
+
+  if (/^G-[A-Z0-9]+$/i.test(trimmed)) {
+    throw new ToolError(
+      ErrorCode.INVALID_INPUT,
+      `"${trimmed}" is a Measurement ID (G-XXXXXX), not a GA4 Property ID`,
+      'Find your Property ID in GA4 Admin → Property Settings — it is a plain number like 123456789 or properties/123456789',
+    )
+  }
+
+  if (/^UA-\d+-\d+$/i.test(trimmed)) {
+    throw new ToolError(
+      ErrorCode.INVALID_INPUT,
+      `"${trimmed}" is a Universal Analytics Property ID (UA-XXXXXX-X), not a GA4 Property ID`,
+      'GA4 properties use plain numeric IDs like 123456789 or properties/123456789',
+    )
+  }
+
+  if (/^properties\/\d+$/.test(trimmed)) {
+    return trimmed
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    return `properties/${trimmed}`
+  }
+
+  throw new ToolError(
+    ErrorCode.INVALID_INPUT,
+    `Unrecognized GA4 property ID format: "${trimmed}"`,
+    'Pass a numeric Property ID (e.g. "123456789") or "properties/123456789"',
+  )
+}
 
 export type NormalizeMode = 'none' | 'minimal' | 'aggressive'
 

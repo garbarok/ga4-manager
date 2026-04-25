@@ -2,16 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   ga4ConsentHealthInputSchema,
   ga4ConsentHealthTool,
-  computeHealthScore,
-  parseConsentModeRows,
-  parseCustomEventRows,
-  runDataApiReport,
   runGa4ConsentHealth,
 } from './ga4-consent-health.js'
-
-// ============================================================================
-// Mock google-auth utility
-// ============================================================================
+import { computeConsentHealth } from './compute-consent-health.js'
 
 vi.mock('../utils/google-auth.js', () => ({
   getGoogleAuthHeaders: vi.fn().mockResolvedValue({
@@ -20,310 +13,184 @@ vi.mock('../utils/google-auth.js', () => ({
 }))
 
 // ============================================================================
-// Input Schema Validation
+// Input schema
 // ============================================================================
 
 describe('ga4ConsentHealthInputSchema', () => {
-  it('accepts valid minimal input', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
+  it('accepts minimal valid input', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
       property_id: 'properties/123456789',
+      grant_event: 'consent_granted',
+      deny_event: 'consent_denied',
     })
-    expect(result.success).toBe(true)
+    expect(r.success).toBe(true)
   })
 
-  it('applies defaults', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
-      property_id: 'properties/123456789',
+  it('applies default days=28 and view_event=page_view', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
+      property_id: '123456789',
+      grant_event: 'consent_granted',
+      deny_event: 'consent_denied',
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.days).toBe(28)
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.data.days).toBe(28)
+      expect(r.data.view_event).toBe('page_view')
     }
   })
 
-  it('accepts all optional fields', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
-      property_id: 'properties/123456789',
-      days: 90,
-      custom_grant_event: 'consent_granted',
-      custom_deny_event: 'consent_denied',
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects missing property_id', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({})
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects property_id without properties/ prefix', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
+  it('accepts raw numeric property_id', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
       property_id: '123456789',
+      grant_event: 'consent_granted',
+      deny_event: 'consent_denied',
     })
-    expect(result.success).toBe(false)
+    expect(r.success).toBe(true)
   })
 
-  it('rejects property_id with wrong format', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
-      property_id: 'properties/abc',
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects days above maximum', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
+  it('rejects missing grant_event', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
       property_id: 'properties/123456789',
+      deny_event: 'consent_denied',
+    })
+    expect(r.success).toBe(false)
+  })
+
+  it('rejects missing deny_event', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
+      property_id: 'properties/123456789',
+      grant_event: 'consent_granted',
+    })
+    expect(r.success).toBe(false)
+  })
+
+  it('rejects days above 365', () => {
+    const r = ga4ConsentHealthInputSchema.safeParse({
+      property_id: 'properties/123456789',
+      grant_event: 'g',
+      deny_event: 'd',
       days: 366,
     })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects days below minimum', () => {
-    const result = ga4ConsentHealthInputSchema.safeParse({
-      property_id: 'properties/123456789',
-      days: 0,
-    })
-    expect(result.success).toBe(false)
+    expect(r.success).toBe(false)
   })
 })
 
 // ============================================================================
-// computeHealthScore
+// computeConsentHealth — pure function unit tests
 // ============================================================================
 
-describe('computeHealthScore', () => {
-  it('returns healthy when denied < 10%', () => {
-    expect(computeHealthScore(0)).toBe('healthy')
-    expect(computeHealthScore(5)).toBe('healthy')
-    expect(computeHealthScore(9.9)).toBe('healthy')
-  })
-
-  it('returns warning when denied 10-30%', () => {
-    expect(computeHealthScore(10)).toBe('warning')
-    expect(computeHealthScore(20)).toBe('warning')
-    expect(computeHealthScore(30)).toBe('warning')
-  })
-
-  it('returns critical when denied > 30%', () => {
-    expect(computeHealthScore(30.1)).toBe('critical')
-    expect(computeHealthScore(50)).toBe('critical')
-    expect(computeHealthScore(100)).toBe('critical')
-  })
+const makeRow = (eventName: string, eventCount: number, totalUsers: number) => ({
+  dimensionValues: [{ value: eventName }],
+  metricValues: [{ value: String(eventCount) }, { value: String(totalUsers) }],
 })
 
-// ============================================================================
-// parseConsentModeRows
-// ============================================================================
+const DEFAULT_NAMES = {
+  grant_event: 'consent_granted',
+  deny_event: 'consent_denied',
+  view_event: 'page_view',
+}
 
-describe('parseConsentModeRows', () => {
-  const makeRow = (
-    analyticsStorage: string,
-    adsStorage: string,
-    sessions: number,
-  ) => ({
-    dimensionValues: [{ value: analyticsStorage }, { value: adsStorage }],
-    metricValues: [{ value: String(sessions) }],
-  })
-
-  it('returns available=false for empty rows', () => {
-    const result = parseConsentModeRows([])
-    expect(result.available).toBe(false)
-    expect(result.analytics_storage.total_sessions).toBe(0)
-  })
-
-  it('computes correct percentages for analytics_storage', () => {
+describe('computeConsentHealth', () => {
+  it('happy path — grant + deny + view all present', () => {
     const rows = [
-      makeRow('GRANTED', 'GRANTED', 700),
-      makeRow('DENIED', 'DENIED', 200),
-      makeRow('UNSET', 'UNSET', 100),
+      makeRow('consent_granted', 800, 750),
+      makeRow('consent_denied', 200, 190),
+      makeRow('page_view', 1200, 1100),
     ]
-    const result = parseConsentModeRows(rows)
-    expect(result.analytics_storage.granted_pct).toBe(70)
-    expect(result.analytics_storage.denied_pct).toBe(20)
-    expect(result.analytics_storage.unset_pct).toBe(10)
-    expect(result.analytics_storage.total_sessions).toBe(1000)
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.available).toBe(true)
+    expect(r.consent_rate_pct).toBe(80)
+    expect(r.health_score).toBe('healthy')
+    expect(r.events.grant_event.event_count).toBe(800)
+    expect(r.events.deny_event.event_count).toBe(200)
+    expect(r.events.view_event?.event_count).toBe(1200)
+    expect(r.consent_visibility_pct).toBe(
+      Math.round(((800 + 200) / 1200) * 1000) / 10,
+    )
+    expect(r.warnings).toHaveLength(0)
   })
 
-  it('computes correct percentages for ads_storage', () => {
+  it('one event missing — only grant present — warns incomplete', () => {
+    const rows = [makeRow('consent_granted', 800, 750)]
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.available).toBe(true)
+    expect(r.consent_rate_pct).toBe(100)
+    expect(r.warnings).toContain(
+      'only one consent event observed; banner instrumentation may be incomplete',
+    )
+  })
+
+  it('one event missing — only deny present — warns incomplete', () => {
+    const rows = [makeRow('consent_denied', 200, 190)]
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.available).toBe(true)
+    expect(r.consent_rate_pct).toBe(0)
+    expect(r.warnings).toContain(
+      'only one consent event observed; banner instrumentation may be incomplete',
+    )
+  })
+
+  it('both events missing — available=false, health_score=no_data', () => {
+    const r = computeConsentHealth([], DEFAULT_NAMES)
+    expect(r.available).toBe(false)
+    expect(r.health_score).toBe('no_data')
+    expect(r.consent_rate_pct).toBeNull()
+    expect(r.warnings).toHaveLength(0)
+  })
+
+  it('threshold 81% → healthy', () => {
     const rows = [
-      makeRow('GRANTED', 'GRANTED', 800),
-      makeRow('GRANTED', 'DENIED', 200),
+      makeRow('consent_granted', 810, 800),
+      makeRow('consent_denied', 190, 180),
     ]
-    const result = parseConsentModeRows(rows)
-    expect(result.ads_storage.granted_pct).toBe(80)
-    expect(result.ads_storage.denied_pct).toBe(20)
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.health_score).toBe('healthy')
   })
 
-  it('sets available=true when granted or denied sessions exist', () => {
-    const rows = [makeRow('GRANTED', 'GRANTED', 100)]
-    const result = parseConsentModeRows(rows)
-    expect(result.available).toBe(true)
-  })
-
-  it('sets available=false when all sessions are UNSET', () => {
-    const rows = [makeRow('UNSET', 'UNSET', 1000)]
-    const result = parseConsentModeRows(rows)
-    expect(result.available).toBe(false)
-  })
-
-  it('handles aggregation of multiple GRANTED rows', () => {
+  it('threshold 65% → warning', () => {
     const rows = [
-      makeRow('GRANTED', 'GRANTED', 300),
-      makeRow('GRANTED', 'DENIED', 200),
+      makeRow('consent_granted', 650, 640),
+      makeRow('consent_denied', 350, 340),
     ]
-    // analytics_storage: 500 granted, 0 denied = 100% granted
-    const result = parseConsentModeRows(rows)
-    expect(result.analytics_storage.granted_pct).toBe(100)
-    expect(result.analytics_storage.denied_pct).toBe(0)
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.health_score).toBe('warning')
+  })
+
+  it('threshold 30% → critical', () => {
+    const rows = [
+      makeRow('consent_granted', 300, 290),
+      makeRow('consent_denied', 700, 690),
+    ]
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.health_score).toBe('critical')
+  })
+
+  it('0% grant → critical', () => {
+    const rows = [makeRow('consent_denied', 1000, 990)]
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.consent_rate_pct).toBe(0)
+    expect(r.health_score).toBe('critical')
+  })
+
+  it('division-by-zero safety — empty rows', () => {
+    const r = computeConsentHealth([], DEFAULT_NAMES)
+    expect(r.consent_rate_pct).toBeNull()
+    expect(r.consent_visibility_pct).toBeNull()
+  })
+
+  it('view_event absent → consent_visibility_pct null', () => {
+    const rows = [
+      makeRow('consent_granted', 800, 750),
+      makeRow('consent_denied', 200, 190),
+    ]
+    const r = computeConsentHealth(rows, DEFAULT_NAMES)
+    expect(r.consent_visibility_pct).toBeNull()
+    expect(r.events.view_event).toBeUndefined()
   })
 })
 
 // ============================================================================
-// parseCustomEventRows
-// ============================================================================
-
-describe('parseCustomEventRows', () => {
-  const makeRow = (eventName: string, count: number) => ({
-    dimensionValues: [{ value: eventName }],
-    metricValues: [{ value: String(count) }],
-  })
-
-  it('correctly parses grant and deny counts', () => {
-    const rows = [
-      makeRow('consent_granted', 800),
-      makeRow('consent_denied', 200),
-    ]
-    const result = parseCustomEventRows(rows, 'consent_granted', 'consent_denied')
-    expect(result.grant_count).toBe(800)
-    expect(result.deny_count).toBe(200)
-    expect(result.consent_rate_pct).toBe(80)
-  })
-
-  it('handles missing grant event', () => {
-    const rows = [makeRow('consent_denied', 200)]
-    const result = parseCustomEventRows(rows, 'consent_granted', 'consent_denied')
-    expect(result.grant_count).toBe(0)
-    expect(result.deny_count).toBe(200)
-    expect(result.consent_rate_pct).toBe(0)
-  })
-
-  it('handles missing deny event', () => {
-    const rows = [makeRow('consent_granted', 800)]
-    const result = parseCustomEventRows(rows, 'consent_granted', 'consent_denied')
-    expect(result.grant_count).toBe(800)
-    expect(result.deny_count).toBe(0)
-    expect(result.consent_rate_pct).toBe(100)
-  })
-
-  it('handles empty rows', () => {
-    const result = parseCustomEventRows([], 'consent_granted', 'consent_denied')
-    expect(result.grant_count).toBe(0)
-    expect(result.deny_count).toBe(0)
-    expect(result.consent_rate_pct).toBe(0)
-  })
-
-  it('echoes event names in output', () => {
-    const rows: ReturnType<typeof makeRow>[] = []
-    const result = parseCustomEventRows(rows, 'my_grant_event', 'my_deny_event')
-    expect(result.grant_event).toBe('my_grant_event')
-    expect(result.deny_event).toBe('my_deny_event')
-  })
-})
-
-// ============================================================================
-// runDataApiReport — API integration (mocked fetch)
-// ============================================================================
-
-describe('runDataApiReport', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    vi.stubGlobal('fetch', vi.fn())
-  })
-
-  it('calls Data API with correct URL and auth', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ rows: [] }),
-    })
-    vi.stubGlobal('fetch', mockFetch)
-
-    await runDataApiReport('properties/123456789', {
-      dateRanges: [{ startDate: '28daysAgo', endDate: 'today' }],
-      dimensions: [{ name: 'privacyInfoAnalyticsStorage' }],
-      metrics: [{ name: 'sessions' }],
-    })
-
-    expect(mockFetch).toHaveBeenCalledOnce()
-    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe(
-      'https://analyticsdata.googleapis.com/v1beta/properties/123456789:runReport',
-    )
-    expect(options.method).toBe('POST')
-    const body = JSON.parse(options.body as string)
-    expect(body.dimensions[0].name).toBe('privacyInfoAnalyticsStorage')
-  })
-
-  it('returns empty array when no rows in response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      }),
-    )
-
-    const rows = await runDataApiReport('properties/123456789', {})
-    expect(rows).toHaveLength(0)
-  })
-
-  it('throws descriptive error on 403', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        text: () => Promise.resolve('Forbidden'),
-      }),
-    )
-
-    await expect(runDataApiReport('properties/123456789', {})).rejects.toThrow(
-      'GA4 Data API access denied',
-    )
-  })
-
-  it('throws descriptive error on 404', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        text: () => Promise.resolve('Not Found'),
-      }),
-    )
-
-    await expect(runDataApiReport('properties/123456789', {})).rejects.toThrow(
-      'Property not found: properties/123456789',
-    )
-  })
-
-  it('throws generic error on other HTTP failures', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        text: () => Promise.resolve('Server Error'),
-      }),
-    )
-
-    await expect(runDataApiReport('properties/123456789', {})).rejects.toThrow(
-      'GA4 Data API error (HTTP 500)',
-    )
-  })
-})
-
-// ============================================================================
-// runGa4ConsentHealth — integration (mocked fetch)
+// runGa4ConsentHealth — handler with mocked fetch
 // ============================================================================
 
 describe('runGa4ConsentHealth', () => {
@@ -332,16 +199,13 @@ describe('runGa4ConsentHealth', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  const makeConsentRow = (
-    analyticsStorage: string,
-    adsStorage: string,
-    sessions: number,
-  ) => ({
-    dimensionValues: [{ value: analyticsStorage }, { value: adsStorage }],
-    metricValues: [{ value: String(sessions) }],
-  })
+  const baseInput = {
+    property_id: 'properties/123456789',
+    grant_event: 'consent_granted',
+    deny_event: 'consent_denied',
+  }
 
-  it('returns healthy score when few denied sessions', async () => {
+  it('happy path — returns healthy with event counts', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -349,88 +213,45 @@ describe('runGa4ConsentHealth', () => {
         json: () =>
           Promise.resolve({
             rows: [
-              makeConsentRow('GRANTED', 'GRANTED', 950),
-              makeConsentRow('DENIED', 'DENIED', 50), // 5% denied
+              makeRow('consent_granted', 800, 750),
+              makeRow('consent_denied', 100, 95),
+              makeRow('page_view', 1200, 1100),
             ],
           }),
       }),
     )
-
-    const input = ga4ConsentHealthInputSchema.parse({
-      property_id: 'properties/123456789',
-    })
-    const result = await runGa4ConsentHealth(input)
-
-    expect(result.success).toBe(true)
-    expect(result.health_score).toBe('healthy')
-    expect(result.consent_mode.analytics_storage.denied_pct).toBe(5)
-    expect(result.consent_mode.available).toBe(true)
+    const input = ga4ConsentHealthInputSchema.parse(baseInput)
+    const r = await runGa4ConsentHealth(input)
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.health_score).toBe('healthy')
+      expect(r.available).toBe(true)
+      expect(r.events.grant_event.event_count).toBe(800)
+      expect(r.events.deny_event.event_count).toBe(100)
+      expect(r.property_id).toBe('properties/123456789')
+      expect(r.period).toBe('last 28 days')
+    }
   })
 
-  it('returns critical when consent mode unavailable (all UNSET)', async () => {
+  it('empty-rows fixture → available=false, health_score=no_data', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            rows: [makeConsentRow('UNSET', 'UNSET', 1000)],
-          }),
+        json: () => Promise.resolve({ rows: [] }),
       }),
     )
-
-    const input = ga4ConsentHealthInputSchema.parse({
-      property_id: 'properties/123456789',
-    })
-    const result = await runGa4ConsentHealth(input)
-
-    expect(result.success).toBe(true)
-    // UNSET = 100% unset, 0% denied → healthy score since denied=0
-    expect(result.health_score).toBe('healthy')
-    expect(result.consent_mode.available).toBe(false)
+    const input = ga4ConsentHealthInputSchema.parse(baseInput)
+    const r = await runGa4ConsentHealth(input)
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.available).toBe(false)
+      expect(r.health_score).toBe('no_data')
+      expect(r.warnings.length).toBeGreaterThan(0)
+    }
   })
 
-  it('includes custom_events when custom event names provided', async () => {
-    const consentRows = [makeConsentRow('GRANTED', 'GRANTED', 1000)]
-    const eventRows = [
-      {
-        dimensionValues: [{ value: 'consent_granted' }],
-        metricValues: [{ value: '800' }],
-      },
-      {
-        dimensionValues: [{ value: 'consent_denied' }],
-        metricValues: [{ value: '200' }],
-      },
-    ]
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ rows: consentRows }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ rows: eventRows }),
-        }),
-    )
-
-    const input = ga4ConsentHealthInputSchema.parse({
-      property_id: 'properties/123456789',
-      custom_grant_event: 'consent_granted',
-      custom_deny_event: 'consent_denied',
-    })
-    const result = await runGa4ConsentHealth(input)
-
-    expect(result.success).toBe(true)
-    expect(result.custom_events).toBeDefined()
-    expect(result.custom_events?.grant_count).toBe(800)
-    expect(result.custom_events?.deny_count).toBe(200)
-    expect(result.custom_events?.consent_rate_pct).toBe(80)
-  })
-
-  it('returns error result on API failure', async () => {
+  it('403 → AUTH_DENIED error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -439,17 +260,16 @@ describe('runGa4ConsentHealth', () => {
         text: () => Promise.resolve('Forbidden'),
       }),
     )
-
-    const input = ga4ConsentHealthInputSchema.parse({
-      property_id: 'properties/123456789',
-    })
-    const result = await runGa4ConsentHealth(input)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toContain('GA4 Data API access denied')
+    const input = ga4ConsentHealthInputSchema.parse(baseInput)
+    const r = await runGa4ConsentHealth(input)
+    expect(r.success).toBe(false)
+    if (!r.success) {
+      expect(r.error.code).toBe('AUTH_DENIED')
+      expect(r.error.hint).toContain('PERMISSIONS.md')
+    }
   })
 
-  it('includes period string in output', async () => {
+  it('raw numeric property_id is normalized to properties/N', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -457,39 +277,55 @@ describe('runGa4ConsentHealth', () => {
         json: () => Promise.resolve({ rows: [] }),
       }),
     )
-
     const input = ga4ConsentHealthInputSchema.parse({
-      property_id: 'properties/123456789',
-      days: 90,
+      ...baseInput,
+      property_id: '987654321',
     })
-    const result = await runGa4ConsentHealth(input)
+    const r = await runGa4ConsentHealth(input)
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect(r.property_id).toBe('properties/987654321')
+    }
+  })
 
-    expect(result.period).toBe('last 90 days')
+  it('G-XXXXXX Measurement ID → INVALID_INPUT error', async () => {
+    const input = ga4ConsentHealthInputSchema.parse({
+      ...baseInput,
+      property_id: 'G-ABC123',
+    })
+    const r = await runGa4ConsentHealth(input)
+    expect(r.success).toBe(false)
+    if (!r.success) {
+      expect(r.error.code).toBe('INVALID_INPUT')
+      expect(r.error.message).toContain('Measurement ID')
+    }
   })
 })
 
 // ============================================================================
-// Tool Definition
+// Tool definition
 // ============================================================================
 
-describe('ga4ConsentHealthTool definition', () => {
+describe('ga4ConsentHealthTool', () => {
   it('has correct tool name', () => {
     expect(ga4ConsentHealthTool.name).toBe('ga4_consent_health')
   })
 
-  it('has a descriptive description', () => {
-    expect(ga4ConsentHealthTool.description).toContain('Consent Mode')
-    expect(ga4ConsentHealthTool.description).toContain('GA4')
+  it('description mentions consent events and clarifies Consent Mode v2 unavailability', () => {
+    expect(ga4ConsentHealthTool.description).toContain('consent_granted')
+    expect(ga4ConsentHealthTool.description).toContain('Consent Mode v2')
+    expect(ga4ConsentHealthTool.description).toContain('NOT exposed')
   })
 
-  it('defines required fields', () => {
+  it('requires property_id, grant_event, deny_event', () => {
     expect(ga4ConsentHealthTool.inputSchema.required).toContain('property_id')
+    expect(ga4ConsentHealthTool.inputSchema.required).toContain('grant_event')
+    expect(ga4ConsentHealthTool.inputSchema.required).toContain('deny_event')
   })
 
-  it('defines all optional parameters', () => {
+  it('defines view_event and days as optional properties', () => {
     const props = ga4ConsentHealthTool.inputSchema.properties
+    expect(props.view_event).toBeDefined()
     expect(props.days).toBeDefined()
-    expect(props.custom_grant_event).toBeDefined()
-    expect(props.custom_deny_event).toBeDefined()
   })
 })

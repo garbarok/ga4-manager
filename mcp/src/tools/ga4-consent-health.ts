@@ -1,220 +1,93 @@
 import { z } from 'zod'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
+import { ToolError, ErrorCode } from '../utils/errors.js'
+import { normalizeGa4Property } from '../utils/url-normalize.js'
+import {
+  computeConsentHealth,
+  type ConsentReportRow,
+  type ConsentHealthResult,
+} from './compute-consent-health.js'
 
 // ============================================================================
 // Input Schema
 // ============================================================================
 
 export const ga4ConsentHealthInputSchema = z.object({
-  /** GA4 property ID in format "properties/123456789" */
   property_id: z
     .string()
     .min(1, 'property_id is required')
-    .regex(/^properties\/\d+$/, 'property_id must be in format "properties/123456789"'),
-  /** Number of days to analyze (default: 28) */
-  days: z.number().int().min(1).max(365).optional().default(28),
-  /** Optional custom consent-granted event name */
-  custom_grant_event: z.string().optional(),
-  /** Optional custom consent-denied event name */
-  custom_deny_event: z.string().optional(),
+    .describe(
+      'GA4 Property ID: numeric (e.g. "123456789") or full form "properties/123456789". Not a Measurement ID (G-XXXXXX).',
+    ),
+  days: z
+    .number()
+    .int()
+    .min(1)
+    .max(365)
+    .optional()
+    .default(28)
+    .describe('Look-back window in days (default: 28; max: 365), e.g. 28'),
+  grant_event: z
+    .string()
+    .min(1, 'grant_event is required')
+    .describe(
+      'GA4 event name fired when user grants consent, e.g. "consent_granted"',
+    ),
+  deny_event: z
+    .string()
+    .min(1, 'deny_event is required')
+    .describe(
+      'GA4 event name fired when user denies consent, e.g. "consent_denied"',
+    ),
+  view_event: z
+    .string()
+    .min(1)
+    .optional()
+    .default('page_view')
+    .describe(
+      'Page/view event used as denominator for consent_visibility_pct (default: "page_view")',
+    ),
 })
 
 export type Ga4ConsentHealthInput = z.infer<typeof ga4ConsentHealthInputSchema>
 
 // ============================================================================
-// Output Types
+// Result Types
 // ============================================================================
 
-export interface ConsentStorageStats {
-  granted_pct: number
-  denied_pct: number
-  unset_pct: number
-  total_sessions: number
-}
-
-export interface ConsentModeData {
-  analytics_storage: ConsentStorageStats
-  ads_storage: ConsentStorageStats
-  available: boolean
-}
-
-export interface CustomEventData {
-  grant_event: string
-  grant_count: number
-  deny_event: string
-  deny_count: number
-  consent_rate_pct: number
-}
-
-export interface Ga4ConsentHealthOutput {
-  success: boolean
+export type Ga4ConsentHealthSuccess = {
+  success: true
+  warnings: string[]
   property_id: string
   period: string
-  consent_mode: ConsentModeData
-  custom_events?: CustomEventData
-  health_score: 'healthy' | 'warning' | 'critical'
-  error?: string
+} & ConsentHealthResult
+
+export interface Ga4ConsentHealthError {
+  success: false
+  error: {
+    code: ErrorCode
+    message: string
+    hint?: string
+  }
 }
+
+export type Ga4ConsentHealthResult =
+  | Ga4ConsentHealthSuccess
+  | Ga4ConsentHealthError
 
 // ============================================================================
-// GA4 Data API Types
+// Data API
 // ============================================================================
-
-interface DimensionValue {
-  value: string
-}
-
-interface MetricValue {
-  value: string
-}
-
-interface DataApiRow {
-  dimensionValues: DimensionValue[]
-  metricValues: MetricValue[]
-}
 
 interface DataApiResponse {
-  rows?: DataApiRow[]
+  rows?: ConsentReportRow[]
+  error?: { code: number; message: string }
 }
 
-// ============================================================================
-// Health Score Logic
-// ============================================================================
-
-/**
- * Compute health score based on analytics_storage denied percentage
- */
-export function computeHealthScore(
-  deniedPct: number,
-): 'healthy' | 'warning' | 'critical' {
-  if (deniedPct > 30) return 'critical'
-  if (deniedPct >= 10) return 'warning'
-  return 'healthy'
-}
-
-// ============================================================================
-// Consent Mode Report Processing
-// ============================================================================
-
-/**
- * Parse consent mode report rows into storage stats
- */
-export function parseConsentModeRows(rows: DataApiRow[]): {
-  analytics_storage: ConsentStorageStats
-  ads_storage: ConsentStorageStats
-  available: boolean
-} {
-  if (rows.length === 0) {
-    const empty: ConsentStorageStats = {
-      granted_pct: 0,
-      denied_pct: 0,
-      unset_pct: 0,
-      total_sessions: 0,
-    }
-    return {
-      analytics_storage: empty,
-      ads_storage: empty,
-      available: false,
-    }
-  }
-
-  // Aggregate sessions by analytics_storage and ads_storage consent values
-  // Dimensions: [0]=privacyInfoAnalyticsStorage, [1]=privacyInfoAdsStorage
-  const analyticsMap = new Map<string, number>()
-  const adsMap = new Map<string, number>()
-
-  for (const row of rows) {
-    const analyticsVal = row.dimensionValues[0]?.value ?? 'UNSET'
-    const adsVal = row.dimensionValues[1]?.value ?? 'UNSET'
-    const sessions = parseInt(row.metricValues[0]?.value ?? '0', 10)
-
-    analyticsMap.set(analyticsVal, (analyticsMap.get(analyticsVal) ?? 0) + sessions)
-    adsMap.set(adsVal, (adsMap.get(adsVal) ?? 0) + sessions)
-  }
-
-  const toStats = (map: Map<string, number>): ConsentStorageStats => {
-    const granted = map.get('GRANTED') ?? 0
-    const denied = map.get('DENIED') ?? 0
-    // Any value not GRANTED or DENIED counts as unset
-    let unset = 0
-    for (const [key, val] of map) {
-      if (key !== 'GRANTED' && key !== 'DENIED') {
-        unset += val
-      }
-    }
-    const total = granted + denied + unset
-
-    if (total === 0) {
-      return { granted_pct: 0, denied_pct: 0, unset_pct: 0, total_sessions: 0 }
-    }
-
-    return {
-      granted_pct: Math.round((granted / total) * 1000) / 10,
-      denied_pct: Math.round((denied / total) * 1000) / 10,
-      unset_pct: Math.round((unset / total) * 1000) / 10,
-      total_sessions: total,
-    }
-  }
-
-  // Check if consent mode data is meaningful (not all UNSET)
-  const analyticsGranted = analyticsMap.get('GRANTED') ?? 0
-  const analyticsDenied = analyticsMap.get('DENIED') ?? 0
-  const available = analyticsGranted > 0 || analyticsDenied > 0
-
-  return {
-    analytics_storage: toStats(analyticsMap),
-    ads_storage: toStats(adsMap),
-    available,
-  }
-}
-
-// ============================================================================
-// Custom Event Processing
-// ============================================================================
-
-/**
- * Parse custom event rows into CustomEventData
- */
-export function parseCustomEventRows(
-  rows: DataApiRow[],
-  grantEvent: string,
-  denyEvent: string,
-): CustomEventData {
-  let grantCount = 0
-  let denyCount = 0
-
-  for (const row of rows) {
-    const eventName = row.dimensionValues[0]?.value ?? ''
-    const count = parseInt(row.metricValues[0]?.value ?? '0', 10)
-    if (eventName === grantEvent) grantCount += count
-    if (eventName === denyEvent) denyCount += count
-  }
-
-  const total = grantCount + denyCount
-  const consent_rate_pct =
-    total > 0 ? Math.round((grantCount / total) * 1000) / 10 : 0
-
-  return {
-    grant_event: grantEvent,
-    grant_count: grantCount,
-    deny_event: denyEvent,
-    deny_count: denyCount,
-    consent_rate_pct,
-  }
-}
-
-// ============================================================================
-// API Calls
-// ============================================================================
-
-
-/**
- * Run a GA4 Data API report
- */
-export async function runDataApiReport(
+async function runDataApiReport(
   propertyId: string,
   body: Record<string, unknown>,
-): Promise<DataApiRow[]> {
+): Promise<ConsentReportRow[]> {
   const authHeaders = await getGoogleAuthHeaders([
     'https://www.googleapis.com/auth/analytics.readonly',
   ])
@@ -223,26 +96,30 @@ export async function runDataApiReport(
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      ...authHeaders,
-      'Content-Type': 'application/json',
-    },
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
 
   if (!response.ok) {
     const text = await response.text()
     if (response.status === 403) {
-      throw new Error(
-        'GA4 Data API access denied — check service account has Viewer role on property',
+      throw new ToolError(
+        ErrorCode.AUTH_DENIED,
+        `GA4 Data API access denied for ${propertyId} (HTTP 403)`,
+        'Grant the service account Viewer role on the GA4 property. See mcp/PERMISSIONS.md.',
       )
     }
     if (response.status === 404) {
-      throw new Error(
-        `Property not found: ${propertyId} — verify the property ID is correct`,
+      throw new ToolError(
+        ErrorCode.NOT_FOUND,
+        `GA4 property not found: ${propertyId}`,
+        'Verify the property ID in GA4 Admin → Property Settings.',
       )
     }
-    throw new Error(`GA4 Data API error (HTTP ${response.status}): ${text}`)
+    throw new ToolError(
+      ErrorCode.UPSTREAM_5XX,
+      `GA4 Data API error (HTTP ${response.status}): ${text}`,
+    )
   }
 
   const data = (await response.json()) as DataApiResponse
@@ -250,94 +127,79 @@ export async function runDataApiReport(
 }
 
 // ============================================================================
-// Main Tool Function
+// Handler
 // ============================================================================
 
-/**
- * Run the full ga4_consent_health tool
- */
 export async function runGa4ConsentHealth(
   input: Ga4ConsentHealthInput,
-): Promise<Ga4ConsentHealthOutput> {
-  const { property_id, days, custom_grant_event, custom_deny_event } = input
-  const period = `last ${days} days`
-  const endDate = 'today'
-  const startDate = `${days}daysAgo`
+): Promise<Ga4ConsentHealthResult> {
+  const { days, grant_event, deny_event, view_event } = input
 
-  const emptyConsentMode: ConsentModeData = {
-    analytics_storage: {
-      granted_pct: 0,
-      denied_pct: 0,
-      unset_pct: 0,
-      total_sessions: 0,
-    },
-    ads_storage: {
-      granted_pct: 0,
-      denied_pct: 0,
-      unset_pct: 0,
-      total_sessions: 0,
-    },
-    available: false,
+  // Normalize property_id — throws ToolError for G-XXX, UA-XXX, etc.
+  let propertyId: string
+  try {
+    propertyId = normalizeGa4Property(input.property_id)
+  } catch (err) {
+    if (err instanceof ToolError) {
+      return {
+        success: false,
+        error: { code: err.code, message: err.message, ...(err.hint !== undefined ? { hint: err.hint } : {}) },
+      }
+    }
+    throw err
   }
 
+  const period = `last ${days} days`
+
   try {
-    // Call 1: Consent Mode signals
-    const consentRows = await runDataApiReport(property_id, {
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [
-        { name: 'privacyInfoAnalyticsStorage' },
-        { name: 'privacyInfoAdsStorage' },
-      ],
-      metrics: [{ name: 'sessions' }],
-    })
-
-    const consent_mode = parseConsentModeRows(consentRows)
-
-    // Call 2: Custom events (only if requested)
-    let custom_events: CustomEventData | undefined
-    if (custom_grant_event || custom_deny_event) {
-      const grantEvent = custom_grant_event ?? ''
-      const denyEvent = custom_deny_event ?? ''
-
-      // Build event name filter
-      const filterValues = [grantEvent, denyEvent].filter(Boolean)
-      const eventRows = await runDataApiReport(property_id, {
-        dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: 'eventName' }],
-        metrics: [{ name: 'eventCount' }],
-        dimensionFilter: {
-          filter: {
-            fieldName: 'eventName',
-            inListFilter: {
-              values: filterValues,
-            },
+    const rows = await runDataApiReport(propertyId, {
+      dimensions: [{ name: 'eventName' }],
+      metrics: [{ name: 'eventCount' }, { name: 'totalUsers' }],
+      dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'yesterday' }],
+      dimensionFilter: {
+        filter: {
+          fieldName: 'eventName',
+          inListFilter: {
+            values: [grant_event, deny_event, view_event],
           },
         },
-      })
+      },
+    })
 
-      custom_events = parseCustomEventRows(eventRows, grantEvent, denyEvent)
+    const health = computeConsentHealth(rows, { grant_event, deny_event, view_event })
+
+    const warnings = [...health.warnings]
+    if (!health.available) {
+      warnings.push(
+        `No "${grant_event}" or "${deny_event}" events found in the last ${days} days. ` +
+          'Instrument grant/deny events on banner accept/deny actions. See mcp/PERMISSIONS.md.',
+      )
     }
-
-    const health_score = computeHealthScore(
-      consent_mode.analytics_storage.denied_pct,
-    )
 
     return {
       success: true,
-      property_id,
+      warnings,
+      property_id: propertyId,
       period,
-      consent_mode,
-      custom_events,
-      health_score,
+      events: health.events,
+      consent_rate_pct: health.consent_rate_pct,
+      consent_visibility_pct: health.consent_visibility_pct,
+      health_score: health.health_score,
+      available: health.available,
     }
   } catch (err) {
+    if (err instanceof ToolError) {
+      return {
+        success: false,
+        error: { code: err.code, message: err.message, ...(err.hint !== undefined ? { hint: err.hint } : {}) },
+      }
+    }
     return {
       success: false,
-      property_id,
-      period,
-      consent_mode: emptyConsentMode,
-      health_score: 'critical',
-      error: err instanceof Error ? err.message : String(err),
+      error: {
+        code: ErrorCode.UPSTREAM_5XX,
+        message: err instanceof Error ? err.message : String(err),
+      },
     }
   }
 }
@@ -349,33 +211,39 @@ export async function runGa4ConsentHealth(
 export const ga4ConsentHealthTool = {
   name: 'ga4_consent_health',
   description:
-    'Report Consent Mode v2 health for a GA4 property: what % of sessions have analytics/ads consent granted vs denied. ' +
-    'Uses GA4 Data API (analyticsdata/v1beta). ' +
-    'Returns health score: healthy (<10% denied), warning (10-30%), critical (>30%).',
+    'Report GA4 consent banner health by counting `consent_granted` / `consent_denied` events vs page views. ' +
+    'Use when traffic looks suspiciously low, after changing the cookie banner, or auditing privacy compliance. ' +
+    'Requires the site to instrument grant/deny events on banner actions — ' +
+    'Consent Mode v2 dimensions are NOT exposed on the Data API and not used here.',
   inputSchema: {
     type: 'object',
-    required: ['property_id'],
+    required: ['property_id', 'grant_event', 'deny_event'],
     properties: {
       property_id: {
         type: 'string',
-        description: 'GA4 property ID in format "properties/123456789"',
+        description:
+          'GA4 Property ID: numeric (e.g. "123456789") or "properties/123456789". Not a Measurement ID (G-XXXXXX).',
       },
       days: {
         type: 'number',
-        description: 'Number of days to analyze (default: 28, max: 365)',
+        description: 'Look-back window in days (default: 28; max: 365)',
         default: 28,
         minimum: 1,
         maximum: 365,
       },
-      custom_grant_event: {
+      grant_event: {
         type: 'string',
-        description:
-          'Optional: custom event name for consent granted (e.g. "consent_granted")',
+        description: 'GA4 event fired on consent grant, e.g. "consent_granted"',
       },
-      custom_deny_event: {
+      deny_event: {
+        type: 'string',
+        description: 'GA4 event fired on consent deny, e.g. "consent_denied"',
+      },
+      view_event: {
         type: 'string',
         description:
-          'Optional: custom event name for consent denied (e.g. "consent_denied")',
+          'Page/view event as denominator for visibility ratio (default: "page_view")',
+        default: 'page_view',
       },
     },
   },
