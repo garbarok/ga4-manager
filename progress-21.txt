@@ -1,0 +1,34 @@
+## Iteration 1 — 2026-04-25
+
+All acceptance criteria implemented in one pass.
+
+### Criteria completed
+- mcp/src/utils/redirect-trace.ts created: exports fetchWithTrace(url, opts) → { chain, finalRes, finalUrl }
+- Manual redirect loop, max 5 hops; throws ToolError(UPSTREAM_5XX) on loop or hop limit
+- Each chain entry: { from, to, status (301/302/307/308) }
+- Cross-domain detection via tldts parse().domain (eTLD+1) in issue-rules.ts
+- seo_page_audit swaps fetch for fetchWithTrace; output adds redirect_chain field
+- New issue rules: redirect.chain_too_long (>3 hops, warning), redirect.cross_domain (eTLD+1 differs, warning), redirect.non_permanent (302 in chain, info), redirect.loop (duplicate from URL, error)
+- Meta-refresh detection: extractMetaRefreshUrl() in seo-page-audit.ts adds meta_refresh info issue with target URL
+- tldts added to mcp/package.json + installed
+- Unit tests: mcp/src/utils/redirect-trace.test.ts (loop, max-hops, single, no-redirect, relative location, no-location, options forwarding)
+- Integration tests: redirect chain tests in seo-page-audit.test.ts, redirect rules in issue-rules.test.ts
+
+### Files touched
+- mcp/src/utils/redirect-trace.ts (new)
+- mcp/src/utils/redirect-trace.test.ts (new)
+- mcp/src/tools/issue-rules.ts (redirect rules + tldts import)
+- mcp/src/tools/issue-rules.test.ts (redirect chain rule tests)
+- mcp/src/tools/seo-page-audit.ts (fetchWithTrace, redirect_chain output, meta-refresh)
+- mcp/src/tools/seo-page-audit.test.ts (redirect chain + meta-refresh integration tests)
+- mcp/package.json (tldts dep)
+- mcp/pnpm-lock.yaml (irrelevant, npm used)
+
+### Decisions
+- fetchWithTrace throws ToolError on loop/hop-limit; seo-page-audit catches and returns success:false
+- redirect.loop issue rule detects duplicate `from` URLs in chain (for testability even though fetchWithTrace throws first)
+- meta-refresh detection in seo-page-audit (not html-signals) because it triggers an issue, not a signal
+- tldts parse().domain gives eTLD+1; same subdomain→apex redirect does NOT fire cross_domain
+
+### Blockers
+None. All criteria satisfied. Build+test+lint pass (1150 tests).

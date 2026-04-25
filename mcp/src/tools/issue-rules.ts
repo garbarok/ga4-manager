@@ -2,7 +2,9 @@
 // issue-rules.ts — pure issue detection engine, no I/O
 // ============================================================================
 
+import { parse as parseDomain } from 'tldts'
 import type { HtmlSignals } from './html-signals.js'
+import type { RedirectHop } from '../utils/redirect-trace.js'
 
 export interface SeoIssue {
   field: string
@@ -16,10 +18,63 @@ export interface IssueSummary {
   infos: number
 }
 
-export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[] {
+function registrableDomain(url: string): string | null {
+  try {
+    return parseDomain(url).domain ?? null
+  } catch {
+    return null
+  }
+}
+
+export function runIssueRules(signals: HtmlSignals, finalUrl: string, chain: RedirectHop[] = []): SeoIssue[] {
   const issues: SeoIssue[] = []
 
-  // Title
+  // ── Redirect chain rules ──────────────────────────────────────────────────
+
+  if (chain.length > 0) {
+    // redirect.loop — same URL visited twice in chain
+    const seen = new Set<string>()
+    for (const hop of chain) {
+      if (seen.has(hop.from)) {
+        issues.push({ field: 'redirect.loop', severity: 'error', message: `Redirect loop: ${hop.from} was visited twice` })
+        break
+      }
+      seen.add(hop.from)
+    }
+
+    // redirect.chain_too_long — more than 3 hops
+    if (chain.length > 3) {
+      issues.push({
+        field: 'redirect.chain_too_long',
+        severity: 'warning',
+        message: `Redirect chain is ${chain.length} hops long (max recommended: 3)`,
+      })
+    }
+
+    // redirect.non_permanent — any 302 in chain
+    if (chain.some((h) => h.status === 302)) {
+      issues.push({
+        field: 'redirect.non_permanent',
+        severity: 'info',
+        message: 'Redirect chain contains a 302 (temporary) redirect; use 301 for SEO-safe permanent redirects',
+      })
+    }
+
+    // redirect.cross_domain — final eTLD+1 differs from start eTLD+1
+    const startUrl = chain[0].from
+    const startDomain = registrableDomain(startUrl)
+    const finalDomain = registrableDomain(finalUrl)
+    if (startDomain && finalDomain && startDomain !== finalDomain) {
+      issues.push({
+        field: 'redirect.cross_domain',
+        severity: 'warning',
+        message: `Redirect crosses domain boundary: ${startDomain} → ${finalDomain}`,
+      })
+    }
+  }
+
+  // ── Title ─────────────────────────────────────────────────────────────────
+
   if (!signals.title) {
     issues.push({ field: 'title', severity: 'error', message: 'Page is missing a <title> tag' })
   } else {
@@ -38,7 +93,8 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[
     }
   }
 
-  // Description
+  // ── Description ───────────────────────────────────────────────────────────
+
   if (!signals.description) {
     issues.push({ field: 'description', severity: 'warning', message: 'Page is missing a meta description' })
   } else if (signals.description_length > 160) {
@@ -49,7 +105,8 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[
     })
   }
 
-  // Canonical
+  // ── Canonical ─────────────────────────────────────────────────────────────
+
   if (!signals.canonical) {
     issues.push({ field: 'canonical', severity: 'warning', message: 'Page is missing a canonical link tag' })
   } else {
@@ -72,7 +129,8 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[
     }
   }
 
-  // Robots noindex
+  // ── Robots noindex ────────────────────────────────────────────────────────
+
   if (signals.noindex) {
     issues.push({
       field: 'robots',
@@ -81,7 +139,8 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[
     })
   }
 
-  // H1
+  // ── H1 ────────────────────────────────────────────────────────────────────
+
   if (signals.h1_count === 0) {
     issues.push({ field: 'h1', severity: 'warning', message: 'Page has no <h1> tag' })
   } else if (signals.h1_count > 1) {
@@ -92,7 +151,8 @@ export function runIssueRules(signals: HtmlSignals, finalUrl: string): SeoIssue[
     })
   }
 
-  // OG image
+  // ── OG image ──────────────────────────────────────────────────────────────
+
   if (!signals.og.image) {
     issues.push({ field: 'og:image', severity: 'info', message: 'Page is missing og:image meta tag' })
   }

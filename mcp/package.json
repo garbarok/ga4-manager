@@ -16,6 +16,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "csv-parse": "^6.2.1",
     "node-html-parser": "^7.1.0",
+    "tldts": "^7.0.28",
     "zod": "^4.3.6"
   },
   "devDependencies": {

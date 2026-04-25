@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { extractSignals, type HtmlSignals } from './html-signals.js'
 import { runIssueRules, summarizeIssues, type SeoIssue, type IssueSummary } from './issue-rules.js'
+import { fetchWithTrace, type RedirectHop } from '../utils/redirect-trace.js'
+import { ToolError } from '../utils/errors.js'
 
 // Re-export granular helpers so existing imports continue to work
 export {
@@ -18,6 +20,7 @@ export {
   type SeoIssue,
   type IssueSummary,
 } from './issue-rules.js'
+export type { RedirectHop } from '../utils/redirect-trace.js'
 
 // ============================================================================
 // Input Schema
@@ -77,6 +80,7 @@ export interface SeoPageAuditOutput {
   url: string
   final_url: string
   status_code: number
+  redirect_chain: RedirectHop[]
   signals: HtmlSignals
   issues: SeoIssue[]
   issue_summary: IssueSummary
@@ -133,6 +137,22 @@ export async function fetchCwv(
 }
 
 // ============================================================================
+// Meta-refresh extraction
+// ============================================================================
+
+function extractMetaRefreshUrl(html: string): string | null {
+  // Matches: <meta http-equiv="refresh" content="5; url=https://example.com">
+  // and reversed attribute order
+  const match = html.match(
+    /<meta[^>]+http-equiv=["']refresh["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+http-equiv=["']refresh["']/i,
+  )
+  if (!match) return null
+  const content = (match[1] ?? match[2] ?? '').trim()
+  const urlMatch = content.match(/url\s*=\s*([^\s;,]+)/i)
+  return urlMatch ? urlMatch[1] : null
+}
+
+// ============================================================================
 // Main Tool Function
 // ============================================================================
 
@@ -157,21 +177,35 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   const { url, user_agent, check_cwv, psi_api_key, psi_strategy } = input
   const warnings: string[] = []
 
-  let fetchResponse: Response
   let finalUrl: string
   let statusCode: number
   let html: string
+  let chain: RedirectHop[] = []
 
   try {
-    fetchResponse = await fetch(url, {
+    const traceResult = await fetchWithTrace(url, {
       headers: { 'User-Agent': user_agent },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      redirect: 'follow',
     })
-    finalUrl = fetchResponse.url || url
-    statusCode = fetchResponse.status
-    html = await fetchResponse.text()
+    chain = traceResult.chain
+    finalUrl = traceResult.finalUrl
+    statusCode = traceResult.finalRes.status
+    html = await traceResult.finalRes.text()
   } catch (err) {
+    if (err instanceof ToolError) {
+      return {
+        success: false,
+        warnings,
+        url,
+        final_url: url,
+        status_code: 0,
+        redirect_chain: [],
+        signals: emptySignals,
+        issues: [],
+        issue_summary: { errors: 0, warnings: 0, infos: 0 },
+        error: err.message,
+      }
+    }
     const message =
       err instanceof Error
         ? err.name === 'TimeoutError'
@@ -184,6 +218,7 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
       url,
       final_url: url,
       status_code: 0,
+      redirect_chain: [],
       signals: emptySignals,
       issues: [],
       issue_summary: { errors: 0, warnings: 0, infos: 0 },
@@ -192,10 +227,20 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   }
 
   const signals = extractSignals(html, finalUrl)
-  let issues = runIssueRules(signals, finalUrl)
+  let issues = runIssueRules(signals, finalUrl, chain)
 
   if (statusCode < 200 || statusCode >= 300) {
     issues = [{ field: 'status', severity: 'error', message: `Page returned HTTP ${statusCode}` }, ...issues]
+  }
+
+  // Meta-refresh detection
+  const metaRefreshUrl = extractMetaRefreshUrl(html)
+  if (metaRefreshUrl) {
+    issues.push({
+      field: 'meta_refresh',
+      severity: 'info',
+      message: `Page has meta refresh redirect to: ${metaRefreshUrl}`,
+    })
   }
 
   const issue_summary = summarizeIssues(issues)
@@ -217,6 +262,7 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
     url,
     final_url: finalUrl,
     status_code: statusCode,
+    redirect_chain: chain,
     signals,
     issues,
     issue_summary,
@@ -232,9 +278,9 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
 export const seoPageAuditTool = {
   name: 'seo_page_audit',
   description:
-    'Use when auditing a single page for SEO problems: missing title or description, bad canonical, noindex directives, missing OG image, heading structure issues. ' +
-    'Fetches the URL and parses on-page signals (title, meta description, canonical, robots, Open Graph, Schema.org types, h1/h2 counts, hreflang). ' +
-    'Returns a structured issues list with severity (error/warning/info). ' +
+    'Use when auditing a single page for SEO problems: missing title or description, bad canonical, noindex directives, missing OG image, heading structure issues, redirect chain problems. ' +
+    'Fetches the URL with manual redirect tracing (max 5 hops), parses on-page signals (title, meta description, canonical, robots, Open Graph, Schema.org types, h1/h2 counts, hreflang). ' +
+    'Returns a structured issues list with severity (error/warning/info) and the full redirect chain. ' +
     'Optionally checks Core Web Vitals via PageSpeed Insights API.',
   inputSchema: {
     type: 'object',

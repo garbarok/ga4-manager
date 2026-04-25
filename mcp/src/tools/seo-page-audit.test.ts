@@ -691,3 +691,183 @@ describe('seoPageAuditTool definition', () => {
     expect(props.psi_strategy).toBeDefined()
   })
 })
+
+// ============================================================================
+// runSeoPageAudit — redirect chain integration
+// ============================================================================
+
+function makeRedirectResponse(status: number, location: string) {
+  return {
+    ok: false,
+    status,
+    url: '',
+    headers: { get: (h: string) => (h.toLowerCase() === 'location' ? location : null) },
+    text: () => Promise.resolve(''),
+  }
+}
+
+function makeOkResponse(url: string, body: string) {
+  return {
+    ok: true,
+    status: 200,
+    url,
+    headers: { get: () => null },
+    text: () => Promise.resolve(body),
+  }
+}
+
+const GOOD_HTML = `<!DOCTYPE html>
+<html><head>
+  <title>Good Page Title For Testing</title>
+  <meta name="description" content="Good description for this test page here.">
+  <link rel="canonical" href="https://example.com/final">
+  <meta property="og:image" content="https://example.com/img.jpg">
+</head><body><h1>Heading</h1></body></html>`
+
+describe('runSeoPageAudit — redirect chain', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('output includes redirect_chain field (empty when no redirect)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(makeOkResponse('https://example.com/page', GOOD_HTML)),
+    )
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/page' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.redirect_chain).toBeDefined()
+    expect(result.redirect_chain).toHaveLength(0)
+  })
+
+  it('multi-hop: redirect_chain has correct length and entries', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/step2'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/final'))
+        .mockResolvedValueOnce(makeOkResponse('https://example.com/final', GOOD_HTML)),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/start' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.redirect_chain).toHaveLength(2)
+    expect(result.redirect_chain[0]).toMatchObject({ from: 'https://example.com/start', status: 301 })
+    expect(result.redirect_chain[1]).toMatchObject({ from: 'https://example.com/step2', status: 301 })
+    expect(result.final_url).toBe('https://example.com/final')
+  })
+
+  it('redirect.chain_too_long issue fires for 4-hop chain', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/b'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/c'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/d'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/final'))
+        .mockResolvedValueOnce(makeOkResponse('https://example.com/final', GOOD_HTML)),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/a' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.redirect_chain).toHaveLength(4)
+    expect(result.issues.some((i) => i.field === 'redirect.chain_too_long' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('returns success=false with error message on redirect loop', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/b'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/a')),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/a' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/loop/i)
+    expect(result.redirect_chain).toHaveLength(0)
+  })
+
+  it('returns success=false with error message when hop limit exceeded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/b'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/c'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/d'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/e'))
+        .mockResolvedValueOnce(makeRedirectResponse(301, 'https://example.com/f')),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/a' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/hop limit/i)
+  })
+})
+
+// ============================================================================
+// runSeoPageAudit — meta-refresh detection
+// ============================================================================
+
+describe('runSeoPageAudit — meta-refresh', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('adds meta_refresh info issue when meta http-equiv="refresh" present', async () => {
+    const htmlWithRefresh = `<!DOCTYPE html>
+<html><head>
+  <title>Redirecting Page Title OK</title>
+  <meta name="description" content="This page redirects you soon.">
+  <link rel="canonical" href="https://example.com/">
+  <meta property="og:image" content="https://example.com/img.jpg">
+  <meta http-equiv="refresh" content="5; url=https://example.com/new-page">
+</head><body><h1>Redirecting</h1></body></html>`
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        url: 'https://example.com/',
+        headers: { get: () => null },
+        text: () => Promise.resolve(htmlWithRefresh),
+      }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    const metaIssue = result.issues.find((i) => i.field === 'meta_refresh')
+    expect(metaIssue).toBeDefined()
+    expect(metaIssue?.severity).toBe('info')
+    expect(metaIssue?.message).toContain('https://example.com/new-page')
+  })
+
+  it('no meta_refresh issue when tag absent', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        url: 'https://example.com/',
+        headers: { get: () => null },
+        text: () => Promise.resolve(GOOD_HTML),
+      }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.issues.some((i) => i.field === 'meta_refresh')).toBe(false)
+  })
+})
