@@ -1,5 +1,68 @@
 import type { CLIResult, CLIError } from '../types/cli.js';
 
+// ============================================================================
+// Standardized tool response contract (used by native tools)
+// ============================================================================
+
+export enum ErrorCode {
+  AUTH_DENIED = 'AUTH_DENIED',
+  QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
+  INVALID_INPUT = 'INVALID_INPUT',
+  UPSTREAM_5XX = 'UPSTREAM_5XX',
+  NOT_FOUND = 'NOT_FOUND',
+  PARTIAL_FETCH_FAILED = 'PARTIAL_FETCH_FAILED',
+}
+
+export class ToolError extends Error {
+  constructor(
+    public readonly code: ErrorCode,
+    message: string,
+    public readonly hint?: string,
+  ) {
+    super(message)
+    this.name = 'ToolError'
+  }
+}
+
+export interface ToolErrorShape {
+  code: ErrorCode
+  message: string
+  hint?: string
+}
+
+export interface ToolFailureResult {
+  success: false
+  error: ToolErrorShape
+}
+
+export interface ToolSuccessResult<T extends Record<string, unknown>> {
+  success: true
+  warnings: string[]
+  data: T
+}
+
+export function errorResult(
+  code: ErrorCode,
+  message: string,
+  hint?: string,
+): ToolFailureResult {
+  return {
+    success: false,
+    error: { code, message, ...(hint !== undefined ? { hint } : {}) },
+  }
+}
+
+export function successResult<T extends Record<string, unknown>>(
+  data: T,
+  warnings: string[] = [],
+): ToolSuccessResult<T> {
+  return { success: true, warnings, data }
+}
+
+// ============================================================================
+// CLI error mapping (used by legacy CLI-backed tools)
+// ============================================================================
+
 /**
  * Map CLI execution result to structured error object
  *

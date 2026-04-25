@@ -1,0 +1,693 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  seoPageAuditInputSchema,
+  seoPageAuditTool,
+  extractTitle,
+  extractMetaContent,
+  extractCanonical,
+  countHreflang,
+  extractSchemaTypes,
+  detectIssues,
+  summarizeIssues,
+  fetchCwv,
+  runSeoPageAudit,
+  SeoSignals,
+} from './seo-page-audit.js'
+
+// ============================================================================
+// Input Schema Validation
+// ============================================================================
+
+describe('seoPageAuditInputSchema', () => {
+  it('accepts valid URL', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('applies default user_agent (Googlebot)', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.user_agent).toContain('Googlebot')
+    }
+  })
+
+  it('applies default check_cwv=false', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.check_cwv).toBe(false)
+    }
+  })
+
+  it('applies default psi_strategy=mobile', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.psi_strategy).toBe('mobile')
+    }
+  })
+
+  it('accepts full input with all options', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/page',
+      user_agent: 'MyBot/1.0',
+      check_cwv: true,
+      psi_api_key: 'my-api-key',
+      psi_strategy: 'desktop',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects missing url', () => {
+    const result = seoPageAuditInputSchema.safeParse({})
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid URL format', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'not-a-url',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid psi_strategy', () => {
+    const result = seoPageAuditInputSchema.safeParse({
+      url: 'https://example.com/',
+      psi_strategy: 'tablet',
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+// ============================================================================
+// HTML Signal Extraction
+// ============================================================================
+
+describe('extractTitle', () => {
+  it('extracts title from simple title tag', () => {
+    expect(extractTitle('<title>My Page Title</title>')).toBe('My Page Title')
+  })
+
+  it('returns null when no title tag', () => {
+    expect(extractTitle('<html><body>no title</body></html>')).toBeNull()
+  })
+
+  it('trims whitespace from title', () => {
+    expect(extractTitle('<title>  Trimmed Title  </title>')).toBe('Trimmed Title')
+  })
+
+  it('handles title with attributes', () => {
+    expect(extractTitle('<title lang="en">My Title</title>')).toBe('My Title')
+  })
+
+  it('collapses internal whitespace', () => {
+    expect(extractTitle('<title>My\n  Title</title>')).toBe('My Title')
+  })
+
+  it('returns null for empty title tag', () => {
+    expect(extractTitle('<title></title>')).toBeNull()
+  })
+})
+
+describe('extractMetaContent', () => {
+  it('extracts meta description content', () => {
+    const html = '<meta name="description" content="My description">'
+    expect(extractMetaContent(html, 'description')).toBe('My description')
+  })
+
+  it('extracts og:title content', () => {
+    const html = '<meta property="og:title" content="OG Title">'
+    expect(extractMetaContent(html, 'og:title')).toBe('OG Title')
+  })
+
+  it('handles reversed attribute order (content before name)', () => {
+    const html = '<meta content="My desc" name="description">'
+    expect(extractMetaContent(html, 'description')).toBe('My desc')
+  })
+
+  it('returns null when meta tag not present', () => {
+    expect(extractMetaContent('<html></html>', 'description')).toBeNull()
+  })
+
+  it('extracts robots meta content', () => {
+    const html = '<meta name="robots" content="noindex, nofollow">'
+    expect(extractMetaContent(html, 'robots')).toBe('noindex, nofollow')
+  })
+})
+
+describe('extractCanonical', () => {
+  it('extracts canonical href', () => {
+    const html = '<link rel="canonical" href="https://example.com/page">'
+    expect(extractCanonical(html)).toBe('https://example.com/page')
+  })
+
+  it('handles reversed attribute order (href before rel)', () => {
+    const html = '<link href="https://example.com/page" rel="canonical">'
+    expect(extractCanonical(html)).toBe('https://example.com/page')
+  })
+
+  it('returns null when no canonical tag', () => {
+    expect(extractCanonical('<html></html>')).toBeNull()
+  })
+})
+
+describe('countHreflang', () => {
+  it('counts hreflang link tags', () => {
+    const html = `
+      <link rel="alternate" hreflang="en" href="https://example.com/">
+      <link rel="alternate" hreflang="es" href="https://example.com/es/">
+      <link rel="alternate" hreflang="x-default" href="https://example.com/">
+    `
+    expect(countHreflang(html)).toBe(3)
+  })
+
+  it('returns 0 when no hreflang tags', () => {
+    expect(countHreflang('<html></html>')).toBe(0)
+  })
+})
+
+describe('extractSchemaTypes', () => {
+  it('extracts single @type from JSON-LD', () => {
+    const html = `
+      <script type="application/ld+json">
+        {"@context": "https://schema.org", "@type": "Article"}
+      </script>
+    `
+    const types = extractSchemaTypes(html)
+    expect(types).toContain('Article')
+  })
+
+  it('extracts multiple types from @graph', () => {
+    const html = `
+      <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {"@type": "WebPage"},
+            {"@type": "BreadcrumbList"}
+          ]
+        }
+      </script>
+    `
+    const types = extractSchemaTypes(html)
+    expect(types).toContain('WebPage')
+    expect(types).toContain('BreadcrumbList')
+  })
+
+  it('handles array @type values', () => {
+    const html = `
+      <script type="application/ld+json">
+        {"@type": ["Article", "NewsArticle"]}
+      </script>
+    `
+    const types = extractSchemaTypes(html)
+    expect(types).toContain('Article')
+    expect(types).toContain('NewsArticle')
+  })
+
+  it('deduplicates types', () => {
+    const html = `
+      <script type="application/ld+json">{"@type": "Article"}</script>
+      <script type="application/ld+json">{"@type": "Article"}</script>
+    `
+    const types = extractSchemaTypes(html)
+    expect(types.filter((t) => t === 'Article')).toHaveLength(1)
+  })
+
+  it('returns empty array when no JSON-LD present', () => {
+    expect(extractSchemaTypes('<html></html>')).toHaveLength(0)
+  })
+
+  it('gracefully handles invalid JSON-LD', () => {
+    const html = `<script type="application/ld+json">{ invalid json }</script>`
+    expect(() => extractSchemaTypes(html)).not.toThrow()
+    expect(extractSchemaTypes(html)).toHaveLength(0)
+  })
+})
+
+// ============================================================================
+// Issue Detection Rules
+// ============================================================================
+
+const baseSignals: SeoSignals = {
+  title: 'A Good Page Title Here',
+  title_length: 25,
+  description: 'A good meta description for this page content.',
+  description_length: 47,
+  canonical: 'https://example.com/page',
+  robots: null,
+  noindex: false,
+  og: {
+    title: 'OG Title',
+    description: 'OG Description',
+    image: 'https://example.com/image.jpg',
+    type: 'article',
+  },
+  schema_types: ['Article'],
+  h1_count: 1,
+  h2_count: 3,
+  hreflang_count: 0,
+}
+
+describe('detectIssues', () => {
+  const finalUrl = 'https://example.com/page'
+
+  it('returns no issues for a perfect page', () => {
+    const issues = detectIssues(baseSignals, finalUrl)
+    expect(issues).toHaveLength(0)
+  })
+
+  it('flags missing title as error', () => {
+    const signals = { ...baseSignals, title: null, title_length: 0 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'title' && i.severity === 'error')).toBe(true)
+  })
+
+  it('flags short title as warning', () => {
+    const signals = { ...baseSignals, title: 'Hi', title_length: 2 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'title' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('flags long title as warning', () => {
+    const longTitle = 'A'.repeat(65)
+    const signals = { ...baseSignals, title: longTitle, title_length: 65 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'title' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('accepts title exactly at 60 chars', () => {
+    const signals = { ...baseSignals, title: 'A'.repeat(60), title_length: 60 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'title')).toBe(false)
+  })
+
+  it('flags missing description as warning', () => {
+    const signals = { ...baseSignals, description: null, description_length: 0 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(
+      issues.some((i) => i.field === 'description' && i.severity === 'warning'),
+    ).toBe(true)
+  })
+
+  it('flags long description as warning', () => {
+    const longDesc = 'A'.repeat(165)
+    const signals = {
+      ...baseSignals,
+      description: longDesc,
+      description_length: 165,
+    }
+    const issues = detectIssues(signals, finalUrl)
+    expect(
+      issues.some((i) => i.field === 'description' && i.severity === 'warning'),
+    ).toBe(true)
+  })
+
+  it('flags missing canonical as warning', () => {
+    const signals = { ...baseSignals, canonical: null }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'canonical' && i.severity === 'warning')).toBe(
+      true,
+    )
+  })
+
+  it('flags canonical pointing to different domain as error', () => {
+    const signals = {
+      ...baseSignals,
+      canonical: 'https://other-domain.com/page',
+    }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'canonical' && i.severity === 'error')).toBe(
+      true,
+    )
+  })
+
+  it('accepts canonical on same domain', () => {
+    const signals = { ...baseSignals, canonical: 'https://example.com/page' }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'canonical')).toBe(false)
+  })
+
+  it('flags noindex as error', () => {
+    const signals = {
+      ...baseSignals,
+      robots: 'noindex',
+      noindex: true,
+    }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'robots' && i.severity === 'error')).toBe(true)
+  })
+
+  it('flags missing h1 as warning', () => {
+    const signals = { ...baseSignals, h1_count: 0 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'h1' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('flags multiple h1 as warning', () => {
+    const signals = { ...baseSignals, h1_count: 3 }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'h1' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('flags missing og:image as info', () => {
+    const signals = {
+      ...baseSignals,
+      og: { ...baseSignals.og, image: null },
+    }
+    const issues = detectIssues(signals, finalUrl)
+    expect(issues.some((i) => i.field === 'og:image' && i.severity === 'info')).toBe(true)
+  })
+})
+
+describe('summarizeIssues', () => {
+  it('counts issues by severity', () => {
+    const issues = [
+      { field: 'title', severity: 'error' as const, message: 'error' },
+      { field: 'desc', severity: 'warning' as const, message: 'warning' },
+      { field: 'desc2', severity: 'warning' as const, message: 'warning2' },
+      { field: 'og', severity: 'info' as const, message: 'info' },
+    ]
+    const summary = summarizeIssues(issues)
+    expect(summary.errors).toBe(1)
+    expect(summary.warnings).toBe(2)
+    expect(summary.infos).toBe(1)
+  })
+
+  it('returns zeros for empty issues', () => {
+    const summary = summarizeIssues([])
+    expect(summary.errors).toBe(0)
+    expect(summary.warnings).toBe(0)
+    expect(summary.infos).toBe(0)
+  })
+})
+
+// ============================================================================
+// fetchCwv — mocked PSI
+// ============================================================================
+
+describe('fetchCwv', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('extracts CWV metrics from PSI response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            lighthouseResult: {
+              categories: { performance: { score: 0.85 } },
+              audits: {
+                'largest-contentful-paint': { numericValue: 2500 },
+                'first-contentful-paint': { numericValue: 1200 },
+                'cumulative-layout-shift': { numericValue: 0.05 },
+                'total-blocking-time': { numericValue: 300 },
+              },
+            },
+          }),
+      }),
+    )
+
+    const cwv = await fetchCwv('https://example.com/', 'mobile')
+
+    expect(cwv.lcp).toBe(2500)
+    expect(cwv.fcp).toBe(1200)
+    expect(cwv.cls).toBe(0.05)
+    expect(cwv.tbt).toBe(300)
+    expect(cwv.performance_score).toBe(85)
+    expect(cwv.strategy).toBe('mobile')
+  })
+
+  it('includes API key in URL when provided', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ lighthouseResult: { categories: {}, audits: {} } }),
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    await fetchCwv('https://example.com/', 'desktop', 'my-api-key')
+
+    const [url] = mockFetch.mock.calls[0] as [string]
+    expect(url).toContain('key=my-api-key')
+    expect(url).toContain('strategy=desktop')
+  })
+
+  it('throws on PSI API error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve('Bad Request'),
+      }),
+    )
+
+    await expect(fetchCwv('https://example.com/', 'mobile')).rejects.toThrow(
+      'PSI API error (HTTP 400)',
+    )
+  })
+})
+
+// ============================================================================
+// runSeoPageAudit — integration (mocked fetch)
+// ============================================================================
+
+describe('runSeoPageAudit', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  const SAMPLE_HTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Page Title Here</title>
+  <meta name="description" content="A test page description that is reasonable length.">
+  <link rel="canonical" href="https://example.com/test-page">
+  <meta property="og:title" content="OG Title">
+  <meta property="og:description" content="OG Description">
+  <meta property="og:image" content="https://example.com/img.jpg">
+  <script type="application/ld+json">{"@type": "WebPage"}</script>
+</head>
+<body>
+  <h1>Main Heading</h1>
+  <h2>Sub Heading 1</h2>
+  <h2>Sub Heading 2</h2>
+</body>
+</html>
+`
+
+  it('returns successful audit for well-formed page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        url: 'https://example.com/test-page',
+        text: () => Promise.resolve(SAMPLE_HTML),
+      }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/test-page',
+    })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.status_code).toBe(200)
+    expect(result.signals.title).toBe('Test Page Title Here')
+    expect(result.signals.h1_count).toBe(1)
+    expect(result.signals.h2_count).toBe(2)
+    expect(result.signals.schema_types).toContain('WebPage')
+    expect(result.cwv).toBeUndefined()
+  })
+
+  it('includes status error issue for non-2xx status', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        url: 'https://example.com/missing',
+        text: () => Promise.resolve('<html><body>Not Found</body></html>'),
+      }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/missing',
+    })
+    const result = await runSeoPageAudit(input)
+
+    // success=true but status_code reflects the 404
+    expect(result.success).toBe(true)
+    expect(result.status_code).toBe(404)
+    expect(result.issues.some((i) => i.field === 'status' && i.severity === 'error')).toBe(
+      true,
+    )
+  })
+
+  it('returns success=false on fetch timeout/error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(
+        Object.assign(new Error('The operation was aborted'), { name: 'TimeoutError' }),
+      ),
+    )
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/slow-page',
+    })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('timed out')
+  })
+
+  it('includes cwv when check_cwv=true and PSI succeeds', async () => {
+    // First fetch: the page HTML
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        url: 'https://example.com/page',
+        text: () => Promise.resolve(SAMPLE_HTML),
+      })
+      // Second fetch: PSI
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            lighthouseResult: {
+              categories: { performance: { score: 0.9 } },
+              audits: {
+                'largest-contentful-paint': { numericValue: 2000 },
+                'first-contentful-paint': { numericValue: 1000 },
+                'cumulative-layout-shift': { numericValue: 0.01 },
+                'total-blocking-time': { numericValue: 200 },
+              },
+            },
+          }),
+      })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/page',
+      check_cwv: true,
+    })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.cwv).toBeDefined()
+    expect(result.cwv?.performance_score).toBe(90)
+    expect(result.cwv_error).toBeUndefined()
+  })
+
+  it('sets cwv_error when PSI fails and omits cwv', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          url: 'https://example.com/page',
+          text: () => Promise.resolve(SAMPLE_HTML),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve('Rate Limited'),
+        }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/page',
+      check_cwv: true,
+    })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.cwv).toBeUndefined()
+    expect(result.cwv_error).toBeDefined()
+  })
+
+  it('uses Googlebot user-agent by default', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      url: 'https://example.com/',
+      text: () => Promise.resolve('<html><head><title>Test</title></head><body><h1>H</h1></body></html>'),
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/',
+    })
+    await runSeoPageAudit(input)
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    const headers = options.headers as Record<string, string>
+    expect(headers['User-Agent']).toContain('Googlebot')
+  })
+
+  it('returns issue_summary with correct counts', async () => {
+    // Minimal page: missing description, missing og:image, missing h1
+    const minimalHtml = `<html><head><title>OK Title Length Here</title><link rel="canonical" href="https://example.com/"></head><body></body></html>`
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        url: 'https://example.com/',
+        text: () => Promise.resolve(minimalHtml),
+      }),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/' })
+    const result = await runSeoPageAudit(input)
+
+    // Expect: missing description (warning), missing og:image (info), missing h1 (warning)
+    expect(result.issue_summary.warnings).toBeGreaterThanOrEqual(2)
+    expect(result.issue_summary.infos).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ============================================================================
+// Tool Definition
+// ============================================================================
+
+describe('seoPageAuditTool definition', () => {
+  it('has correct tool name', () => {
+    expect(seoPageAuditTool.name).toBe('seo_page_audit')
+  })
+
+  it('has a descriptive description', () => {
+    expect(seoPageAuditTool.description).toContain('SEO')
+    expect(seoPageAuditTool.description).toContain('Googlebot')
+  })
+
+  it('requires url field', () => {
+    expect(seoPageAuditTool.inputSchema.required).toContain('url')
+  })
+
+  it('defines all optional parameters', () => {
+    const props = seoPageAuditTool.inputSchema.properties
+    expect(props.user_agent).toBeDefined()
+    expect(props.check_cwv).toBeDefined()
+    expect(props.psi_api_key).toBeDefined()
+    expect(props.psi_strategy).toBeDefined()
+  })
+})
