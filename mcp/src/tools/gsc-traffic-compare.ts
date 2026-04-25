@@ -7,10 +7,11 @@ import {
   type GscRow,
   type TrafficDiff,
   type TrafficDiffSummary,
+  type TrafficTail,
 } from './compute-traffic-diff.js'
 
 // Re-export for consumers that need the diff types
-export type { TrafficDiff, TrafficDiffSummary }
+export type { TrafficDiff, TrafficDiffSummary, TrafficTail }
 
 // ============================================================================
 // Input Schema
@@ -41,14 +42,22 @@ export const gscTrafficCompareInputSchema = z.object({
     .optional()
     .default(['page'])
     .describe('Dimensions to query, e.g. ["page"] or ["page","country"]'),
-  limit: z
+  fetch_limit: z
     .number()
     .int()
     .min(1)
     .max(25000)
     .optional()
-    .default(500)
-    .describe('Max rows per period from GSC API (default: 500, max 25000)'),
+    .default(5000)
+    .describe('Max rows fetched per period from GSC API (default: 5000, max 25000)'),
+  output_limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .optional()
+    .default(50)
+    .describe('Max drops/gains rows returned in output arrays (default: 50, max 500)'),
   min_clicks_a: z
     .number()
     .int()
@@ -85,7 +94,9 @@ export type GscTrafficCompareResult =
       period_b: string
       summary: TrafficDiffSummary
       drops: TrafficDiff[]
+      drops_tail: TrafficTail
       gains: TrafficDiff[]
+      gains_tail: TrafficTail
       unchanged: number
       normalize_mode_used: string
     }
@@ -165,8 +176,21 @@ function periodDays(start: string, end: string): number {
 export async function runGscTrafficCompare(
   input: GscTrafficCompareInput,
 ): Promise<GscTrafficCompareResult> {
-  const { site: rawSite, period_a, period_b, dimensions, limit, min_clicks_a, sort_by, normalize } =
+  const { site: rawSite, period_a, period_b, dimensions, fetch_limit, output_limit, min_clicks_a, sort_by, normalize } =
     input
+
+  // ── Input validation ────────────────────────────────────────────────────
+
+  if (fetch_limit <= output_limit) {
+    return {
+      success: false,
+      error: {
+        code: ErrorCode.INVALID_INPUT,
+        message: `fetch_limit (${fetch_limit}) must be greater than output_limit (${output_limit})`,
+        hint: 'Increase fetch_limit or decrease output_limit so output_limit < fetch_limit',
+      },
+    }
+  }
 
   // ── Date-range validation ────────────────────────────────────────────────
 
@@ -227,8 +251,8 @@ export async function runGscTrafficCompare(
   }
 
   const [resultA, resultB] = await Promise.allSettled([
-    querySearchAnalytics(site, period_a.start, period_a.end, dimensions, limit),
-    querySearchAnalytics(site, period_b.start, period_b.end, dimensions, limit),
+    querySearchAnalytics(site, period_a.start, period_a.end, dimensions, fetch_limit),
+    querySearchAnalytics(site, period_b.start, period_b.end, dimensions, fetch_limit),
   ])
 
   const aFailed = resultA.status === 'rejected'
@@ -285,11 +309,13 @@ export async function runGscTrafficCompare(
   const rowsA = (resultA as PromiseFulfilledResult<GscRow[]>).value
   const rowsB = (resultB as PromiseFulfilledResult<GscRow[]>).value
 
-  const { drops, gains, unchanged, summary, normalize_mode_used } = computeTrafficDiff(rowsA, rowsB, {
-    min_clicks_a,
-    sort_by,
-    normalize,
-  })
+  const { drops, drops_tail, gains, gains_tail, unchanged, summary, normalize_mode_used } =
+    computeTrafficDiff(rowsA, rowsB, {
+      min_clicks_a,
+      sort_by,
+      normalize,
+      output_limit,
+    })
 
   return {
     success: true,
@@ -299,7 +325,9 @@ export async function runGscTrafficCompare(
     period_b: `${period_b.start} to ${period_b.end}`,
     summary,
     drops,
+    drops_tail,
     gains,
+    gains_tail,
     unchanged,
     normalize_mode_used,
   }
@@ -314,7 +342,12 @@ export const gscTrafficCompareTool = {
   description:
     'Use when the user asks why organic traffic dropped or which pages changed. ' +
     'Compares Google Search Console search analytics between two date ranges per URL, ' +
-    'returning the top drops and gains by clicks. ' +
+    'returning the top drops and gains. ' +
+    'Controls: fetch_limit (rows fetched from GSC, default 5000, max 25000), ' +
+    'output_limit (rows returned per drops/gains array, default 50, max 500), ' +
+    'sort_by (clicks_abs|clicks_pct|impressions_abs, default clicks_abs), ' +
+    'min_clicks_a (filter low-traffic URLs before sort, default 0). ' +
+    'Tail summaries (drops_tail, gains_tail) report count + total_clicks_delta + 5-row sample for rows beyond output_limit. ' +
     'Makes 2 GSC requests per call (one per period). ' +
     'GSC quota is 2000 requests/day.',
   inputSchema: {
@@ -350,12 +383,19 @@ export const gscTrafficCompareTool = {
         description: 'Dimensions to break down by (default: ["page"])',
         default: ['page'],
       },
-      limit: {
+      fetch_limit: {
         type: 'number',
-        description: 'Max rows per period from GSC API (default: 500, max 25000)',
-        default: 500,
+        description: 'Max rows fetched per period from GSC API (default: 5000, max 25000)',
+        default: 5000,
         minimum: 1,
         maximum: 25000,
+      },
+      output_limit: {
+        type: 'number',
+        description: 'Max drops/gains rows returned in output arrays (default: 50, max 500)',
+        default: 50,
+        minimum: 1,
+        maximum: 500,
       },
       min_clicks_a: {
         type: 'number',

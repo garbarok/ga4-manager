@@ -36,7 +36,8 @@ describe('gscTrafficCompareInputSchema', () => {
       period_a: { start: '2026-02-01', end: '2026-02-28' },
       period_b: { start: '2026-03-01', end: '2026-03-31' },
       dimensions: ['page', 'country'],
-      limit: 1000,
+      fetch_limit: 2000,
+      output_limit: 100,
       min_clicks_a: 10,
       sort_by: 'clicks_pct',
     })
@@ -52,7 +53,8 @@ describe('gscTrafficCompareInputSchema', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.dimensions).toEqual(['page'])
-      expect(result.data.limit).toBe(500)
+      expect(result.data.fetch_limit).toBe(5000)
+      expect(result.data.output_limit).toBe(50)
       expect(result.data.min_clicks_a).toBe(0)
       expect(result.data.sort_by).toBe('clicks_abs')
     }
@@ -92,22 +94,32 @@ describe('gscTrafficCompareInputSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects limit above maximum', () => {
+  it('rejects fetch_limit above maximum', () => {
     const result = gscTrafficCompareInputSchema.safeParse({
       site: 'sc-domain:example.com',
       period_a: { start: '2026-03-01', end: '2026-03-31' },
       period_b: { start: '2026-04-01', end: '2026-04-24' },
-      limit: 25001,
+      fetch_limit: 25001,
     })
     expect(result.success).toBe(false)
   })
 
-  it('rejects limit below minimum', () => {
+  it('rejects fetch_limit below minimum', () => {
     const result = gscTrafficCompareInputSchema.safeParse({
       site: 'sc-domain:example.com',
       period_a: { start: '2026-03-01', end: '2026-03-31' },
       period_b: { start: '2026-04-01', end: '2026-04-24' },
-      limit: 0,
+      fetch_limit: 0,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects output_limit above maximum', () => {
+    const result = gscTrafficCompareInputSchema.safeParse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-03-01', end: '2026-03-31' },
+      period_b: { start: '2026-04-01', end: '2026-04-24' },
+      output_limit: 501,
     })
     expect(result.success).toBe(false)
   })
@@ -294,6 +306,20 @@ describe('runGscTrafficCompare', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
+  it('returns INVALID_INPUT when fetch_limit <= output_limit', async () => {
+    const input = gscTrafficCompareInputSchema.parse({
+      ...baseInput,
+      fetch_limit: 50,
+      output_limit: 50,
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('INVALID_INPUT')
+      expect(result.error.message).toContain('fetch_limit')
+    }
+  })
+
   it('happy path: returns success with drops/gains/summary and normalize_mode_used', async () => {
     vi.stubGlobal(
       'fetch',
@@ -328,6 +354,8 @@ describe('runGscTrafficCompare', () => {
       expect(result.drops[0]).toHaveProperty('ctr_delta')
       expect(result.drops[0]).toHaveProperty('position_delta')
       expect(result.gains).toHaveLength(0)
+      expect(result.drops_tail).toMatchObject({ count: 0, total_clicks_delta: 0, sample: [] })
+      expect(result.gains_tail).toMatchObject({ count: 0, total_clicks_delta: 0, sample: [] })
       expect(result.warnings).toEqual([])
       expect(result.normalize_mode_used).toBe('minimal')
     }
@@ -601,7 +629,8 @@ describe('gscTrafficCompareTool definition', () => {
   it('defines all optional parameters including normalize', () => {
     const { properties: props } = gscTrafficCompareTool.inputSchema
     expect(props.dimensions).toBeDefined()
-    expect(props.limit).toBeDefined()
+    expect(props.fetch_limit).toBeDefined()
+    expect(props.output_limit).toBeDefined()
     expect(props.min_clicks_a).toBeDefined()
     expect(props.sort_by).toBeDefined()
     expect(props.normalize).toBeDefined()

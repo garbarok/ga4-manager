@@ -41,9 +41,17 @@ export interface TrafficDiffOptions {
   normalize?: NormalizeMode
 }
 
+export interface TrafficTail {
+  count: number
+  total_clicks_delta: number
+  sample: TrafficDiff[]
+}
+
 export interface TrafficDiffResult {
   drops: TrafficDiff[]
+  drops_tail: TrafficTail
   gains: TrafficDiff[]
+  gains_tail: TrafficTail
   unchanged: number
   summary: TrafficDiffSummary
   normalize_mode_used: NormalizeMode
@@ -159,9 +167,24 @@ export function computeTrafficDiff(
   drops.sort((a, b) => getSortValue(b, sort_by) - getSortValue(a, sort_by))
   gains.sort((a, b) => getSortValue(b, sort_by) - getSortValue(a, sort_by))
 
+  const dropsTop = drops.slice(0, output_limit)
+  const dropsTailRows = drops.slice(output_limit)
+  const gainsTop = gains.slice(0, output_limit)
+  const gainsTailRows = gains.slice(output_limit)
+
+  function buildTail(rows: TrafficDiff[]): TrafficTail {
+    return {
+      count: rows.length,
+      total_clicks_delta: rows.reduce((sum, r) => sum + r.clicks_delta, 0),
+      sample: rows.slice(0, 5),
+    }
+  }
+
   return {
-    drops: drops.slice(0, output_limit),
-    gains: gains.slice(0, output_limit),
+    drops: dropsTop,
+    drops_tail: buildTail(dropsTailRows),
+    gains: gainsTop,
+    gains_tail: buildTail(gainsTailRows),
     unchanged,
     summary: {
       urls_compared: commonKeys.length,

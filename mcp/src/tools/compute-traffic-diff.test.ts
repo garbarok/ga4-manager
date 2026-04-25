@@ -139,6 +139,73 @@ describe('computeTrafficDiff', () => {
     expect(drops).toHaveLength(50)
   })
 
+  // ── Tail summaries ─────────────────────────────────────────────────────
+
+  it('drops_tail count = total drops minus output_limit', () => {
+    const rowsA = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 100))
+    const rowsB = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 50))
+    const { drops_tail } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(drops_tail.count).toBe(20)
+  })
+
+  it('drops_tail total_clicks_delta sums the tail rows', () => {
+    // 70 drops each -50 clicks; top 50 captured, tail 20 each -50 = -1000
+    const rowsA = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 100))
+    const rowsB = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 50))
+    const { drops_tail } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(drops_tail.total_clicks_delta).toBe(-1000)
+  })
+
+  it('drops_tail sample has at most 5 rows', () => {
+    const rowsA = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 100))
+    const rowsB = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 50))
+    const { drops_tail } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(drops_tail.sample.length).toBeLessThanOrEqual(5)
+    expect(drops_tail.sample).toHaveLength(5)
+  })
+
+  it('gains_tail count = total gains minus output_limit', () => {
+    const rowsA = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 50))
+    const rowsB = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 100))
+    const { gains_tail } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(gains_tail.count).toBe(20)
+  })
+
+  it('gains_tail total_clicks_delta sums the tail rows', () => {
+    // 70 gains each +50 clicks; top 50 captured, tail 20 each +50 = +1000
+    const rowsA = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 50))
+    const rowsB = Array.from({ length: 70 }, (_, i) => row(`/page-${i}`, 100))
+    const { gains_tail } = computeTrafficDiff(rowsA, rowsB, { output_limit: 50 })
+    expect(gains_tail.total_clicks_delta).toBe(1000)
+  })
+
+  it('tail is empty when drops/gains count <= output_limit', () => {
+    const { drops_tail, gains_tail } = computeTrafficDiff(
+      [row('/a', 100)],
+      [row('/a', 50)],
+      { output_limit: 50 },
+    )
+    expect(drops_tail).toEqual({ count: 0, total_clicks_delta: 0, sample: [] })
+    expect(gains_tail).toEqual({ count: 0, total_clicks_delta: 0, sample: [] })
+  })
+
+  it('integration: 1000-row fixture — drops/gains bounded by output_limit', () => {
+    const rowsA = Array.from({ length: 1000 }, (_, i) => row(`/page-${i}`, 100 + i))
+    // Even pages: -50% drop; odd pages: +50% gain
+    const rowsB = Array.from({ length: 1000 }, (_, i) =>
+      row(`/page-${i}`, i % 2 === 0 ? Math.round((100 + i) * 0.5) : Math.round((100 + i) * 1.5)),
+    )
+    const limit = 30
+    const { drops, gains, drops_tail, gains_tail } = computeTrafficDiff(rowsA, rowsB, {
+      output_limit: limit,
+    })
+    expect(drops.length).toBeLessThanOrEqual(limit)
+    expect(gains.length).toBeLessThanOrEqual(limit)
+    // Tail must account for the rest
+    expect(drops.length + drops_tail.count).toBe(500) // 500 even pages = drops
+    expect(gains.length + gains_tail.count).toBe(500) // 500 odd pages = gains
+  })
+
   // ── Edge cases ─────────────────────────────────────────────────────────
 
   it('handles empty input', () => {
