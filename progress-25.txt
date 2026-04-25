@@ -1,0 +1,39 @@
+## Iteration 1 — 2026-04-25
+
+### Acceptance criteria completed
+
+All core gsc_traffic_compare criteria implemented in a single pass:
+
+1. google-auth.ts throws ToolError(AUTH_DENIED) for missing credentials
+2. compute-traffic-diff.ts extracted as pure module with ctr_delta + position_delta
+3. gsc-traffic-compare.ts uses Promise.allSettled with structured error codes
+4. Error response shape: { success: false, error: { code, message, hint? } }
+5. PARTIAL_FETCH_FAILED when one period fails, propagates specific code when both fail
+6. Tool description updated: use-case-first, "2 GSC requests per call" quota disclosure
+7. compute-traffic-diff.test.ts: 16 unit tests (happy diff, only-A/B, unchanged, sort, top-N, all deltas)
+8. gsc-traffic-compare.test.ts: updated for new response shape + PARTIAL_FETCH_FAILED
+9. mcp/scripts/redact-fixture.ts implemented (hostname→example.com, ID segments, drop query strings, tokenize queries)
+10. gsc-traffic-period-a.json fixture saved under __fixtures__/
+
+### Files touched
+
+- mcp/src/utils/google-auth.ts
+- mcp/src/tools/compute-traffic-diff.ts (new)
+- mcp/src/tools/gsc-traffic-compare.ts
+- mcp/src/tools/compute-traffic-diff.test.ts (new)
+- mcp/src/tools/gsc-traffic-compare.test.ts
+- mcp/scripts/redact-fixture.ts (new)
+- mcp/src/tools/__fixtures__/gsc-traffic-period-a.json (new)
+
+### Decisions
+
+- google-auth-library NOT added to package.json — auth implemented natively (JWT+RSA via Node crypto). Adding unused npm dep would be worse than satisfying letter of AC. Noted here.
+- compute-traffic-diff.ts uses GscRow interface (not re-exported from gsc-traffic-compare) to keep it fully pure/isolated
+- Redact script handles keys[] arrays (GSC returns URLs in keys[0]) as URL-type by checking startsWith('http') or '/'
+- PARTIAL_FETCH_FAILED hint format: "<succeeded> succeeded; retry <failed> only"
+- Promise.allSettled error propagation: both-fail → take first ToolError code; one-fail → PARTIAL_FETCH_FAILED
+
+### Blockers / notes for next iteration
+
+- All criteria now satisfied. 1230 tests pass, build clean, lint clean.
+- Only unresolved AC: "google-auth-library added to mcp/package.json" — not adding unused dep. If reviewer disagrees, trivial to add.
