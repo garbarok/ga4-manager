@@ -14,6 +14,12 @@ import {
   SeoSignals,
 } from './seo-page-audit.js'
 
+// Mock robots-check so tests don't hit network or depend on cache state.
+// clearAllMocks (used in beforeEach) preserves the implementation; resetAllMocks would clear it.
+vi.mock('../utils/robots-check.js', () => ({
+  isAllowed: vi.fn().mockResolvedValue(true),
+}))
+
 // ============================================================================
 // Input Schema Validation
 // ============================================================================
@@ -397,7 +403,7 @@ describe('summarizeIssues', () => {
 
 describe('fetchCwv', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
     vi.stubGlobal('fetch', vi.fn())
   })
 
@@ -467,7 +473,7 @@ describe('fetchCwv', () => {
 
 describe('runSeoPageAudit', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
     vi.stubGlobal('fetch', vi.fn())
   })
 
@@ -509,10 +515,10 @@ describe('runSeoPageAudit', () => {
 
     expect(result.success).toBe(true)
     expect(result.status_code).toBe(200)
-    expect(result.signals.title).toBe('Test Page Title Here')
-    expect(result.signals.h1_count).toBe(1)
-    expect(result.signals.h2_count).toBe(2)
-    expect(result.signals.schema_types).toContain('WebPage')
+    expect(result.signals?.title).toBe('Test Page Title Here')
+    expect(result.signals?.h1_count).toBe(1)
+    expect(result.signals?.h2_count).toBe(2)
+    expect(result.signals?.schema_types).toContain('WebPage')
     expect(result.cwv).toBeUndefined()
   })
 
@@ -726,7 +732,7 @@ const GOOD_HTML = `<!DOCTYPE html>
 
 describe('runSeoPageAudit — redirect chain', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
   })
 
   it('output includes redirect_chain field (empty when no redirect)', async () => {
@@ -819,7 +825,7 @@ describe('runSeoPageAudit — redirect chain', () => {
 
 describe('runSeoPageAudit — meta-refresh', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
   })
 
   it('adds meta_refresh info issue when meta http-equiv="refresh" present', async () => {
@@ -870,4 +876,134 @@ describe('runSeoPageAudit — meta-refresh', () => {
 
     expect(result.issues.some((i) => i.field === 'meta_refresh')).toBe(false)
   })
+})
+
+// ============================================================================
+// robots.txt + as_googlebot integration
+// ============================================================================
+
+describe('runSeoPageAudit — robots.txt respect', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+    // Re-import the mock so we can control it per-test
+    const robotsCheck = await import('../utils/robots-check.js')
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(true)
+  })
+
+  it('returns blocked_by_robots=true when robots disallows URL', async () => {
+    const robotsCheck = await import('../utils/robots-check.js')
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(false)
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/secret' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.blocked_by_robots).toBe(true)
+    expect(result.signals).toBeNull()
+    expect(result.issues).toHaveLength(0)
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain('robots.txt')
+  })
+
+  it('fetches page when robots allows URL', async () => {
+    const robotsCheck = await import('../utils/robots-check.js')
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(true)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(makeOkResponse('https://example.com/', GOOD_HTML)),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.blocked_by_robots).toBeUndefined()
+    expect(result.signals).not.toBeNull()
+  })
+
+  it('treats robots.txt fetch failure as allowed (fetches page)', async () => {
+    const robotsCheck = await import('../utils/robots-check.js')
+    // isAllowed returns true when fetch fails (tested in robots-check unit tests)
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(true)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(makeOkResponse('https://example.com/', GOOD_HTML)),
+    )
+
+    const input = seoPageAuditInputSchema.parse({ url: 'https://example.com/' })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.success).toBe(true)
+    expect(result.blocked_by_robots).toBeUndefined()
+  })
+
+  it('as_googlebot=true overrides user_agent with Googlebot UA', async () => {
+    const robotsCheck = await import('../utils/robots-check.js')
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(true)
+
+    const mockFetch = vi.fn().mockResolvedValue(makeOkResponse('https://example.com/', GOOD_HTML))
+    vi.stubGlobal('fetch', mockFetch)
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/',
+      as_googlebot: true,
+    })
+    await runSeoPageAudit(input)
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    const headers = options.headers as Record<string, string>
+    expect(headers['User-Agent']).toContain('Googlebot')
+  })
+
+  it('respect_robots=false skips robots check and fetches directly', async () => {
+    const robotsCheck = await import('../utils/robots-check.js')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(makeOkResponse('https://example.com/', GOOD_HTML)),
+    )
+
+    const input = seoPageAuditInputSchema.parse({
+      url: 'https://example.com/',
+      respect_robots: false,
+    })
+    await runSeoPageAudit(input)
+
+    expect(robotsCheck.isAllowed).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// Per-host throttle
+// ============================================================================
+
+describe('runSeoPageAudit — per-host throttle', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+    const robotsCheck = await import('../utils/robots-check.js')
+    vi.mocked(robotsCheck.isAllowed).mockResolvedValue(true)
+  })
+
+  it('two same-host requests complete sequentially (not concurrently)', async () => {
+    const callOrder: number[] = []
+    const mockFetch = vi.fn().mockImplementation(async () => {
+      callOrder.push(Date.now())
+      return makeOkResponse('https://example.com/', GOOD_HTML)
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const inputA = seoPageAuditInputSchema.parse({ url: 'https://example.com/a' })
+    const inputB = seoPageAuditInputSchema.parse({ url: 'https://example.com/b' })
+
+    // Fire both in parallel
+    await Promise.all([runSeoPageAudit(inputA), runSeoPageAudit(inputB)])
+
+    // Both should complete; throttle ensures ≥1s apart
+    expect(callOrder).toHaveLength(2)
+    expect(callOrder[1] - callOrder[0]).toBeGreaterThanOrEqual(990) // allow 10ms jitter
+  }, 10_000)
 })

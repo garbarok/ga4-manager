@@ -1,8 +1,10 @@
+import Bottleneck from 'bottleneck'
 import { z } from 'zod'
 import { extractSignals, type HtmlSignals } from './html-signals.js'
 import { runIssueRules, summarizeIssues, type SeoIssue, type IssueSummary } from './issue-rules.js'
 import { fetchWithTrace, type RedirectHop } from '../utils/redirect-trace.js'
 import { ToolError } from '../utils/errors.js'
+import { isAllowed as robotsIsAllowed } from '../utils/robots-check.js'
 
 // Re-export granular helpers so existing imports continue to work
 export {
@@ -29,6 +31,9 @@ export type { RedirectHop } from '../utils/redirect-trace.js'
 const HONEST_UA =
   'GA4Manager-SEO-Auditor/1.0 (+https://github.com/garbarok/ga4-manager)'
 
+const GOOGLEBOT_UA =
+  'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+
 export const seoPageAuditInputSchema = z.object({
   url: z
     .string()
@@ -53,6 +58,16 @@ export const seoPageAuditInputSchema = z.object({
     .optional()
     .default('mobile')
     .describe('PSI analysis strategy. One of: "mobile" (default), "desktop"'),
+  respect_robots: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Respect robots.txt disallow rules (default: true). Set false to bypass.'),
+  as_googlebot: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Override user_agent with the standard Googlebot UA string (default: false)'),
 })
 
 export type SeoPageAuditInput = z.infer<typeof seoPageAuditInputSchema>
@@ -76,12 +91,13 @@ export interface CwvData {
 
 export interface SeoPageAuditOutput {
   success: boolean
+  blocked_by_robots?: true
   warnings: string[]
   url: string
   final_url: string
   status_code: number
   redirect_chain: RedirectHop[]
-  signals: HtmlSignals
+  signals: HtmlSignals | null
   issues: SeoIssue[]
   issue_summary: IssueSummary
   cwv?: CwvData
@@ -153,6 +169,21 @@ function extractMetaRefreshUrl(html: string): string | null {
 }
 
 // ============================================================================
+// Per-host throttle (1 req/sec per hostname, scoped to MCP session lifetime)
+// ============================================================================
+
+const hostLimiters = new Map<string, Bottleneck>()
+
+function getLimiter(hostname: string): Bottleneck {
+  let limiter = hostLimiters.get(hostname)
+  if (!limiter) {
+    limiter = new Bottleneck({ minTime: 1000, maxConcurrent: 1 })
+    hostLimiters.set(hostname, limiter)
+  }
+  return limiter
+}
+
+// ============================================================================
 // Main Tool Function
 // ============================================================================
 
@@ -174,8 +205,30 @@ const emptySignals: HtmlSignals = {
 }
 
 export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPageAuditOutput> {
-  const { url, user_agent, check_cwv, psi_api_key, psi_strategy } = input
+  const { url, check_cwv, psi_api_key, psi_strategy, respect_robots, as_googlebot } = input
+  const effectiveUA = as_googlebot ? GOOGLEBOT_UA : input.user_agent
   const warnings: string[] = []
+
+  // Robots check before fetching
+  if (respect_robots) {
+    const allowed = await robotsIsAllowed(url, effectiveUA)
+    if (!allowed) {
+      return {
+        success: true,
+        blocked_by_robots: true,
+        warnings: [`robots.txt disallows crawling ${url} with UA "${effectiveUA}"`],
+        url,
+        final_url: url,
+        status_code: 0,
+        redirect_chain: [],
+        signals: null,
+        issues: [],
+        issue_summary: { errors: 0, warnings: 0, infos: 0 },
+      }
+    }
+  }
+
+  const limiter = getLimiter(new URL(url).hostname)
 
   let finalUrl: string
   let statusCode: number
@@ -183,10 +236,12 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   let chain: RedirectHop[] = []
 
   try {
-    const traceResult = await fetchWithTrace(url, {
-      headers: { 'User-Agent': user_agent },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
+    const traceResult = await limiter.schedule(() =>
+      fetchWithTrace(url, {
+        headers: { 'User-Agent': effectiveUA },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      }),
+    )
     chain = traceResult.chain
     finalUrl = traceResult.finalUrl
     statusCode = traceResult.finalRes.status
@@ -309,6 +364,16 @@ export const seoPageAuditTool = {
         enum: ['mobile', 'desktop'],
         description: 'PSI analysis strategy. One of: "mobile" (default), "desktop"',
         default: 'mobile',
+      },
+      respect_robots: {
+        type: 'boolean',
+        description: 'Respect robots.txt disallow rules before fetching (default: true)',
+        default: true,
+      },
+      as_googlebot: {
+        type: 'boolean',
+        description: 'Override user_agent with the standard Googlebot UA string (default: false)',
+        default: false,
       },
     },
   },
