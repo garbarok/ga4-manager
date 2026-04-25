@@ -403,65 +403,92 @@ function extractSection(output: string, startMarker: string, endMarker: string):
 /**
  * Parse table rows from a section
  *
- * Handles tablewriter output format (borderless tables with aligned columns)
+ * Handles tablewriter output format. Tables look like:
+ *
+ *               EVENT NAME           | COUNTING METHOD
+ *   ---------------------------------+-------------------
+ *     purchase                       | ONCE_PER_EVENT
+ *     contact_form_submit            | ONCE_PER_SESSION
+ *
+ * The previous implementation computed fixed column positions from the
+ * header line and used substring(start, end) to extract values. That broke
+ * because tablewriter centers headers (left-pads with spaces) but
+ * left-aligns data values, so the computed start position was inside a
+ * word for data rows — producing fragments like "rm_submit" instead of
+ * "contact_form_submit".
+ *
+ * This implementation splits each row on the `|` separator instead, which
+ * is robust against any horizontal alignment. It also skips border/
+ * separator lines that contain `+`, `|`, `-`, `=`, or unicode box-drawing
+ * characters — the previous regex missed `+` and `|`, causing rows like
+ * `+--------+----+` to be parsed as data.
  */
 function parseTableRows(section: string, expectedHeaders: string[]): Array<Record<string, string>> {
   const lines = section.split('\n').filter(line => line.trim().length > 0);
   const rows: Array<Record<string, string>> = [];
 
-  // Find header line
+  // Find the header line: the first line whose pipe-separated cells contain
+  // all of the expected header substrings.
   let headerLineIdx = -1;
-  let headerPositions: Array<{ name: string; start: number; end: number | undefined }> = [];
+  let columnNames: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Check if this line contains all expected headers
-    const hasAllHeaders = expectedHeaders.every(h => line.toUpperCase().includes(h));
-    if (hasAllHeaders) {
+    const cells = splitPipes(lines[i]).map(c => c.trim().toUpperCase());
+    if (cells.length < expectedHeaders.length) continue;
+
+    const allHeadersPresent = expectedHeaders.every(h => cells.some(c => c.includes(h)));
+    if (allHeadersPresent) {
       headerLineIdx = i;
-      // Calculate column positions based on header positions
-      headerPositions = expectedHeaders.map((header, idx) => {
-        const start = line.toUpperCase().indexOf(header);
-        // End position is either the start of next header or undefined for last column
-        const nextHeaderStart = idx < expectedHeaders.length - 1
-          ? line.toUpperCase().indexOf(expectedHeaders[idx + 1])
-          : undefined;
-        return { name: header, start, end: nextHeaderStart };
-      });
+      columnNames = cells;
       break;
     }
   }
 
   if (headerLineIdx === -1) return rows;
 
-  // Parse data rows (lines after header)
+  // Border / separator regex — anything made entirely of border characters,
+  // including `+` (corner) and `|` (vertical) which tablewriter uses.
+  const borderRegex = /^[\s─\-═+|]+$/;
+
   for (let i = headerLineIdx + 1; i < lines.length; i++) {
     const line = lines[i];
+    if (borderRegex.test(line) || line.trim().length === 0) continue;
 
-    // Skip separator lines and empty lines
-    if (line.match(/^[\s─\-═]+$/) || line.trim().length === 0) {
-      continue;
-    }
+    const cells = splitPipes(line).map(c => c.trim());
+    if (cells.length < expectedHeaders.length) continue;
 
-    // Extract values based on column positions
     const row: Record<string, string> = {};
-    for (const { name, start, end } of headerPositions) {
-      // For last column (end is undefined), take rest of line
-      const value = end !== undefined
-        ? line.substring(start, end).trim()
-        : line.substring(start).trim();
-      if (value) {
-        row[name] = value;
-      }
+    for (let j = 0; j < columnNames.length && j < cells.length; j++) {
+      const value = cells[j];
+      if (value) row[columnNames[j]] = value;
     }
 
-    // Only add if we got at least one value
-    if (Object.keys(row).length > 0) {
-      rows.push(row);
-    }
+    if (Object.keys(row).length > 0) rows.push(row);
   }
 
   return rows;
+}
+
+/**
+ * Split a tablewriter row on `|` separators.
+ *
+ * Tablewriter typically renders rows as:
+ *   `  cell1  | cell2  | cell3 `
+ * with optional leading/trailing whitespace. We split on `|`, then drop
+ * empty leading/trailing cells produced by leading/trailing pipes in some
+ * tablewriter configurations.
+ */
+function splitPipes(line: string): string[] {
+  const cells = line.split('|');
+  // Drop a leading empty cell if the row starts with `|`.
+  if (cells.length > 0 && cells[0].trim() === '' && line.trimStart().startsWith('|')) {
+    cells.shift();
+  }
+  // Drop a trailing empty cell if the row ends with `|`.
+  if (cells.length > 0 && cells[cells.length - 1].trim() === '' && line.trimEnd().endsWith('|')) {
+    cells.pop();
+  }
+  return cells;
 }
 
 /**
