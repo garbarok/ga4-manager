@@ -26,13 +26,13 @@ describe('seoPageAuditInputSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('applies default user_agent (Googlebot)', () => {
+  it('applies default user_agent (GA4Manager honest UA)', () => {
     const result = seoPageAuditInputSchema.safeParse({
       url: 'https://example.com/',
     })
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.user_agent).toContain('Googlebot')
+      expect(result.data.user_agent).toContain('GA4Manager-SEO-Auditor')
     }
   })
 
@@ -279,14 +279,14 @@ describe('detectIssues', () => {
   })
 
   it('flags long title as warning', () => {
-    const longTitle = 'A'.repeat(65)
-    const signals = { ...baseSignals, title: longTitle, title_length: 65 }
+    const longTitle = 'A'.repeat(75)
+    const signals = { ...baseSignals, title: longTitle, title_length: 75 }
     const issues = detectIssues(signals, finalUrl)
     expect(issues.some((i) => i.field === 'title' && i.severity === 'warning')).toBe(true)
   })
 
-  it('accepts title exactly at 60 chars', () => {
-    const signals = { ...baseSignals, title: 'A'.repeat(60), title_length: 60 }
+  it('accepts title exactly at 70 chars', () => {
+    const signals = { ...baseSignals, title: 'A'.repeat(70), title_length: 70 }
     const issues = detectIssues(signals, finalUrl)
     expect(issues.some((i) => i.field === 'title')).toBe(false)
   })
@@ -624,7 +624,7 @@ describe('runSeoPageAudit', () => {
     expect(result.cwv_error).toBeDefined()
   })
 
-  it('uses Googlebot user-agent by default', async () => {
+  it('uses GA4Manager honest user-agent by default', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -640,7 +640,7 @@ describe('runSeoPageAudit', () => {
 
     const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
     const headers = options.headers as Record<string, string>
-    expect(headers['User-Agent']).toContain('Googlebot')
+    expect(headers['User-Agent']).toContain('GA4Manager-SEO-Auditor')
   })
 
   it('returns issue_summary with correct counts', async () => {
@@ -674,9 +674,9 @@ describe('seoPageAuditTool definition', () => {
     expect(seoPageAuditTool.name).toBe('seo_page_audit')
   })
 
-  it('has a descriptive description', () => {
+  it('has a use-case-first description', () => {
     expect(seoPageAuditTool.description).toContain('SEO')
-    expect(seoPageAuditTool.description).toContain('Googlebot')
+    expect(seoPageAuditTool.description.toLowerCase()).toContain('use when')
   })
 
   it('requires url field', () => {

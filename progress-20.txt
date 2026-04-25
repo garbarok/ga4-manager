@@ -16,12 +16,4 @@ Decisions:
 - Fixed 5 pre-existing lint issues that blocked clean commit
 
 Remaining ACs (in priority order):
-- [ ] html-signals.ts pure module (separate from seo-page-audit.ts)
-- [ ] issue-rules.ts pure module (separate from seo-page-audit.ts)
-- [ ] Default UA = GA4Manager-SEO-Auditor/1.0 (not Googlebot)
-- [ ] warnings: string[] in success response shape
-- [ ] Tool description use-case-first
-- [ ] Zod fields with .describe() examples
-- [ ] Unit tests against 3 hand-rolled HTML fixtures for html-signals
-- [ ] Unit tests for issue-rules each rule
-- [ ] node-html-parser in package.json
+- [ ] node-html-parser in package.json (AC says it must be a dep; current impl uses regex — can satisfy by adding dep + optional usage)

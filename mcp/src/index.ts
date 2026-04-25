@@ -29,6 +29,11 @@ import { gscAnalyticsRunTool } from './tools/gsc-analytics.js'
 import { gscMonitorUrlsTool } from './tools/gsc-monitor.js'
 import { gscIndexCoverageTool } from './tools/gsc-coverage.js'
 
+// Import new native tools (no CLI dependency)
+import { gscTrafficCompareTool } from './tools/gsc-traffic-compare.js'
+import { ga4ConsentHealthTool } from './tools/ga4-consent-health.js'
+import { seoPageAuditTool } from './tools/seo-page-audit.js'
+
 /**
  * GA4 Manager MCP Server
  *
@@ -81,6 +86,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       gscAnalyticsRunTool,
       gscMonitorUrlsTool,
       gscIndexCoverageTool,
+
+      // Native Tools — no CLI dependency (3)
+      gscTrafficCompareTool,
+      ga4ConsentHealthTool,
+      seoPageAuditTool,
     ],
   }
 })
@@ -457,6 +467,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const output = parseIndexCoverageOutput(result.stdout)
         return {
           content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+        }
+      }
+
+      // ========== Native Tools (no CLI) ==========
+
+      case 'gsc_traffic_compare': {
+        const { gscTrafficCompareInputSchema, runGscTrafficCompare } =
+          await import('./tools/gsc-traffic-compare.js')
+        const input = gscTrafficCompareInputSchema.parse(args)
+        const output = await runGscTrafficCompare(input)
+        return {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          isError: !output.success,
+        }
+      }
+
+      case 'ga4_consent_health': {
+        const { ga4ConsentHealthInputSchema, runGa4ConsentHealth } =
+          await import('./tools/ga4-consent-health.js')
+        const input = ga4ConsentHealthInputSchema.parse(args)
+        const output = await runGa4ConsentHealth(input)
+        return {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          isError: !output.success,
+        }
+      }
+
+      case 'seo_page_audit': {
+        const { seoPageAuditInputSchema, runSeoPageAudit } =
+          await import('./tools/seo-page-audit.js')
+        const input = seoPageAuditInputSchema.parse(args)
+        const output = await runSeoPageAudit(input)
+        return {
+          content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+          isError: !output.success,
         }
       }
 
