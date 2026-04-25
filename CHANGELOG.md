@@ -8,8 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
+- `ga4 doctor` subcommand — preflight checks for credentials, scopes, API enablement, and per-resource access
 - Priority filtering (`--priority high/medium/low`)
 - Incremental updates for partial updates
+
+## [2.2.0] - 2026-04-25
+
+### Diagnostic & SEO MCP tools + onboarding overhaul
+
+#### Added
+
+**Three new MCP tools (16 total)**
+- `gsc_traffic_compare` — diff GSC search analytics between two date ranges per URL, surface biggest drops/gains. Configurable URL normalization, fetch/output limits, tail summary stats, parallel period fetch with structured `PARTIAL_FETCH_FAILED` error code, configurable sort modes, `min_clicks_a` filter.
+- `ga4_consent_health` — events-based consent banner health: `consent_rate_pct`, `consent_visibility_pct`, health score from instrumented `consent_granted` / `consent_denied` events. (Consent Mode v2 dimensions are not exposed on the GA4 Data API; this tool counts custom events instead.)
+- `seo_page_audit` — single-URL on-page SEO audit: title/description char + pixel-width checks, canonical severity escalation by registrable domain distance, JSON-LD `@graph` extraction, redirect chain tracing with loop/cross-domain/non-permanent flags, `meta-refresh` detection, robots.txt respect, per-host throttle, optional Core Web Vitals via PageSpeed Insights with bottleneck rate-limiting and 5-minute cache.
+
+**Onboarding & docs**
+- `scripts/setup.sh` — one-shot interactive setup: prereq check, ADC vs SA decision, scoped `gcloud` auth, quota project setup, four-API enablement, smoke tests, manual-step reminders. Idempotent and re-runnable.
+- `mcp/TROUBLESHOOTING.md` — every error message you might see during setup or runtime, mapped to the exact fix.
+- `mcp/PERMISSIONS.md` — expanded with ADC vs service account decision matrix and the explicit gcloud commands for each path.
+- README — rewritten lean (133 lines, was 663) with 30-second quick-start at top.
+- `mcp/scripts/provision-ga4-access.ts` — batch GA4 Viewer provisioning via the Admin API (covers the GSC manual-only gap with a programmatic GA4 alternative).
+
+**Shared utilities (used across the new tools)**
+- `mcp/src/utils/google-auth.ts` — JWT auth with scope-keyed in-memory token cache.
+- `mcp/src/utils/cache.ts` — generic `TTLCache<V>` with lazy expiry.
+- `mcp/src/utils/errors.ts` — `ToolError` + `ErrorCode` enum, standardized response shape (`success` / `warnings` / `error: { code, message, hint }`).
+- `mcp/src/utils/url-normalize.ts` — pure URL normalization (`none` / `minimal` / `aggressive`) plus GSC site format flexibility (`sc-domain:`, URL-prefix, raw domain) and GA4 Property ID normalization with explicit Measurement-ID and UA-ID error hints.
+- `mcp/src/utils/pixel-width.ts` — Arial-13px width estimation table for SERP truncation checks.
+- `mcp/src/utils/redirect-trace.ts` — manual redirect handling with chain reporting (max 5 hops, loop detection).
+- `mcp/src/utils/robots-check.ts` — robots.txt fetcher with per-origin TTL cache.
+
+#### Changed
+
+- `mcp/CONFIGURATION.md` — env vars unchanged; new tools reuse `GOOGLE_APPLICATION_CREDENTIALS`. Updated to list the three new tools alongside the 13 existing.
+- `mcp/package.json` — version bumped to 2.2.0; added `google-auth-library`, `node-html-parser`, `robots-parser`, `tldts`, `bottleneck`.
+
+#### Removed
+
+- 10 per-issue `progress-*.txt` artifacts at repo root (Ralph autonomous-loop iteration memory; not permanent docs).
 
 ## [2.1.0] - 2025-12-28
 
