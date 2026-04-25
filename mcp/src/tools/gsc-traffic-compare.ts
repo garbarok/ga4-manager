@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
 import { ToolError, ErrorCode } from '../utils/errors.js'
+import { normalizeGscSite } from '../utils/url-normalize.js'
 import {
   computeTrafficDiff,
   type GscRow,
@@ -60,6 +61,13 @@ export const gscTrafficCompareInputSchema = z.object({
     .optional()
     .default('clicks_abs')
     .describe('Sort metric for drops/gains: "clicks_abs" (default), "clicks_pct", "impressions_abs"'),
+  normalize: z
+    .enum(['none', 'minimal', 'aggressive'])
+    .optional()
+    .default('minimal')
+    .describe(
+      'URL normalization before inner-join: "none" (no change), "minimal" (strip trailing slash, lowercase host, default), "aggressive" (minimal + drop www., force https://, drop query string)',
+    ),
 })
 
 export type GscTrafficCompareInput = z.infer<typeof gscTrafficCompareInputSchema>
@@ -79,6 +87,7 @@ export type GscTrafficCompareResult =
       drops: TrafficDiff[]
       gains: TrafficDiff[]
       unchanged: number
+      normalize_mode_used: string
     }
   | {
       success: false
@@ -148,11 +157,74 @@ export async function querySearchAnalytics(
  * Both GSC period requests run in parallel via Promise.allSettled so a single
  * period failure is diagnosable without blocking the other.
  */
+// Returns number of days between two YYYY-MM-DD dates (end - start, inclusive)
+function periodDays(start: string, end: string): number {
+  return (Date.parse(end) - Date.parse(start)) / 86400000 + 1
+}
+
 export async function runGscTrafficCompare(
   input: GscTrafficCompareInput,
 ): Promise<GscTrafficCompareResult> {
-  const { site, period_a, period_b, dimensions, limit, min_clicks_a, sort_by } =
+  const { site: rawSite, period_a, period_b, dimensions, limit, min_clicks_a, sort_by, normalize } =
     input
+
+  // ── Date-range validation ────────────────────────────────────────────────
+
+  if (period_a.start > period_a.end) {
+    return {
+      success: false,
+      error: {
+        code: ErrorCode.INVALID_INPUT,
+        message: `period_a start (${period_a.start}) is after end (${period_a.end})`,
+        hint: 'Ensure start <= end in YYYY-MM-DD format',
+      },
+    }
+  }
+
+  if (period_b.start > period_b.end) {
+    return {
+      success: false,
+      error: {
+        code: ErrorCode.INVALID_INPUT,
+        message: `period_b start (${period_b.start}) is after end (${period_b.end})`,
+        hint: 'Ensure start <= end in YYYY-MM-DD format',
+      },
+    }
+  }
+
+  const warnings: string[] = []
+
+  // Warn if periods overlap
+  if (period_a.end >= period_b.start) {
+    warnings.push(
+      `Periods overlap (period_a ends ${period_a.end}, period_b starts ${period_b.start}); results may double-count shared dates`,
+    )
+  }
+
+  // Warn if period_b.end is within the GSC 48-hour data lag
+  const today = new Date().toISOString().slice(0, 10)
+  const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+  if (period_b.end > twoDaysAgo) {
+    warnings.push(
+      `period_b end (${period_b.end}) is within 48 hours of today (${today}); GSC data may be incomplete`,
+    )
+  }
+
+  // Warn if periods are different lengths
+  const daysA = periodDays(period_a.start, period_a.end)
+  const daysB = periodDays(period_b.start, period_b.end)
+  if (daysA !== daysB) {
+    warnings.push(
+      `Periods are different lengths (period_a: ${daysA} days, period_b: ${daysB} days); per-period totals are not directly comparable`,
+    )
+  }
+
+  // ── Site normalization ───────────────────────────────────────────────────
+
+  const { site, warning: siteWarning } = normalizeGscSite(rawSite)
+  if (siteWarning !== undefined) {
+    warnings.push(siteWarning)
+  }
 
   const [resultA, resultB] = await Promise.allSettled([
     querySearchAnalytics(site, period_a.start, period_a.end, dimensions, limit),
@@ -213,14 +285,15 @@ export async function runGscTrafficCompare(
   const rowsA = (resultA as PromiseFulfilledResult<GscRow[]>).value
   const rowsB = (resultB as PromiseFulfilledResult<GscRow[]>).value
 
-  const { drops, gains, unchanged, summary } = computeTrafficDiff(rowsA, rowsB, {
+  const { drops, gains, unchanged, summary, normalize_mode_used } = computeTrafficDiff(rowsA, rowsB, {
     min_clicks_a,
     sort_by,
+    normalize,
   })
 
   return {
     success: true,
-    warnings: [],
+    warnings,
     site,
     period_a: `${period_a.start} to ${period_a.end}`,
     period_b: `${period_b.start} to ${period_b.end}`,
@@ -228,6 +301,7 @@ export async function runGscTrafficCompare(
     drops,
     gains,
     unchanged,
+    normalize_mode_used,
   }
 }
 
@@ -296,6 +370,13 @@ export const gscTrafficCompareTool = {
         description:
           'Sort metric for drops/gains (default: clicks_abs — absolute click change)',
         default: 'clicks_abs',
+      },
+      normalize: {
+        type: 'string',
+        enum: ['none', 'minimal', 'aggressive'],
+        description:
+          'URL normalization mode before inner-join: "none" (no change), "minimal" (strip trailing slash + lowercase host, default), "aggressive" (minimal + drop www. + force https:// + drop query string)',
+        default: 'minimal',
       },
     },
   },

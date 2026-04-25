@@ -133,6 +133,40 @@ describe('gscTrafficCompareInputSchema', () => {
       expect(result.success).toBe(true)
     }
   })
+
+  it('accepts normalize field with valid values', () => {
+    for (const normalize of ['none', 'minimal', 'aggressive'] as const) {
+      const result = gscTrafficCompareInputSchema.safeParse({
+        site: 'sc-domain:example.com',
+        period_a: { start: '2026-03-01', end: '2026-03-31' },
+        period_b: { start: '2026-04-01', end: '2026-04-24' },
+        normalize,
+      })
+      expect(result.success).toBe(true)
+    }
+  })
+
+  it('rejects invalid normalize value', () => {
+    const result = gscTrafficCompareInputSchema.safeParse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-03-01', end: '2026-03-31' },
+      period_b: { start: '2026-04-01', end: '2026-04-24' },
+      normalize: 'extreme',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('defaults normalize to "minimal"', () => {
+    const result = gscTrafficCompareInputSchema.safeParse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-03-01', end: '2026-03-31' },
+      period_b: { start: '2026-04-01', end: '2026-04-24' },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.normalize).toBe('minimal')
+    }
+  })
 })
 
 // ============================================================================
@@ -247,10 +281,11 @@ describe('querySearchAnalytics', () => {
 // runGscTrafficCompare — integration (mocked fetch)
 // ============================================================================
 
+// Use same-length periods safely in the past (no lag warning, no length mismatch)
 const baseInput = {
   site: 'sc-domain:example.com',
-  period_a: { start: '2026-03-01', end: '2026-03-31' },
-  period_b: { start: '2026-04-01', end: '2026-04-24' },
+  period_a: { start: '2026-01-01', end: '2026-01-31' },
+  period_b: { start: '2026-02-01', end: '2026-03-03' },
 }
 
 describe('runGscTrafficCompare', () => {
@@ -259,7 +294,7 @@ describe('runGscTrafficCompare', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('happy path: returns success with drops/gains/summary', async () => {
+  it('happy path: returns success with drops/gains/summary and normalize_mode_used', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn()
@@ -285,8 +320,8 @@ describe('runGscTrafficCompare', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.site).toBe('sc-domain:example.com')
-      expect(result.period_a).toBe('2026-03-01 to 2026-03-31')
-      expect(result.period_b).toBe('2026-04-01 to 2026-04-24')
+      expect(result.period_a).toBe('2026-01-01 to 2026-01-31')
+      expect(result.period_b).toBe('2026-02-01 to 2026-03-03')
       expect(result.drops).toHaveLength(1)
       expect(result.drops[0].url).toBe('/page-a')
       expect(result.drops[0].clicks_delta).toBe(-30)
@@ -294,6 +329,7 @@ describe('runGscTrafficCompare', () => {
       expect(result.drops[0]).toHaveProperty('position_delta')
       expect(result.gains).toHaveLength(0)
       expect(result.warnings).toEqual([])
+      expect(result.normalize_mode_used).toBe('minimal')
     }
   })
 
@@ -409,6 +445,140 @@ describe('runGscTrafficCompare', () => {
 })
 
 // ============================================================================
+// Date validation + warnings
+// ============================================================================
+
+describe('runGscTrafficCompare — date validation and warnings', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  const emptyFetch = () =>
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ rows: [] }),
+    })
+
+  it('returns INVALID_INPUT when period_a start > end', async () => {
+    const input = gscTrafficCompareInputSchema.parse({
+      ...baseInput,
+      period_a: { start: '2026-03-31', end: '2026-03-01' },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('INVALID_INPUT')
+      expect(result.error.message).toContain('period_a')
+    }
+  })
+
+  it('returns INVALID_INPUT when period_b start > end', async () => {
+    const input = gscTrafficCompareInputSchema.parse({
+      ...baseInput,
+      period_b: { start: '2026-04-30', end: '2026-04-01' },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('INVALID_INPUT')
+      expect(result.error.message).toContain('period_b')
+    }
+  })
+
+  it('warns when periods overlap (period_a.end >= period_b.start)', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-03-01', end: '2026-04-10' },
+      period_b: { start: '2026-04-01', end: '2026-04-24' },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.warnings.some((w) => w.toLowerCase().includes('overlap'))).toBe(true)
+    }
+  })
+
+  it('warns when period_b.end is within 48-hour GSC lag window', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-03-01', end: '2026-03-31' },
+      period_b: { start: yesterday, end: today },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.warnings.some((w) => w.includes('48 hours') || w.includes('incomplete'))).toBe(true)
+    }
+  })
+
+  it('warns when periods are different lengths', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-01-01', end: '2026-01-31' }, // 31 days
+      period_b: { start: '2026-02-01', end: '2026-02-14' }, // 14 days
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.warnings.some((w) => w.includes('different lengths'))).toBe(true)
+    }
+  })
+
+  it('no warning when periods are same length and non-overlapping', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'sc-domain:example.com',
+      period_a: { start: '2026-01-01', end: '2026-01-31' },
+      period_b: { start: '2026-02-01', end: '2026-03-03' }, // also 31 days
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const nonLagWarnings = result.warnings.filter(
+        (w) => !w.includes('48 hours') && !w.includes('incomplete'),
+      )
+      expect(nonLagWarnings).toHaveLength(0)
+    }
+  })
+
+  it('warns when raw domain site input is normalised to sc-domain', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'example.com',
+      period_a: { start: '2026-01-01', end: '2026-01-31' },
+      period_b: { start: '2026-02-01', end: '2026-03-03' },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.warnings.some((w) => w.includes('sc-domain'))).toBe(true)
+      expect(result.site).toBe('sc-domain:example.com')
+    }
+  })
+
+  it('normalised site warning included when https URL missing trailing slash', async () => {
+    vi.stubGlobal('fetch', emptyFetch())
+    const input = gscTrafficCompareInputSchema.parse({
+      site: 'https://example.com',
+      period_a: { start: '2026-01-01', end: '2026-01-31' },
+      period_b: { start: '2026-02-01', end: '2026-03-03' },
+    })
+    const result = await runGscTrafficCompare(input)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.warnings.some((w) => w.includes('trailing slash'))).toBe(true)
+      expect(result.site).toBe('https://example.com/')
+    }
+  })
+})
+
+// ============================================================================
 // Tool Definition
 // ============================================================================
 
@@ -428,12 +598,13 @@ describe('gscTrafficCompareTool definition', () => {
     expect(gscTrafficCompareTool.inputSchema.required).toContain('period_b')
   })
 
-  it('defines all optional parameters', () => {
+  it('defines all optional parameters including normalize', () => {
     const { properties: props } = gscTrafficCompareTool.inputSchema
     expect(props.dimensions).toBeDefined()
     expect(props.limit).toBeDefined()
     expect(props.min_clicks_a).toBeDefined()
     expect(props.sort_by).toBeDefined()
+    expect(props.normalize).toBeDefined()
   })
 
   it('period_a and period_b are objects with start/end', () => {

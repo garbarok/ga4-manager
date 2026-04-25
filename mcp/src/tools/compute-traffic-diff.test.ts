@@ -185,4 +185,91 @@ describe('computeTrafficDiff', () => {
     expect(summary.urls_only_in_a).toBe(1)
     expect(summary.urls_only_in_b).toBe(1)
   })
+
+  // ── normalize_mode_used ────────────────────────────────────────────────
+
+  it('includes normalize_mode_used in result (default: minimal)', () => {
+    const result = computeTrafficDiff([], [])
+    expect(result.normalize_mode_used).toBe('minimal')
+  })
+
+  it('includes normalize_mode_used when explicitly set', () => {
+    const result = computeTrafficDiff([], [], { normalize: 'aggressive' })
+    expect(result.normalize_mode_used).toBe('aggressive')
+  })
+
+  it('includes normalize_mode_used: none when none passed', () => {
+    const result = computeTrafficDiff([], [], { normalize: 'none' })
+    expect(result.normalize_mode_used).toBe('none')
+  })
+
+  // ── URL normalization — integration ───────────────────────────────────
+
+  function fullRow(
+    url: string,
+    clicks: number,
+    impressions = 1000,
+    ctr = 0.05,
+    position = 5.0,
+  ): GscRow {
+    return { keys: [url], clicks, impressions, ctr, position }
+  }
+
+  it('minimal: trailing-slash variant inner-joins with non-trailing-slash variant', () => {
+    // period_a has trailing slash; period_b does not → should still match
+    const { drops, summary } = computeTrafficDiff(
+      [fullRow('https://example.com/blog/', 100)],
+      [fullRow('https://example.com/blog', 70)],
+      { normalize: 'minimal' },
+    )
+    expect(summary.urls_compared).toBe(1)
+    expect(drops[0].clicks_delta).toBe(-30)
+  })
+
+  it('minimal: different host casing inner-joins', () => {
+    const { summary } = computeTrafficDiff(
+      [fullRow('https://EXAMPLE.COM/page', 100)],
+      [fullRow('https://example.com/page', 80)],
+      { normalize: 'minimal' },
+    )
+    expect(summary.urls_compared).toBe(1)
+  })
+
+  it('aggressive: www vs apex inner-joins', () => {
+    const { summary } = computeTrafficDiff(
+      [fullRow('https://www.example.com/page', 100)],
+      [fullRow('https://example.com/page', 80)],
+      { normalize: 'aggressive' },
+    )
+    expect(summary.urls_compared).toBe(1)
+  })
+
+  it('aggressive: http vs https inner-joins', () => {
+    const { summary } = computeTrafficDiff(
+      [fullRow('http://example.com/page', 100)],
+      [fullRow('https://example.com/page', 80)],
+      { normalize: 'aggressive' },
+    )
+    expect(summary.urls_compared).toBe(1)
+  })
+
+  it('aggressive: query string variants inner-join', () => {
+    const { summary } = computeTrafficDiff(
+      [fullRow('https://example.com/page?utm_source=google', 100)],
+      [fullRow('https://example.com/page', 80)],
+      { normalize: 'aggressive' },
+    )
+    expect(summary.urls_compared).toBe(1)
+  })
+
+  it('none: trailing-slash variants do NOT inner-join', () => {
+    const { summary } = computeTrafficDiff(
+      [fullRow('https://example.com/blog/', 100)],
+      [fullRow('https://example.com/blog', 70)],
+      { normalize: 'none' },
+    )
+    expect(summary.urls_compared).toBe(0)
+    expect(summary.urls_only_in_a).toBe(1)
+    expect(summary.urls_only_in_b).toBe(1)
+  })
 })
