@@ -1,6 +1,8 @@
 // Pure module for computing per-URL traffic deltas between two GSC periods.
 // Extracted from gsc-traffic-compare for isolated unit testing.
 
+import { normalizeUrl, type NormalizeMode } from '../utils/url-normalize.js'
+
 export interface GscRow {
   keys: string[]
   clicks: number
@@ -36,6 +38,7 @@ export interface TrafficDiffOptions {
   min_clicks_a?: number
   sort_by?: 'clicks_abs' | 'clicks_pct' | 'impressions_abs'
   output_limit?: number
+  normalize?: NormalizeMode
 }
 
 export interface TrafficDiffResult {
@@ -43,12 +46,29 @@ export interface TrafficDiffResult {
   gains: TrafficDiff[]
   unchanged: number
   summary: TrafficDiffSummary
+  normalize_mode_used: NormalizeMode
 }
 
-function buildUrlMap(rows: GscRow[]): Map<string, GscRow> {
+function buildUrlMap(rows: GscRow[], normalize: NormalizeMode): Map<string, GscRow> {
   const map = new Map<string, GscRow>()
   for (const row of rows) {
-    map.set(row.keys.join('|'), row)
+    // Normalize the first key (page URL) only; other dimensions (country, etc.) are kept verbatim
+    const normalizedFirstKey = normalizeUrl(row.keys[0] ?? '', normalize)
+    const compositeKey = [normalizedFirstKey, ...row.keys.slice(1)].join('|')
+    // Last writer wins when normalization collapses multiple forms to the same key
+    const existing = map.get(compositeKey)
+    if (existing === undefined) {
+      map.set(compositeKey, row)
+    } else {
+      // Merge by summing clicks/impressions, averaging position and ctr
+      map.set(compositeKey, {
+        keys: [normalizedFirstKey, ...row.keys.slice(1)],
+        clicks: existing.clicks + row.clicks,
+        impressions: existing.impressions + row.impressions,
+        ctr: (existing.ctr + row.ctr) / 2,
+        position: (existing.position + row.position) / 2,
+      })
+    }
   }
   return map
 }
@@ -80,10 +100,10 @@ export function computeTrafficDiff(
   rowsB: GscRow[],
   opts: TrafficDiffOptions = {},
 ): TrafficDiffResult {
-  const { min_clicks_a = 0, sort_by = 'clicks_abs', output_limit = 50 } = opts
+  const { min_clicks_a = 0, sort_by = 'clicks_abs', output_limit = 50, normalize = 'minimal' } = opts
 
-  const mapA = buildUrlMap(rowsA)
-  const mapB = buildUrlMap(rowsB)
+  const mapA = buildUrlMap(rowsA, normalize)
+  const mapB = buildUrlMap(rowsB, normalize)
 
   const keysA = new Set(mapA.keys())
   const keysB = new Set(mapB.keys())
@@ -148,5 +168,6 @@ export function computeTrafficDiff(
       urls_only_in_a,
       urls_only_in_b,
     },
+    normalize_mode_used: normalize,
   }
 }
