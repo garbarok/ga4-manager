@@ -139,6 +139,22 @@ export async function fetchCwv(
 
   if (!response.ok) {
     const text = await response.text()
+
+    // Detect the "zero per-project daily quota" trap that hits unauthenticated
+    // PSI calls when Google attributes them to the caller's gcloud project.
+    // Free tier with API key has 25k/day; without key the project default is 0.
+    if (
+      response.status === 429 &&
+      (text.includes('"quota_limit_value": "0"') ||
+        text.includes('"quota_limit_value":"0"'))
+    ) {
+      throw new Error(
+        'PSI returned 429 with per-project daily quota = 0. ' +
+          'Create a free PSI API key (Cloud Console → Credentials → Create credentials → API key, restrict to PageSpeed Insights API) and pass it via the psi_api_key input. ' +
+          'See mcp/TROUBLESHOOTING.md → "PSI returns 429 quota_limit_value=0".',
+      )
+    }
+
     throw new Error(`PSI API error (HTTP ${response.status}): ${text}`)
   }
 

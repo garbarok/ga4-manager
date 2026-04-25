@@ -149,21 +149,40 @@ Repeat for every GA4 property you want to manage.
 
 **Affects tools:** `seo_page_audit` (when `check_cwv: true`)
 
-PageSpeed Insights works without an API key (rate-limited to ~1 request per 100 seconds). An optional API key removes the rate limit.
+> **An API key is effectively required.** The keyless free-tier path is documented as 1 request / 100 seconds, but in practice Google attributes any PSI request from a gcloud-configured environment to your quota project, where the per-day default is **0**. Without a key, `check_cwv: true` calls return HTTP 429 immediately. See [TROUBLESHOOTING.md → "PSI returns 429 with quota_limit_value: 0"](./TROUBLESHOOTING.md#seo_page_audit--psi-returns-429-with-quota_limit_value-0) for the full mechanics.
 
-### Without an API key
+### Recommended — provision a free PSI API key
 
-No setup needed. The server automatically throttles requests to stay within the free quota. Pass `check_cwv: true` to enable Core Web Vitals data.
+The free tier with API key gives 25,000 requests / day, no per-request rate limit.
 
-### With an API key (optional)
+1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. Select the same project you used as your GCP quota project (`gcloud auth application-default set-quota-project ...`).
+3. **+ Create Credentials** → **API key**.
+4. Click **Edit** on the new key. Restrict it:
+   - **Application restrictions:** None (or HTTP referrers if calling from a browser).
+   - **API restrictions:** Restrict key → check **PageSpeed Insights API** only.
+5. Copy the key.
+6. Pass it to every `seo_page_audit` call:
 
-1. Open [Google Cloud Console](https://console.cloud.google.com) and select your project.
-2. Navigate to **APIs & Services → Library**.
-3. Search for **PageSpeed Insights API** and click **Enable**.
-4. Navigate to **APIs & Services → Credentials**.
-5. Click **Create Credentials → API key**.
-6. Copy the key and restrict it to the PageSpeed Insights API (recommended).
-7. Pass the key as `psi_api_key` in `seo_page_audit` calls, or set it in a shared config.
+   ```jsonc
+   {
+     "url": "https://example.com/page",
+     "check_cwv": true,
+     "psi_api_key": "AIzaSy...your-key"
+   }
+   ```
+
+   Or set it in your MCP client config so you don't have to pass it each call. See `mcp/CONFIGURATION.md`.
+
+### Keyless (NOT recommended)
+
+If you skip the API key, PSI calls will return:
+
+```json
+{ "error": { "code": 429, "metadata": { "quota_limit_value": "0", ... } } }
+```
+
+The tool surfaces this as a `psi_unavailable` warning and returns the HTML audit without `cwv` data. The `check_cwv: false` path continues to work unaffected.
 
 ---
 
