@@ -1,0 +1,25 @@
+## Iteration 1 — 2026-04-25
+
+Criteria completed (all 9):
+- force_refresh?: boolean (default false) added to input schema + tool definition
+- psi-client (fetchCwv) already existed; added TTLCache + Bottleneck wrapping at call site
+- PSI cache: TTLCache<CwvData> 5-min TTL, key "${url}|${strategy}"; force_refresh skips read, always writes
+- PSI throttle: keylessPsiLimiter (minTime: 100000) used when no psi_api_key; no throttle when key present
+- CWV output block already correct (only included when check_cwv=true and PSI succeeds)
+- PSI failure now pushes "psi_unavailable: <reason>" to warnings; removed cwv_error field from output type
+- Unit tests: cache key shape + force_refresh behavior (skips read, writes fresh)
+- Integration tests: check_cwv=false no cwv, check_cwv=true PSI success, check_cwv=true PSI 500 → warning
+- All tests pass (1182), lint clean, build clean
+
+Files touched:
+- mcp/src/tools/seo-page-audit.ts (schema, PSI cache/throttle, failure handling)
+- mcp/src/tools/seo-page-audit.test.ts (new PSI cache describe block, updated PSI failure test)
+
+Decisions:
+- Imported TTLCache from utils/cache.ts (already existed from issue #22)
+- Exported psiCache from seo-page-audit.ts for direct cache manipulation in tests
+- Used unique URLs per test to avoid PSI cache cross-contamination (cache is module-level singleton)
+- dist/ test files compiled by tsc alongside src; both sets must pass (existing repo behavior)
+- PSI cache tests use psi_api_key to bypass keylessPsiLimiter (avoids 100s wait in tests)
+
+Blockers: none
