@@ -490,7 +490,7 @@ GA4 Manager includes a **Model Context Protocol (MCP) server** that exposes all 
 
 ### What is MCP?
 
-MCP (Model Context Protocol) lets AI assistants like Claude Code interact with external tools and data sources. The GA4 Manager MCP server provides 13 tools that AI assistants can use to:
+MCP (Model Context Protocol) lets AI assistants like Claude Code interact with external tools and data sources. The GA4 Manager MCP server provides 16 tools that AI assistants can use to:
 
 - Configure GA4 properties
 - Manage Search Console
@@ -521,7 +521,7 @@ claude mcp add \
   --env "GA4_BINARY_PATH=/absolute/path/to/ga4-manager/ga4"
 ```
 
-### Available Tools (13)
+### Available Tools (16)
 
 **GA4 Tools (5):**
 - `ga4_setup` - Setup from YAML configuration
@@ -539,6 +539,11 @@ claude mcp add \
 - `gsc_analytics_run` - Query search analytics
 - `gsc_monitor_urls` - Batch URL monitoring
 - `gsc_index_coverage` - Index coverage report
+
+**Diagnostic & SEO Tools (3):**
+- `gsc_traffic_compare` - Compare GSC traffic between two date ranges to surface biggest URL-level drops and gains
+- `ga4_consent_health` - Report Consent Mode v2 grant/deny percentages and health score across GA4 sessions
+- `seo_page_audit` - Audit a URL's on-page SEO signals (title, description, canonical, schema, redirects, robots) with optional Core Web Vitals via PageSpeed Insights
 
 ### Documentation
 

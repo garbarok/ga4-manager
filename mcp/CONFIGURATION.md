@@ -127,7 +127,7 @@ claude mcp add \
 
 ```bash
 claude mcp list
-# Should show: ga4-manager (12 tools)
+# Should show: ga4-manager (16 tools)
 ```
 
 **Update existing server:**
@@ -239,6 +239,8 @@ For Cline (VS Code extension), configure via Cline settings:
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON | `/path/to/credentials.json` |
 | `GOOGLE_CLOUD_PROJECT` | GCP project ID | `my-analytics-project` |
 | `GA4_BINARY_PATH` | Path to ga4 binary | `/path/to/ga4-manager/ga4` |
+
+> **No new variables required for v2.1.0 tools.** The three new tools (`gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`) reuse the same `GOOGLE_APPLICATION_CREDENTIALS` service account. See [PERMISSIONS.md](./PERMISSIONS.md) for how to grant the service account access to GSC sites and GA4 properties.
 
 ### Optional Variables
 
@@ -642,6 +644,7 @@ chmod 600 /path/to/credentials.json
 ## References
 
 - [Main README](./README.md) - Tool documentation and examples
+- [PERMISSIONS.md](./PERMISSIONS.md) - Service account access setup for GSC, GA4, and PSI
 - [CHANGELOG](./CHANGELOG.md) - Version history
 - [GA4 Admin API](https://developers.google.com/analytics/devguides/config/admin/v1)
 - [Search Console API](https://developers.google.com/webmaster-tools/v1)

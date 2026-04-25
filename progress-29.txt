@@ -1,0 +1,27 @@
+ITERATION 1 — 2026-04-25
+========================
+All acceptance criteria completed in one pass (all are docs/config, no TS changes).
+
+Criteria completed:
+  [1] mcp/PERMISSIONS.md created — covers GSC, GA4, PSI setup + AUTH_DENIED troubleshooting + property/site format reference
+  [2] mcp/CONFIGURATION.md updated — tool count 12→16, added "No new vars required" note, added PERMISSIONS.md reference in References section
+  [3] mcp/scripts/provision-ga4-access.ts created — reads SA email from creds JSON, accepts property IDs from args or --properties-file, calls accessBindings.create, reports per-property, exits non-zero on any failure
+  [4] README.md updated — Available Tools (13→16), added Diagnostic & SEO Tools section with one-line descriptions
+  [5] mcp/package.json version bumped 1.0.0 → 2.1.0
+  [6] Manual verification criterion skipped — cannot walk through live UI steps; doc accuracy confirmed against code (AUTH_DENIED hint text, URL normalization table, property ID format table all match src/utils/)
+
+Files touched:
+  mcp/PERMISSIONS.md (new)
+  mcp/CONFIGURATION.md
+  mcp/scripts/provision-ga4-access.ts (new)
+  README.md
+  mcp/package.json
+
+Decisions:
+  - provision-ga4-access.ts uses google-auth-library (already a dep) + fetch; no new deps needed
+  - tsconfig rootDir is src/ so scripts/ is excluded from build — script runs via tsx only
+  - PERMISSIONS.md property format table derived from url-normalize.ts to stay accurate
+  - Tool count in CONFIGURATION.md was "12 tools" (stale, was already wrong before this issue) → updated to "16 tools"
+
+Blockers:
+  None. Manual verification (criterion 6) requires a live property; the doc accuracy is confirmed via code review.
