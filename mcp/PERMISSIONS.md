@@ -1,10 +1,14 @@
 # GA4 Manager MCP — Permissions Guide
 
-This guide explains how to grant your service account the access it needs for each tool in the GA4 Manager MCP server.
+This guide explains how to grant the access each tool in the GA4 Manager MCP server needs.
+
+> **First time?** Run `./scripts/setup.sh` from the repo root — it walks through auth, API enablement, and smoke tests in one pass, then prints exactly which manual permission grants are still needed below.
 
 ## Table of Contents
 
-- [Service Account Setup](#service-account-setup)
+- [Auth path decision matrix](#auth-path-decision-matrix)
+- [Setup A — ADC user credentials (recommended for personal use)](#setup-a--adc-user-credentials-recommended-for-personal-use)
+- [Setup B — Service account key (for CI / teams)](#setup-b--service-account-key-for-ci--teams)
 - [Google Search Console (GSC)](#google-search-console-gsc)
 - [Google Analytics 4 (GA4)](#google-analytics-4-ga4)
 - [PageSpeed Insights (PSI)](#pagespeed-insights-psi)
@@ -13,18 +17,87 @@ This guide explains how to grant your service account the access it needs for ea
 
 ---
 
-## Service Account Setup
+## Auth path decision matrix
 
-All tools use the same `GOOGLE_APPLICATION_CREDENTIALS` environment variable — no extra credential setup is required beyond what is documented in [CONFIGURATION.md](./CONFIGURATION.md).
+The MCP server reads credentials from the `GOOGLE_APPLICATION_CREDENTIALS` env var. Two file types are accepted:
+
+| Path | File | When to use | Pros | Cons |
+|------|------|-------------|------|------|
+| **A — ADC user creds** | `~/.config/gcloud/application_default_credentials.json` | Personal/dev use; you query your own GA4 + GSC | Free, fast, no separate user to manage; uses your existing GA4/GSC access | Tied to your Google identity; needs explicit quota project |
+| **B — Service account key** | `/path/to/sa-key.json` you download | CI/CD, teams, headless servers | Identity is auditable; clean separation; can be granted property-by-property | Requires SA + key generation; SA email must be added to every GSC site / GA4 property |
+
+**Pick A** unless you need automation outside your laptop.
+
+> Don't mix them — only one `GOOGLE_APPLICATION_CREDENTIALS` value can be active at a time. Switch by setting the env var to a different path.
+
+---
+
+## Setup A — ADC user credentials (recommended for personal use)
+
+```bash
+# 1. Re-login with all required scopes
+gcloud auth application-default login \
+  --scopes=openid,\
+https://www.googleapis.com/auth/cloud-platform,\
+https://www.googleapis.com/auth/analytics.readonly,\
+https://www.googleapis.com/auth/webmasters.readonly,\
+https://www.googleapis.com/auth/userinfo.email
+
+# 2. Set quota project (the GCP project that gets billed for API calls)
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+
+# 3. Enable the four APIs in that project
+gcloud services enable \
+  analyticsdata.googleapis.com \
+  analyticsadmin.googleapis.com \
+  searchconsole.googleapis.com \
+  pagespeedonline.googleapis.com \
+  --project=YOUR_PROJECT_ID
+
+# 4. Verify
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
+gcloud auth application-default print-access-token
+```
+
+The principal in this case is **your Google account**, so any GA4 properties or Search Console sites you already own are accessible without further per-resource setup. To query someone else's resource, they must add your email as a user (see GSC and GA4 sections below).
+
+> **Common gotcha:** if you skip step 2, calls fail with `SERVICE_DISABLED` even when the API is enabled. The quota project tells Google which project to bill — for ADC user creds, this is not inferred automatically. The Node and Go libraries pick it up from `quota_project_id` in the ADC file once `set-quota-project` runs.
+
+---
+
+## Setup B — Service account key (for CI / teams)
+
+```bash
+# 1. Create the SA in Cloud Console (one-time)
+#    https://console.cloud.google.com → IAM & Admin → Service Accounts → Create
+#    Pick a name (e.g. "ga4-manager") and skip role grants — they aren't used here.
+
+# 2. Create + download a JSON key
+#    Service Accounts → click the SA → Keys → Add key → Create new key (JSON)
+#    Save the file securely. NEVER commit it.
+
+# 3. Enable the four APIs in the SA's GCP project
+gcloud services enable \
+  analyticsdata.googleapis.com \
+  analyticsadmin.googleapis.com \
+  searchconsole.googleapis.com \
+  pagespeedonline.googleapis.com \
+  --project=YOUR_PROJECT_ID
+
+# 4. Point the env var at the key
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/sa-key.json
+
+# 5. Add the SA email as a user on each resource (see GSC/GA4 sections below)
+```
 
 To find the service account email used by the server:
 
 ```bash
-cat "$GOOGLE_APPLICATION_CREDENTIALS" | grep '"client_email"'
-# → "client_email": "ga4-manager@your-project.iam.gserviceaccount.com"
+jq -r .client_email "$GOOGLE_APPLICATION_CREDENTIALS"
+# → ga4-manager@your-project.iam.gserviceaccount.com
 ```
 
-You will need this email address to grant access in the sections below.
+You will need this email to grant access in the sections below.
 
 ---
 
