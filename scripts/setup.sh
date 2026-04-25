@@ -39,7 +39,10 @@ done
 # ── Color / format helpers ───────────────────────────────────────────────────
 
 if [[ -t 1 ]]; then
-  C_OK="\033[32m"; C_WARN="\033[33m"; C_ERR="\033[31m"; C_DIM="\033[2m"; C_BOLD="\033[1m"; C_OFF="\033[0m"
+  # ANSI-C quoting ($'...') so the variables hold real escape bytes.
+  # This makes the colors work inside heredocs (cat <<EOF), not just printf.
+  C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'
+  C_DIM=$'\033[2m'; C_BOLD=$'\033[1m'; C_OFF=$'\033[0m'
 else
   C_OK=""; C_WARN=""; C_ERR=""; C_DIM=""; C_BOLD=""; C_OFF=""
 fi
@@ -152,16 +155,54 @@ SCOPES="openid,https://www.googleapis.com/auth/cloud-platform,https://www.google
 if [[ "$AUTH_PATH" == "A" ]]; then
   ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
 
-  # If ADC already exists, ask whether to re-login (might be missing scopes)
+  REQUIRED_SCOPES=(
+    "https://www.googleapis.com/auth/cloud-platform"
+    "https://www.googleapis.com/auth/analytics.readonly"
+    "https://www.googleapis.com/auth/webmasters.readonly"
+  )
+
+  # If ADC already exists, check whether its token has the required scopes
   RELOGIN=1
   if [[ -f "$ADC_FILE" ]]; then
-    dim "ADC file already exists at $ADC_FILE"
-    if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    dim "ADC file already exists at $ADC_FILE — checking scopes..."
+
+    # Mint a token from the existing ADC and ask Google what scopes it carries
+    EXISTING_TOKEN=$(gcloud auth application-default print-access-token 2>/dev/null || echo "")
+    GRANTED_SCOPES=""
+    if [[ -n "$EXISTING_TOKEN" ]]; then
+      GRANTED_SCOPES=$(curl -s "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=$EXISTING_TOKEN" \
+        | jq -r '.scope // ""' 2>/dev/null || echo "")
+    fi
+
+    MISSING=()
+    for scope in "${REQUIRED_SCOPES[@]}"; do
+      if [[ "$GRANTED_SCOPES" != *"$scope"* ]]; then
+        MISSING+=("$scope")
+      fi
+    done
+
+    if [[ ${#MISSING[@]} -eq 0 ]]; then
+      ok "All required scopes already granted (cloud-platform, analytics.readonly, webmasters.readonly)"
       RELOGIN=0
-      dim "Skipping re-login in non-interactive mode (assume scopes are already granted)"
     else
-      ans=$(ask "Re-login to ensure all required scopes are granted? (y/n)" "y")
-      [[ "$ans" =~ ^[Yy]$ ]] || RELOGIN=0
+      warn "Existing ADC is missing ${#MISSING[@]} required scope(s):"
+      for s in "${MISSING[@]}"; do
+        printf "    - %s\n" "$s"
+      done
+      if [[ "$NON_INTERACTIVE" == "1" ]]; then
+        dim "Re-running login automatically (non-interactive)"
+        RELOGIN=1
+      else
+        ans=$(ask "Re-login now to grant the missing scopes? (y/n)" "y")
+        if [[ "$ans" =~ ^[Yy]$ ]]; then
+          RELOGIN=1
+        else
+          RELOGIN=0
+          warn "Continuing without re-login. Tools that need the missing scopes will fail."
+          warn "Re-run setup.sh later, or run the gcloud login command manually:"
+          printf "    gcloud auth application-default login --scopes=%s\n" "$SCOPES"
+        fi
+      fi
     fi
   fi
 
