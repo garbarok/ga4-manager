@@ -11,6 +11,7 @@ import {
   summarizeIssues,
   fetchCwv,
   runSeoPageAudit,
+  psiCache,
   SeoSignals,
 } from './seo-page-audit.js'
 
@@ -91,6 +92,14 @@ describe('seoPageAuditInputSchema', () => {
       psi_strategy: 'tablet',
     })
     expect(result.success).toBe(false)
+  })
+
+  it('applies default force_refresh=false', () => {
+    const result = seoPageAuditInputSchema.safeParse({ url: 'https://example.com/' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.force_refresh).toBe(false)
+    }
   })
 })
 
@@ -468,6 +477,104 @@ describe('fetchCwv', () => {
 })
 
 // ============================================================================
+// PSI cache — cache key shape and force_refresh behavior
+// ============================================================================
+
+describe('PSI cache', () => {
+  const PSI_RESPONSE = {
+    lighthouseResult: {
+      categories: { performance: { score: 0.8 } },
+      audits: {
+        'largest-contentful-paint': { numericValue: 2000 },
+        'first-contentful-paint': { numericValue: 1000 },
+        'cumulative-layout-shift': { numericValue: 0.1 },
+        'total-blocking-time': { numericValue: 150 },
+      },
+    },
+  }
+
+  const PAGE_HTML = `<!DOCTYPE html>
+<html><head>
+  <title>Test Page For Cache</title>
+  <meta name="description" content="Cache test description here.">
+  <link rel="canonical" href="https://psi-cache-test.example.com/">
+  <meta property="og:image" content="https://psi-cache-test.example.com/img.jpg">
+</head><body><h1>Cache Test</h1></body></html>`
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Clear PSI cache between tests using a fresh store via set+get cycling is not possible,
+    // but we can force-clear by deleting internal state — instead use unique URLs per test.
+  })
+
+  it('cache key is url|strategy — second call hits cache, fetch called only once for PSI', async () => {
+    const testUrl = 'https://psi-cache-test.example.com/cache-hit'
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, url: testUrl, headers: { get: () => null }, text: () => Promise.resolve(PAGE_HTML) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(PSI_RESPONSE) })
+      // Third call would be a second PSI fetch — should NOT happen if cache works
+      .mockResolvedValueOnce({ ok: true, status: 200, url: testUrl, headers: { get: () => null }, text: () => Promise.resolve(PAGE_HTML) })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const input = seoPageAuditInputSchema.parse({ url: testUrl, check_cwv: true, psi_api_key: 'key' })
+    // First call — populates cache
+    const r1 = await runSeoPageAudit(input)
+    expect(r1.cwv).toBeDefined()
+
+    // Second call — should hit cache; no additional PSI fetch
+    const r2 = await runSeoPageAudit(input)
+    expect(r2.cwv).toBeDefined()
+    expect(r2.cwv?.performance_score).toBe(r1.cwv?.performance_score)
+
+    // PSI fetch (googleapis.com) called exactly once
+    const psiCalls = mockFetch.mock.calls.filter((args) =>
+      typeof args[0] === 'string' && (args[0] as string).includes('googleapis.com/pagespeedonline'),
+    )
+    expect(psiCalls).toHaveLength(1)
+  })
+
+  it('force_refresh=true skips cache read but writes to cache', async () => {
+    const testUrl = 'https://psi-cache-test.example.com/force-refresh'
+    const mockFetch = vi.fn()
+      .mockResolvedValue({ ok: true, status: 200, url: testUrl, headers: { get: () => null }, text: () => Promise.resolve(PAGE_HTML) })
+
+    // Pre-populate cache so first call would normally hit it
+    const cacheKey = `${testUrl}|mobile`
+    psiCache.set(cacheKey, { lcp: 999, fcp: 999, cls: 0, tbt: 999, performance_score: 99, strategy: 'mobile' })
+
+    const psiMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(PSI_RESPONSE) })
+    // page fetch + psi fetch interleaved — use mockImplementation to route
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('googleapis.com')) return psiMock(url)
+      return mockFetch(url)
+    }))
+
+    const input = seoPageAuditInputSchema.parse({ url: testUrl, check_cwv: true, psi_api_key: 'key', force_refresh: true })
+    const result = await runSeoPageAudit(input)
+
+    // force_refresh bypassed the cached value (99), fetched fresh (80)
+    expect(result.cwv?.performance_score).toBe(80)
+    expect(psiMock).toHaveBeenCalledOnce()
+
+    // And cache was updated with the fresh value
+    const cached = psiCache.get(cacheKey)
+    expect(cached?.performance_score).toBe(80)
+  })
+
+  it('check_cwv=false returns no cwv block', async () => {
+    const testUrl = 'https://psi-cache-test.example.com/no-cwv'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, url: testUrl, headers: { get: () => null }, text: () => Promise.resolve(PAGE_HTML),
+    }))
+
+    const input = seoPageAuditInputSchema.parse({ url: testUrl, check_cwv: false })
+    const result = await runSeoPageAudit(input)
+
+    expect(result.cwv).toBeUndefined()
+  })
+})
+
+// ============================================================================
 // runSeoPageAudit — integration (mocked fetch)
 // ============================================================================
 
@@ -593,41 +700,44 @@ describe('runSeoPageAudit', () => {
     const input = seoPageAuditInputSchema.parse({
       url: 'https://example.com/page',
       check_cwv: true,
+      psi_api_key: 'dummy-key-to-skip-throttle',
     })
     const result = await runSeoPageAudit(input)
 
     expect(result.success).toBe(true)
     expect(result.cwv).toBeDefined()
     expect(result.cwv?.performance_score).toBe(90)
-    expect(result.cwv_error).toBeUndefined()
+    expect(result.warnings.some((w) => w.startsWith('psi_unavailable:'))).toBe(false)
   })
 
-  it('sets cwv_error when PSI fails and omits cwv', async () => {
+  it('adds psi_unavailable warning when PSI returns 500 and omits cwv', async () => {
+    const failUrl = 'https://example.com/psi-fail-test'
     vi.stubGlobal(
       'fetch',
       vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          url: 'https://example.com/page',
+          url: failUrl,
           text: () => Promise.resolve(SAMPLE_HTML),
         })
         .mockResolvedValueOnce({
           ok: false,
-          status: 429,
-          text: () => Promise.resolve('Rate Limited'),
+          status: 500,
+          text: () => Promise.resolve('Internal Server Error'),
         }),
     )
 
     const input = seoPageAuditInputSchema.parse({
-      url: 'https://example.com/page',
+      url: failUrl,
       check_cwv: true,
+      psi_api_key: 'dummy-key-to-skip-throttle',
     })
     const result = await runSeoPageAudit(input)
 
     expect(result.success).toBe(true)
     expect(result.cwv).toBeUndefined()
-    expect(result.cwv_error).toBeDefined()
+    expect(result.warnings.some((w) => w.startsWith('psi_unavailable:'))).toBe(true)
   })
 
   it('uses GA4Manager honest user-agent by default', async () => {
@@ -695,6 +805,7 @@ describe('seoPageAuditTool definition', () => {
     expect(props.check_cwv).toBeDefined()
     expect(props.psi_api_key).toBeDefined()
     expect(props.psi_strategy).toBeDefined()
+    expect(props.force_refresh).toBeDefined()
   })
 })
 

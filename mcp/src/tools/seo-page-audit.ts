@@ -5,6 +5,7 @@ import { runIssueRules, summarizeIssues, type SeoIssue, type IssueSummary } from
 import { fetchWithTrace, type RedirectHop } from '../utils/redirect-trace.js'
 import { ToolError } from '../utils/errors.js'
 import { isAllowed as robotsIsAllowed } from '../utils/robots-check.js'
+import { TTLCache } from '../utils/cache.js'
 
 // Re-export granular helpers so existing imports continue to work
 export {
@@ -68,6 +69,11 @@ export const seoPageAuditInputSchema = z.object({
     .optional()
     .default(false)
     .describe('Override user_agent with the standard Googlebot UA string (default: false)'),
+  force_refresh: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Bypass the 5-minute PSI cache and fetch fresh Core Web Vitals data (default: false)'),
 })
 
 export type SeoPageAuditInput = z.infer<typeof seoPageAuditInputSchema>
@@ -101,7 +107,6 @@ export interface SeoPageAuditOutput {
   issues: SeoIssue[]
   issue_summary: IssueSummary
   cwv?: CwvData
-  cwv_error?: string
   error?: string
 }
 
@@ -169,6 +174,16 @@ function extractMetaRefreshUrl(html: string): string | null {
 }
 
 // ============================================================================
+// PSI cache + keyless throttle
+// ============================================================================
+
+// 5-minute TTL; keyed by `${url}|${strategy}`
+export const psiCache = new TTLCache<CwvData>(5 * 60 * 1000)
+
+// When no API key, PSI rate-limits to ~1 req/100s. A single shared limiter enforces this.
+const keylessPsiLimiter = new Bottleneck({ minTime: 100_000, maxConcurrent: 1 })
+
+// ============================================================================
 // Per-host throttle (1 req/sec per hostname, scoped to MCP session lifetime)
 // ============================================================================
 
@@ -205,7 +220,7 @@ const emptySignals: HtmlSignals = {
 }
 
 export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPageAuditOutput> {
-  const { url, check_cwv, psi_api_key, psi_strategy, respect_robots, as_googlebot } = input
+  const { url, check_cwv, psi_api_key, psi_strategy, respect_robots, as_googlebot, force_refresh } = input
   const effectiveUA = as_googlebot ? GOOGLEBOT_UA : input.user_agent
   const warnings: string[] = []
 
@@ -301,13 +316,21 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   const issue_summary = summarizeIssues(issues)
 
   let cwv: CwvData | undefined
-  let cwv_error: string | undefined
 
   if (check_cwv) {
-    try {
-      cwv = await fetchCwv(finalUrl, psi_strategy, psi_api_key)
-    } catch (err) {
-      cwv_error = err instanceof Error ? err.message : String(err)
+    const cacheKey = `${finalUrl}|${psi_strategy}`
+    if (!force_refresh) {
+      cwv = psiCache.get(cacheKey)
+    }
+    if (!cwv) {
+      try {
+        const doFetch = () => fetchCwv(finalUrl, psi_strategy, psi_api_key)
+        cwv = psi_api_key ? await doFetch() : await keylessPsiLimiter.schedule(doFetch)
+        psiCache.set(cacheKey, cwv)
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        warnings.push(`psi_unavailable: ${reason}`)
+      }
     }
   }
 
@@ -322,7 +345,6 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
     issues,
     issue_summary,
     ...(cwv ? { cwv } : {}),
-    ...(cwv_error ? { cwv_error } : {}),
   }
 }
 
@@ -373,6 +395,11 @@ export const seoPageAuditTool = {
       as_googlebot: {
         type: 'boolean',
         description: 'Override user_agent with the standard Googlebot UA string (default: false)',
+        default: false,
+      },
+      force_refresh: {
+        type: 'boolean',
+        description: 'Bypass the 5-minute PSI cache and fetch fresh Core Web Vitals data (default: false)',
         default: false,
       },
     },
