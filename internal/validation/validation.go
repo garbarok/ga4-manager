@@ -199,6 +199,53 @@ func ValidateMetricType(metricType string) error {
 	return nil
 }
 
+// ValidateConversionParams validates all inputs required to create a conversion event.
+// It is a composite of ValidatePropertyID, ValidateEventName, and ValidateCountingMethod.
+func ValidateConversionParams(propertyID, eventName, countingMethod string) error {
+	if err := ValidatePropertyID(propertyID); err != nil {
+		return err
+	}
+	if err := ValidateEventName(eventName); err != nil {
+		return err
+	}
+	return ValidateCountingMethod(countingMethod)
+}
+
+// ValidateDimensionParams validates all inputs required to create a custom dimension.
+// It is a composite of ValidatePropertyID, ValidateParameterName, ValidateDisplayName,
+// and ValidateScope.
+func ValidateDimensionParams(propertyID, paramName, displayName, scope string) error {
+	if err := ValidatePropertyID(propertyID); err != nil {
+		return err
+	}
+	if err := ValidateParameterName(paramName); err != nil {
+		return err
+	}
+	if err := ValidateDisplayName(displayName); err != nil {
+		return err
+	}
+	return ValidateScope(scope)
+}
+
+// ValidateMetricParams validates all inputs required to create a custom metric.
+// It is a composite of ValidatePropertyID, ValidateParameterName, ValidateDisplayName,
+// ValidateMeasurementUnit, and ValidateScope.
+func ValidateMetricParams(propertyID, paramName, displayName, measurementUnit, metricType string) error {
+	if err := ValidatePropertyID(propertyID); err != nil {
+		return err
+	}
+	if err := ValidateParameterName(paramName); err != nil {
+		return err
+	}
+	if err := ValidateDisplayName(displayName); err != nil {
+		return err
+	}
+	if err := ValidateMeasurementUnit(measurementUnit); err != nil {
+		return err
+	}
+	return ValidateScope(metricType)
+}
+
 // ValidateNotEmpty validates that a string is not empty or whitespace
 func ValidateNotEmpty(value, fieldName string) error {
 	if strings.TrimSpace(value) == "" {

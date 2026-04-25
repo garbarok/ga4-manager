@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/ga4"
+	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +37,13 @@ func init() {
 	reportCmd.Flags().StringVarP(&reportOutput, "output", "o", "", "Output file path (default: stdout or auto-generated filename)")
 }
 
+// runReport is the Cobra RunE handler — reads flag variables and delegates to executeReport.
 func runReport(cmd *cobra.Command, args []string) error {
+	return executeReport(reportConfigPath, projectName, reportAll, reportExport, reportOutput)
+}
+
+// executeReport performs the report with explicit parameters, avoiding reliance on global flag state.
+func executeReport(cfgPath, projName string, all bool, export, output string) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
 
 	// Create GA4 client
@@ -46,14 +53,14 @@ func runReport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load projects based on flags
-	projects, err := loadProjects(reportConfigPath, projectName, reportAll)
+	projects, err := loadProjects(cfgPath, projName, all)
 	if err != nil {
 		return err
 	}
 
 	// Handle export mode
-	if reportExport != "" {
-		return exportReports(client, projects, reportExport, reportOutput)
+	if export != "" {
+		return exportReports(client, projects, export, output)
 	}
 
 	// Normal display mode
@@ -74,6 +81,144 @@ func runReport(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// handleReportAction handles the "View Reports" menu action in interactive mode.
+func handleReportAction() {
+	projectPath, err := tui.RunProjectSelector()
+	if err != nil {
+		if err == tui.ErrBackToMenu || err.Error() == "no project selected" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error selecting project: %v\n", err)
+		return
+	}
+
+	var cfgPath string
+	var all bool
+
+	if projectPath == "--all" {
+		all = true
+		fmt.Println("\n📊 Loading reports for all projects...")
+	} else {
+		cfgPath = projectPath
+		fmt.Printf("\n📊 Loading report for %s...\n", projectPath)
+	}
+	fmt.Println()
+
+	if err := executeReport(cfgPath, "", all, "", ""); err != nil {
+		fmt.Fprintf(os.Stderr, "\n❌ Error running report: %v\n", err)
+		return
+	}
+
+	// After displaying, ask if user wants to export
+	promptReportExport(projectPath, all)
+}
+
+// handleExportAction handles the "Export Reports" menu action in interactive mode.
+func handleExportAction() {
+	projectPath, err := tui.RunProjectSelector()
+	if err != nil {
+		if err == tui.ErrBackToMenu || err.Error() == "no project selected" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error selecting project: %v\n", err)
+		return
+	}
+
+	var all bool
+	if projectPath == "--all" {
+		all = true
+		fmt.Println("\n💾 Exporting reports for all projects...")
+	} else {
+		fmt.Printf("\n💾 Preparing to export report for %s...\n", projectPath)
+	}
+
+	format := promptFormatSelection()
+	if format != "" {
+		executeExport(projectPath, all, format)
+	}
+}
+
+// promptFormatSelection prompts user to select export format.
+func promptFormatSelection() string {
+	fmt.Println("\n" + strings.Repeat("─", 50))
+	fmt.Println("\n📦 Select export format:")
+	fmt.Println("  1. JSON - Single file with all data")
+	fmt.Println("  2. CSV - Multiple files (conversions, dimensions, metrics, etc.)")
+	fmt.Println("  3. Markdown - Formatted report with tables")
+	fmt.Println("  4. Cancel (return to menu)")
+	fmt.Print("\nSelect option (1-4): ")
+
+	var choice string
+	_, _ = fmt.Scanln(&choice)
+
+	switch choice {
+	case "1":
+		return "json"
+	case "2":
+		return "csv"
+	case "3":
+		return "markdown"
+	case "4", "":
+		fmt.Println("\nExport cancelled.")
+		return ""
+	default:
+		fmt.Println("\nInvalid choice. Export cancelled.")
+		return ""
+	}
+}
+
+// promptReportExport prompts the user to export the report after viewing.
+func promptReportExport(projectPath string, all bool) {
+	fmt.Println("\n" + strings.Repeat("─", 50))
+	fmt.Println("\n💾 Would you like to export this report?")
+	fmt.Println("  1. Export as JSON")
+	fmt.Println("  2. Export as CSV (multiple files)")
+	fmt.Println("  3. Export as Markdown")
+	fmt.Println("  4. Skip export (return to menu)")
+	fmt.Print("\nSelect option (1-4): ")
+
+	var choice string
+	_, _ = fmt.Scanln(&choice)
+
+	switch choice {
+	case "1":
+		executeExport(projectPath, all, "json")
+	case "2":
+		executeExport(projectPath, all, "csv")
+	case "3":
+		executeExport(projectPath, all, "markdown")
+	case "4", "":
+		// Skip export, return to menu
+		return
+	default:
+		fmt.Println("Invalid choice, skipping export.")
+	}
+}
+
+// executeExport performs the actual export operation.
+func executeExport(projectPath string, all bool, format string) {
+	fmt.Printf("\n📤 Exporting as %s...\n\n", strings.ToUpper(format))
+
+	// Create GA4 client
+	client, err := ga4.NewClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating client: %v\n", err)
+		return
+	}
+
+	// Load projects
+	projects, err := loadProjects(projectPath, "", all)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading projects: %v\n", err)
+		return
+	}
+
+	// Export with auto-generated filename
+	if err := exportReports(client, projects, format, ""); err != nil {
+		fmt.Fprintf(os.Stderr, "Error exporting report: %v\n", err)
+	}
 }
 
 // exportReports handles exporting reports in various formats

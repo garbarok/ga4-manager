@@ -9,6 +9,7 @@ import (
 	"github.com/garbarok/ga4-manager/internal/ga4"
 	"github.com/garbarok/ga4-manager/internal/gsc"
 	"github.com/garbarok/ga4-manager/internal/setup"
+	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -54,9 +55,15 @@ func init() {
 	setupCmd.Flags().BoolVar(&setupDryRun, "dry-run", false, "Preview changes without applying them")
 }
 
+// runSetup is the Cobra RunE handler — reads flag variables and delegates to executeSetup.
 func runSetup(cmd *cobra.Command, args []string) error {
+	return executeSetup(configPath, projectName, setupAll, setupDryRun)
+}
+
+// executeSetup performs the setup with explicit parameters, avoiding reliance on global flag state.
+func executeSetup(cfgPath, projName string, all, dryRun bool) error {
 	// Load configuration
-	configs, paths, err := loadProjectConfigs(configPath, projectName, setupAll)
+	configs, paths, err := loadProjectConfigs(cfgPath, projName, all)
 	if err != nil {
 		return err
 	}
@@ -68,7 +75,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	// Setup each configuration
 	for i, cfg := range configs {
-		cfgPath := paths[i]
+		cfgFilePath := paths[i]
 
 		// Create clients
 		var ga4Client *ga4.Client
@@ -97,7 +104,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		}
 
 		// Create and execute orchestrator
-		orchestrator := setup.NewSetupOrchestrator(cfg, cfgPath, ga4Client, gscClient, logger, setupDryRun)
+		orchestrator := setup.NewSetupOrchestrator(cfg, cfgFilePath, ga4Client, gscClient, logger, dryRun)
 
 		if err := orchestrator.Execute(); err != nil {
 			return err
@@ -112,6 +119,34 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// handleSetupAction handles the "Setup Projects" menu action in interactive mode.
+func handleSetupAction() {
+	projectPath, err := tui.RunProjectSelector()
+	if err != nil {
+		if err == tui.ErrBackToMenu || err.Error() == "no project selected" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error selecting project: %v\n", err)
+		return
+	}
+
+	var cfgPath string
+	var all bool
+
+	if projectPath == "--all" {
+		all = true
+		fmt.Println("\n⚙️  Running setup for all projects...")
+	} else {
+		cfgPath = projectPath
+		fmt.Printf("\n⚙️  Running setup for %s...\n", projectPath)
+	}
+	fmt.Println()
+
+	if err := executeSetup(cfgPath, "", all, false); err != nil {
+		fmt.Fprintf(os.Stderr, "\n❌ Error running setup: %v\n", err)
+	}
 }
 
 // loadProjectConfigs loads ProjectConfig(s) based on command flags

@@ -3,7 +3,6 @@ package ga4
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/validation"
@@ -12,24 +11,10 @@ import (
 
 func (c *Client) CreateConversion(propertyID, eventName, countingMethod string) error {
 	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
+	if err := validation.ValidateConversionParams(propertyID, eventName, countingMethod); err != nil {
+		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateEventName(eventName); err != nil {
-		c.logger.Error("invalid event name",
 			slog.String("event_name", eventName),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateCountingMethod(countingMethod); err != nil {
-		c.logger.Error("invalid counting method",
 			slog.String("counting_method", countingMethod),
 			slog.String("error", err.Error()),
 		)
@@ -56,7 +41,7 @@ func (c *Client) CreateConversion(propertyID, eventName, countingMethod string) 
 
 	_, err := c.admin.Properties.ConversionEvents.Create(parent, conversion).Context(c.ctx).Do()
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		if isAlreadyExistsError(err) {
 			c.logger.Debug("conversion already exists",
 				slog.String("event_name", eventName),
 			)
@@ -156,7 +141,6 @@ func (c *Client) DeleteConversion(propertyID, eventName string) error {
 		)
 		return fmt.Errorf("validation failed: %w", err)
 	}
-
 	if err := validation.ValidateEventName(eventName); err != nil {
 		c.logger.Error("invalid event name",
 			slog.String("event_name", eventName),

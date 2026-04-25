@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/garbarok/ga4-manager/internal/ga4"
+	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-
-	"github.com/garbarok/ga4-manager/internal/ga4"
 )
 
 var (
@@ -57,41 +57,13 @@ func init() {
 	cleanupCmd.Flags().BoolVarP(&cleanupYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
-// validateCleanupType ensures cleanup type is valid.
-func validateCleanupType(cleanupType string) error {
-	validTypes := []string{"conversions", "dimensions", "metrics", "all"}
-	for _, vt := range validTypes {
-		if cleanupType == vt {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid type '%s': must be one of %v", cleanupType, validTypes)
-}
-
-// shouldProceedWithCleanup determines if cleanup should proceed.
-func shouldProceedWithCleanup(hasItems, skipConfirmation bool, yellow func(a ...interface{}) string) bool {
-	if !hasItems {
-		return false
-	}
-
-	if skipConfirmation {
-		return true
-	}
-
-	fmt.Printf("\n%s This will permanently remove/archive the items shown above.\n", yellow("⚠"))
-	fmt.Print("Do you want to continue? [y/N]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return false
-	}
-
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
-}
-
+// runCleanup is the Cobra RunE handler — reads flag variables and delegates to executeCleanup.
 func runCleanup(cmd *cobra.Command, args []string) error {
+	return executeCleanup(cleanupConfigPath, cleanupProject, cleanupAllProjects, cleanupDryRun, cleanupType, cleanupYes)
+}
+
+// executeCleanup performs the cleanup with explicit parameters, avoiding reliance on global flag state.
+func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, yes bool) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
@@ -102,7 +74,7 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	fmt.Println("═══════════════════════════════════════════════")
 	fmt.Println()
 
-	if err := validateCleanupType(cleanupType); err != nil {
+	if err := validateCleanupType(cType); err != nil {
 		return err
 	}
 
@@ -113,7 +85,7 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load projects based on flags
-	projects, err := loadProjects(cleanupConfigPath, cleanupProject, cleanupAllProjects)
+	projects, err := loadProjects(cfgPath, projName, all)
 	if err != nil {
 		return err
 	}
@@ -127,9 +99,9 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s %s\n\n", blue("ℹ️"), project.Cleanup.Reason)
 		}
 
-		hasConversions := len(project.Cleanup.ConversionsToRemove) > 0 && (cleanupType == "conversions" || cleanupType == "all")
-		hasDimensions := len(project.Cleanup.DimensionsToRemove) > 0 && (cleanupType == "dimensions" || cleanupType == "all")
-		hasMetrics := len(project.Cleanup.MetricsToRemove) > 0 && (cleanupType == "metrics" || cleanupType == "all")
+		hasConversions := len(project.Cleanup.ConversionsToRemove) > 0 && (cType == "conversions" || cType == "all")
+		hasDimensions := len(project.Cleanup.DimensionsToRemove) > 0 && (cType == "dimensions" || cType == "all")
+		hasMetrics := len(project.Cleanup.MetricsToRemove) > 0 && (cType == "metrics" || cType == "all")
 		hasItems := hasConversions || hasDimensions || hasMetrics
 
 		if !hasItems {
@@ -177,12 +149,12 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 			table.Render()
 		}
 
-		if cleanupDryRun {
+		if dryRun {
 			fmt.Printf("\n%s Dry-run mode enabled - no changes applied\n", yellow("ℹ️"))
 			continue
 		}
 
-		if !shouldProceedWithCleanup(hasItems, cleanupYes, yellow) {
+		if !shouldProceedWithCleanup(hasItems, yes, yellow) {
 			fmt.Println("Cleanup cancelled.")
 			continue
 		}
@@ -240,14 +212,14 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 	fmt.Println("═══════════════════════════════════════════════")
-	if cleanupDryRun {
+	if dryRun {
 		fmt.Printf("%s Dry-run complete! No changes were applied.\n", blue("ℹ️"))
 	} else {
 		fmt.Printf("%s Cleanup complete!\n", green("✅"))
 	}
 	fmt.Println()
 	fmt.Println("Next steps:")
-	if cleanupDryRun {
+	if dryRun {
 		fmt.Println("1. Review the changes above")
 		fmt.Println("2. Run without --dry-run to apply changes")
 	} else {
@@ -258,4 +230,67 @@ func runCleanup(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	return nil
+}
+
+// handleCleanupAction handles the "Cleanup Unused Items" menu action in interactive mode.
+func handleCleanupAction() {
+	projectPath, err := tui.RunProjectSelector()
+	if err != nil {
+		if err == tui.ErrBackToMenu || err.Error() == "no project selected" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error selecting project: %v\n", err)
+		return
+	}
+
+	var cfgPath string
+	var all bool
+
+	if projectPath == "--all" {
+		all = true
+	} else {
+		cfgPath = projectPath
+	}
+
+	fmt.Println("\n🧹 Running cleanup in dry-run mode (preview only)...")
+	fmt.Println("To apply changes, use: ga4 cleanup --config", projectPath)
+	fmt.Println()
+
+	if err := executeCleanup(cfgPath, "", all, true, "all", false); err != nil {
+		fmt.Fprintf(os.Stderr, "Error running cleanup: %v\n", err)
+	}
+}
+
+// validateCleanupType ensures cleanup type is valid.
+func validateCleanupType(cleanupType string) error {
+	validTypes := []string{"conversions", "dimensions", "metrics", "all"}
+	for _, vt := range validTypes {
+		if cleanupType == vt {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid type '%s': must be one of %v", cleanupType, validTypes)
+}
+
+// shouldProceedWithCleanup determines if cleanup should proceed.
+func shouldProceedWithCleanup(hasItems, skipConfirmation bool, yellow func(a ...interface{}) string) bool {
+	if !hasItems {
+		return false
+	}
+
+	if skipConfirmation {
+		return true
+	}
+
+	fmt.Printf("\n%s This will permanently remove/archive the items shown above.\n", yellow("⚠"))
+	fmt.Print("Do you want to continue? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "y" || response == "yes"
 }

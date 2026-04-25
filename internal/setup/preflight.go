@@ -192,6 +192,13 @@ func (pv *PreflightValidator) CheckGA4Access() ValidationResult {
 		Status:      ValidationPassed,
 	}
 
+	if pv.ga4Client == nil {
+		result.Status = ValidationSkipped
+		result.Details = "GA4 client not initialised"
+		pv.logger.Warn("GA4 client is nil, skipping GA4 access check")
+		return result
+	}
+
 	propertyID := pv.config.GetPropertyID()
 
 	// Try to list data streams (quick API call to verify access)
@@ -276,6 +283,13 @@ func (pv *PreflightValidator) CheckGSCAccess() ValidationResult {
 		Status:      ValidationPassed,
 	}
 
+	if pv.gscClient == nil {
+		result.Status = ValidationSkipped
+		result.Details = "GSC client not initialised"
+		pv.logger.Warn("GSC client is nil, skipping GSC access check")
+		return result
+	}
+
 	siteURL := pv.config.SearchConsole.SiteURL
 
 	// Try to list sitemaps (quick API call to verify access)
@@ -353,6 +367,13 @@ func (pv *PreflightValidator) CheckGSCQuota() ValidationResult {
 		Status:      ValidationPassed,
 	}
 
+	if pv.gscClient == nil {
+		result.Status = ValidationSkipped
+		result.Details = "GSC client not initialised"
+		pv.logger.Warn("GSC client is nil, skipping GSC quota check")
+		return result
+	}
+
 	// Get current quota status
 	used, dailyLimit, _ := pv.gscClient.GetQuotaStatus()
 	percentage := (float64(used) / float64(dailyLimit)) * 100.0
@@ -391,7 +412,7 @@ func (pv *PreflightValidator) DetectConflicts() ([]ConflictWarning, error) {
 	conflicts := []ConflictWarning{}
 
 	// Check GA4 conflicts
-	if pv.config.HasAnalytics() {
+	if pv.config.HasAnalytics() && pv.ga4Client != nil {
 		propertyID := pv.config.GetPropertyID()
 
 		// Check existing conversions
@@ -462,7 +483,7 @@ func (pv *PreflightValidator) DetectConflicts() ([]ConflictWarning, error) {
 	}
 
 	// Check GSC conflicts
-	if pv.config.HasSearchConsole() {
+	if pv.config.HasSearchConsole() && pv.gscClient != nil {
 		siteURL := pv.config.SearchConsole.SiteURL
 
 		// Check existing sitemaps

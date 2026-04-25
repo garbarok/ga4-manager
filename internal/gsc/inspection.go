@@ -53,8 +53,8 @@ func (c *Client) InspectURL(siteURL, inspectURL string) (*URLInspectionResult, e
 		return nil, err
 	}
 
-	// Check daily quota before making API call
-	if err := c.checkDailyQuota(); err != nil {
+	// Check daily quota and increment counter atomically before making API call.
+	if err := c.useQuota(); err != nil {
 		return nil, err
 	}
 
@@ -81,9 +81,6 @@ func (c *Client) InspectURL(siteURL, inspectURL string) (*URLInspectionResult, e
 			"error", err)
 		return nil, fmt.Errorf("failed to inspect URL %s: %w", inspectURL, err)
 	}
-
-	// Increment quota counter after successful API call
-	c.incrementQuota()
 
 	// Transform API response to our domain type
 	result := transformInspectionResponse(response, inspectURL)

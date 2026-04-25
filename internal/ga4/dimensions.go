@@ -3,7 +3,6 @@ package ga4
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/validation"
@@ -12,32 +11,11 @@ import (
 
 func (c *Client) CreateDimension(propertyID string, dim config.CustomDimension) error {
 	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
+	if err := validation.ValidateDimensionParams(propertyID, dim.ParameterName, dim.DisplayName, dim.Scope); err != nil {
+		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateParameterName(dim.ParameterName); err != nil {
-		c.logger.Error("invalid parameter name",
 			slog.String("parameter_name", dim.ParameterName),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateDisplayName(dim.DisplayName); err != nil {
-		c.logger.Error("invalid display name",
 			slog.String("display_name", dim.DisplayName),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateScope(dim.Scope); err != nil {
-		c.logger.Error("invalid scope",
 			slog.String("scope", dim.Scope),
 			slog.String("error", err.Error()),
 		)
@@ -67,7 +45,7 @@ func (c *Client) CreateDimension(propertyID string, dim config.CustomDimension) 
 
 	_, err := c.admin.Properties.CustomDimensions.Create(parent, dimension).Context(c.ctx).Do()
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		if isAlreadyExistsError(err) {
 			c.logger.Debug("dimension already exists",
 				slog.String("parameter_name", dim.ParameterName),
 			)

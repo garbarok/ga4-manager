@@ -195,10 +195,15 @@ func (c *Client) Context() context.Context {
 	return c.ctx
 }
 
-// checkDailyQuota checks if we've exceeded daily quota limits
-// Returns error if critical threshold exceeded, warning if warning threshold exceeded
-func (c *Client) checkDailyQuota() error {
-	// Check if we need to reset the daily counter (new day)
+// useQuota atomically checks the daily quota and increments the counter if the
+// operation is allowed. Callers must call this once per billable API request;
+// they no longer need a separate increment call.
+//
+// Returns an error if the critical threshold (95 %) has been reached, which
+// prevents the operation from proceeding. A warning is logged (but no error
+// returned) when the warning threshold (75 %) is crossed.
+func (c *Client) useQuota() error {
+	// Reset counter when the calendar day rolls over.
 	now := time.Now()
 	if !isSameDay(c.quotaTracker.currentDate, now) {
 		c.logger.Info("resetting daily quota counter",
@@ -209,7 +214,7 @@ func (c *Client) checkDailyQuota() error {
 		c.quotaTracker.inspectionCount = 0
 	}
 
-	// Check critical threshold (95% - block operation)
+	// Block at critical threshold (95 %).
 	if c.quotaTracker.inspectionCount >= c.quotaTracker.criticalThreshold {
 		c.logger.Error("daily quota critical threshold reached",
 			"count", c.quotaTracker.inspectionCount,
@@ -221,26 +226,24 @@ func (c *Client) checkDailyQuota() error {
 			float64(c.quotaTracker.inspectionCount)/float64(c.quotaTracker.dailyLimit)*100)
 	}
 
-	// Check warning threshold (75% - log warning but allow)
+	// Warn at warning threshold (75 %) but allow the operation.
 	if c.quotaTracker.inspectionCount >= c.quotaTracker.warningThreshold {
 		c.logger.Warn("daily quota warning threshold reached",
 			"count", c.quotaTracker.inspectionCount,
 			"limit", c.quotaTracker.dailyLimit,
 			"threshold", c.quotaTracker.warningThreshold,
 			"remaining", c.quotaTracker.dailyLimit-c.quotaTracker.inspectionCount)
-		// Don't return error, just log warning
 	}
 
-	return nil
-}
-
-// incrementQuota increments the daily inspection counter
-func (c *Client) incrementQuota() {
+	// Increment immediately so every allowed call is counted regardless of
+	// whether the downstream API call succeeds or fails.
 	c.quotaTracker.inspectionCount++
 	c.logger.Debug("daily quota incremented",
 		"count", c.quotaTracker.inspectionCount,
 		"limit", c.quotaTracker.dailyLimit,
 		"remaining", c.quotaTracker.dailyLimit-c.quotaTracker.inspectionCount)
+
+	return nil
 }
 
 // GetQuotaStatus returns the current quota usage status

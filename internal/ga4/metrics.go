@@ -3,7 +3,6 @@ package ga4
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/validation"
@@ -13,41 +12,13 @@ import (
 // CreateCustomMetric creates a custom metric in GA4
 func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetric) error {
 	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
+	if err := validation.ValidateMetricParams(propertyID, metric.EventParameter, metric.DisplayName, metric.MeasurementUnit, metric.Scope); err != nil {
+		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateParameterName(metric.EventParameter); err != nil {
-		c.logger.Error("invalid parameter name",
 			slog.String("parameter_name", metric.EventParameter),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateDisplayName(metric.DisplayName); err != nil {
-		c.logger.Error("invalid display name",
 			slog.String("display_name", metric.DisplayName),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateScope(metric.Scope); err != nil {
-		c.logger.Error("invalid scope",
-			slog.String("scope", metric.Scope),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	if err := validation.ValidateMeasurementUnit(metric.MeasurementUnit); err != nil {
-		c.logger.Error("invalid measurement unit",
 			slog.String("measurement_unit", metric.MeasurementUnit),
+			slog.String("scope", metric.Scope),
 			slog.String("error", err.Error()),
 		)
 		return fmt.Errorf("validation failed: %w", err)
@@ -78,7 +49,7 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetri
 	property := fmt.Sprintf("properties/%s", propertyID)
 	_, err := c.admin.Properties.CustomMetrics.Create(property, customMetric).Context(c.ctx).Do()
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "alreadyExists") {
+		if isAlreadyExistsError(err) {
 			c.logger.Debug("custom metric already exists",
 				slog.String("display_name", metric.DisplayName),
 				slog.String("parameter_name", metric.EventParameter),

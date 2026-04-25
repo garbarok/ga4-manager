@@ -91,8 +91,8 @@ func (c *Client) QuerySearchAnalytics(query *SearchAnalyticsQuery) (*SearchAnaly
 		return nil, fmt.Errorf("invalid search query: %w", err)
 	}
 
-	// Check daily quota before making API call
-	if err := c.checkDailyQuota(); err != nil {
+	// Check daily quota and increment counter atomically before making API call.
+	if err := c.useQuota(); err != nil {
 		return nil, fmt.Errorf("quota check failed: %w", err)
 	}
 
@@ -133,9 +133,6 @@ func (c *Client) QuerySearchAnalytics(query *SearchAnalyticsQuery) (*SearchAnaly
 		)
 		return nil, fmt.Errorf("search analytics query failed for %s: %w", query.SiteURL, err)
 	}
-
-	// Increment quota counter
-	c.incrementQuota()
 
 	c.logger.Info("search analytics query completed",
 		"site_url", query.SiteURL,

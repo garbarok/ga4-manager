@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/garbarok/ga4-manager/internal/config"
+	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-
-	"github.com/garbarok/ga4-manager/internal/config"
 )
 
 var validateCmd = &cobra.Command{
@@ -41,7 +41,13 @@ func init() {
 	validateCmd.Flags().BoolVarP(&validateVerbose, "verbose", "v", false, "Show detailed validation results")
 }
 
+// runValidate is the Cobra RunE handler — reads flag variables and delegates to executeValidate.
 func runValidate(cmd *cobra.Command, args []string) error {
+	return executeValidate(validateAll, validateVerbose, args)
+}
+
+// executeValidate performs validation with explicit parameters, avoiding reliance on global flag state.
+func executeValidate(all, verbose bool, args []string) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
@@ -54,7 +60,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	var filesToValidate []string
 
-	if validateAll {
+	if all {
 		// Find all YAML files in configs/
 		paths := []string{"configs/examples", "configs"}
 		for _, dir := range paths {
@@ -136,7 +142,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		}
 
 		// Step 4: Show config summary
-		if validateVerbose {
+		if verbose {
 			tier := cfg.GA4.Tier
 			if tier == "" {
 				tier = "standard"
@@ -192,6 +198,34 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	return nil
+}
+
+// handleValidateAction handles the "Validate Configs" menu action in interactive mode.
+func handleValidateAction() {
+	projectPath, err := tui.RunProjectSelector()
+	if err != nil {
+		if err == tui.ErrBackToMenu || err.Error() == "no project selected" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error selecting project: %v\n", err)
+		return
+	}
+
+	var args []string
+	var all bool
+
+	if projectPath == "--all" {
+		all = true
+		fmt.Println("\n✅ Validating all configurations...")
+	} else {
+		args = []string{projectPath}
+		fmt.Printf("\n✅ Validating %s...\n", projectPath)
+	}
+	fmt.Println()
+
+	if err := executeValidate(all, false, args); err != nil {
+		fmt.Fprintf(os.Stderr, "\n❌ Error running validate: %v\n", err)
+	}
 }
 
 // printYAMLError provides helpful error messages for YAML syntax errors

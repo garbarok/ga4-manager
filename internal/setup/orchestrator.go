@@ -190,6 +190,11 @@ func (so *SetupOrchestrator) RunPreflight() error {
 
 // SetupGA4 configures Google Analytics 4
 func (so *SetupOrchestrator) SetupGA4() error {
+	if so.ga4Client == nil {
+		so.logger.Warn("GA4 client is nil, skipping GA4 setup")
+		return nil
+	}
+
 	green := color.New(color.FgGreen).SprintFunc()
 	blue := color.New(color.FgBlue).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
@@ -367,6 +372,11 @@ func (so *SetupOrchestrator) SetupGA4() error {
 
 // SetupGSC configures Google Search Console
 func (so *SetupOrchestrator) SetupGSC() error {
+	if so.gscClient == nil {
+		so.logger.Warn("GSC client is nil, skipping GSC setup")
+		return nil
+	}
+
 	green := color.New(color.FgGreen).SprintFunc()
 	blue := color.New(color.FgBlue).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
