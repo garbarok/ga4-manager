@@ -164,3 +164,78 @@ describe('summarizeIssues', () => {
     expect(s.infos).toBe(0)
   })
 })
+
+// ============================================================================
+// Redirect chain rules
+// ============================================================================
+
+import type { RedirectHop } from '../utils/redirect-trace.js'
+
+describe('runIssueRules — redirect chain', () => {
+  it('no issues when chain is empty', () => {
+    const issues = runIssueRules(baseSignals, finalUrl, [])
+    expect(issues.some((i: SeoIssue) => i.field.startsWith('redirect.'))).toBe(false)
+  })
+
+  it('redirect.chain_too_long: fires when chain length > 3', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://example.com/a', to: 'https://example.com/b', status: 301 },
+      { from: 'https://example.com/b', to: 'https://example.com/c', status: 301 },
+      { from: 'https://example.com/c', to: 'https://example.com/d', status: 301 },
+      { from: 'https://example.com/d', to: 'https://example.com/page', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, finalUrl, chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.chain_too_long' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('redirect.chain_too_long: does NOT fire for chain of exactly 3', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://example.com/a', to: 'https://example.com/b', status: 301 },
+      { from: 'https://example.com/b', to: 'https://example.com/c', status: 301 },
+      { from: 'https://example.com/c', to: 'https://example.com/page', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, finalUrl, chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.chain_too_long')).toBe(false)
+  })
+
+  it('redirect.non_permanent: fires when chain contains a 302', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://example.com/a', to: 'https://example.com/page', status: 302 },
+    ]
+    const issues = runIssueRules(baseSignals, finalUrl, chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.non_permanent' && i.severity === 'info')).toBe(true)
+  })
+
+  it('redirect.non_permanent: does NOT fire for 301-only chain', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://example.com/a', to: 'https://example.com/page', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, finalUrl, chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.non_permanent')).toBe(false)
+  })
+
+  it('redirect.cross_domain: fires when eTLD+1 differs between start and final URL', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://old-site.com/', to: 'https://example.com/page', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, 'https://example.com/page', chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.cross_domain' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('redirect.cross_domain: does NOT fire for same eTLD+1 (different subdomain)', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://www.example.com/', to: 'https://example.com/page', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, 'https://example.com/page', chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.cross_domain')).toBe(false)
+  })
+
+  it('redirect.loop: fires when same URL appears twice in chain', () => {
+    const chain: RedirectHop[] = [
+      { from: 'https://example.com/a', to: 'https://example.com/b', status: 301 },
+      { from: 'https://example.com/a', to: 'https://example.com/c', status: 301 },
+    ]
+    const issues = runIssueRules(baseSignals, finalUrl, chain)
+    expect(issues.some((i: SeoIssue) => i.field === 'redirect.loop' && i.severity === 'error')).toBe(true)
+  })
+})
