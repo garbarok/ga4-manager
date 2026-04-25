@@ -283,24 +283,17 @@ func (so *SetupOrchestrator) SetupGA4() error {
 	skippedCount = 0
 
 	for _, dim := range so.config.Dimensions {
-		if dimensionMap[dim.Parameter] {
+		if dimensionMap[dim.ParameterName] {
 			fmt.Printf("  %s %s %s\n", yellow("○"), dim.DisplayName, blue("(already exists, skipping)"))
 			skippedCount++
 			continue
 		}
 
 		if so.dryRun {
-			fmt.Printf("  %s %s (param: %s, scope: %s)\n", blue("○"), dim.DisplayName, dim.Parameter, dim.Scope)
+			fmt.Printf("  %s %s (param: %s, scope: %s)\n", blue("○"), dim.DisplayName, dim.ParameterName, dim.Scope)
 			createdCount++
 		} else {
-			customDim := config.CustomDimension{
-				ParameterName: dim.Parameter,
-				DisplayName:   dim.DisplayName,
-				Description:   dim.Description,
-				Scope:         dim.Scope,
-			}
-
-			err := so.ga4Client.CreateDimension(propertyID, customDim)
+			err := so.ga4Client.CreateDimension(propertyID, dim)
 			if err != nil {
 				fmt.Printf("  %s %s: %s\n", red("✗"), dim.DisplayName, err)
 				return fmt.Errorf("create dimension %s: %w", dim.DisplayName, err)
@@ -324,7 +317,7 @@ func (so *SetupOrchestrator) SetupGA4() error {
 	skippedCount = 0
 
 	for _, metric := range so.config.Metrics {
-		if metricMap[metric.Parameter] {
+		if metricMap[metric.ParameterName] {
 			fmt.Printf("  %s %s %s\n", yellow("○"), metric.DisplayName, blue("(already exists, skipping)"))
 			skippedCount++
 			continue
@@ -332,18 +325,10 @@ func (so *SetupOrchestrator) SetupGA4() error {
 
 		if so.dryRun {
 			fmt.Printf("  %s %s (param: %s, scope: %s, unit: %s)\n",
-				blue("○"), metric.DisplayName, metric.Parameter, metric.Scope, metric.Unit)
+				blue("○"), metric.DisplayName, metric.ParameterName, metric.Scope, metric.MeasurementUnit)
 			createdCount++
 		} else {
-			customMetric := config.CustomMetric{
-				EventParameter:  metric.Parameter,
-				DisplayName:     metric.DisplayName,
-				Description:     metric.Description,
-				MeasurementUnit: metric.Unit,
-				Scope:           metric.Scope,
-			}
-
-			err := so.ga4Client.CreateCustomMetric(propertyID, customMetric)
+			err := so.ga4Client.CreateCustomMetric(propertyID, metric)
 			if err != nil {
 				fmt.Printf("  %s %s: %s\n", red("✗"), metric.DisplayName, err)
 				return fmt.Errorf("create metric %s: %w", metric.DisplayName, err)

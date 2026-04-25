@@ -10,12 +10,12 @@ import (
 )
 
 // CreateCustomMetric creates a custom metric in GA4
-func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetric) error {
+func (c *Client) CreateCustomMetric(propertyID string, metric config.MetricConfig) error {
 	// Validate inputs
-	if err := validation.ValidateMetricParams(propertyID, metric.EventParameter, metric.DisplayName, metric.MeasurementUnit, metric.Scope); err != nil {
+	if err := validation.ValidateMetricParams(propertyID, metric.ParameterName, metric.DisplayName, metric.MeasurementUnit, metric.Scope); err != nil {
 		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
-			slog.String("parameter_name", metric.EventParameter),
+			slog.String("parameter_name", metric.ParameterName),
 			slog.String("display_name", metric.DisplayName),
 			slog.String("measurement_unit", metric.MeasurementUnit),
 			slog.String("scope", metric.Scope),
@@ -31,28 +31,18 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetri
 
 	c.logger.Debug("creating custom metric",
 		slog.String("property_id", propertyID),
-		slog.String("parameter_name", metric.EventParameter),
+		slog.String("parameter_name", metric.ParameterName),
 		slog.String("display_name", metric.DisplayName),
 		slog.String("scope", metric.Scope),
 	)
 
-	// Create the custom metric request
-	customMetric := &analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric{
-		DisplayName:          metric.DisplayName,
-		Description:          metric.Description,
-		MeasurementUnit:      metric.MeasurementUnit,
-		Scope:                metric.Scope,
-		ParameterName:        metric.EventParameter,
-		RestrictedMetricType: []string{}, // Empty for non-restricted metrics
-	}
-
 	property := fmt.Sprintf("properties/%s", propertyID)
-	_, err := c.admin.Properties.CustomMetrics.Create(property, customMetric).Context(c.ctx).Do()
+	_, err := c.admin.Properties.CustomMetrics.Create(property, metricToSDK(metric)).Context(c.ctx).Do()
 	if err != nil {
 		if isAlreadyExistsError(err) {
 			c.logger.Debug("custom metric already exists",
 				slog.String("display_name", metric.DisplayName),
-				slog.String("parameter_name", metric.EventParameter),
+				slog.String("parameter_name", metric.ParameterName),
 			)
 			return nil // Already exists, not an error
 		}
@@ -65,12 +55,23 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.CustomMetri
 	}
 
 	c.logger.Info("custom metric created successfully",
-		slog.String("parameter_name", metric.EventParameter),
+		slog.String("parameter_name", metric.ParameterName),
 		slog.String("display_name", metric.DisplayName),
 		slog.String("property_id", propertyID),
 	)
 
 	return nil
+}
+
+func metricToSDK(metric config.MetricConfig) *analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric {
+	return &analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric{
+		DisplayName:          metric.DisplayName,
+		Description:          metric.Description,
+		MeasurementUnit:      metric.MeasurementUnit,
+		Scope:                metric.Scope,
+		ParameterName:        metric.ParameterName,
+		RestrictedMetricType: []string{},
+	}
 }
 
 // ListCustomMetrics returns all custom metrics for a property
@@ -112,9 +113,9 @@ func (c *Client) ListCustomMetrics(propertyID string) ([]*analyticsadmin.GoogleA
 }
 
 // SetupCustomMetrics creates all custom metrics for a project
-func (c *Client) SetupCustomMetrics(project config.Project) error {
-	for _, metric := range project.Metrics {
-		if err := c.CreateCustomMetric(project.PropertyID, metric); err != nil {
+func (c *Client) SetupCustomMetrics(propertyID string, metrics []config.MetricConfig) error {
+	for _, metric := range metrics {
+		if err := c.CreateCustomMetric(propertyID, metric); err != nil {
 			return fmt.Errorf("failed to setup metric %s: %w", metric.DisplayName, err)
 		}
 	}
@@ -122,7 +123,7 @@ func (c *Client) SetupCustomMetrics(project config.Project) error {
 }
 
 // UpdateCustomMetric updates an existing custom metric
-func (c *Client) UpdateCustomMetric(metricName string, metric config.CustomMetric) error {
+func (c *Client) UpdateCustomMetric(metricName string, metric config.MetricConfig) error {
 	// Wait for rate limit
 	if err := c.waitForRateLimit(c.ctx, "UpdateCustomMetric"); err != nil {
 		return err

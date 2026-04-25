@@ -91,17 +91,18 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 	}
 
 	// Process each project
-	for _, project := range projects {
-		fmt.Printf("\n📦 %s: %s (Property: %s)\n", cyan("Project"), project.Name, project.PropertyID)
+	for _, cfg := range projects {
+		propertyID := cfg.GetPropertyID()
+		fmt.Printf("\n📦 %s: %s (Property: %s)\n", cyan("Project"), cfg.Project.Name, propertyID)
 		fmt.Println("───────────────────────────────────────────────")
 
-		if project.Cleanup.Reason != "" {
-			fmt.Printf("%s %s\n\n", blue("ℹ️"), project.Cleanup.Reason)
+		if cfg.Cleanup.Reason != "" {
+			fmt.Printf("%s %s\n\n", blue("ℹ️"), cfg.Cleanup.Reason)
 		}
 
-		hasConversions := len(project.Cleanup.ConversionsToRemove) > 0 && (cType == "conversions" || cType == "all")
-		hasDimensions := len(project.Cleanup.DimensionsToRemove) > 0 && (cType == "dimensions" || cType == "all")
-		hasMetrics := len(project.Cleanup.MetricsToRemove) > 0 && (cType == "metrics" || cType == "all")
+		hasConversions := len(cfg.Cleanup.ConversionsToRemove) > 0 && (cType == "conversions" || cType == "all")
+		hasDimensions := len(cfg.Cleanup.DimensionsToRemove) > 0 && (cType == "dimensions" || cType == "all")
+		hasMetrics := len(cfg.Cleanup.MetricsToRemove) > 0 && (cType == "metrics" || cType == "all")
 		hasItems := hasConversions || hasDimensions || hasMetrics
 
 		if !hasItems {
@@ -117,7 +118,7 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 			table.SetAutoWrapText(false)
 			table.SetAlignment(tablewriter.ALIGN_LEFT)
 
-			for _, eventName := range project.Cleanup.ConversionsToRemove {
+			for _, eventName := range cfg.Cleanup.ConversionsToRemove {
 				table.Append([]string{eventName, "Will be deleted"})
 			}
 			table.Render()
@@ -130,7 +131,7 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 			table.SetAutoWrapText(false)
 			table.SetAlignment(tablewriter.ALIGN_LEFT)
 
-			for _, paramName := range project.Cleanup.DimensionsToRemove {
+			for _, paramName := range cfg.Cleanup.DimensionsToRemove {
 				table.Append([]string{paramName, "Will be archived"})
 			}
 			table.Render()
@@ -143,7 +144,7 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 			table.SetAutoWrapText(false)
 			table.SetAlignment(tablewriter.ALIGN_LEFT)
 
-			for _, paramName := range project.Cleanup.MetricsToRemove {
+			for _, paramName := range cfg.Cleanup.MetricsToRemove {
 				table.Append([]string{paramName, "Will be archived"})
 			}
 			table.Render()
@@ -163,8 +164,8 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 		fmt.Println()
 		if hasConversions {
 			fmt.Printf("%s Removing conversion events...\n", red("🗑"))
-			for _, eventName := range project.Cleanup.ConversionsToRemove {
-				err := client.DeleteConversion(project.PropertyID, eventName)
+			for _, eventName := range cfg.Cleanup.ConversionsToRemove {
+				err := client.DeleteConversion(propertyID, eventName)
 				if err != nil {
 					if strings.Contains(err.Error(), "not found") {
 						fmt.Printf("  %s %s (already removed)\n", yellow("○"), eventName)
@@ -179,8 +180,8 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 
 		if hasDimensions {
 			fmt.Printf("\n%s Archiving custom dimensions...\n", red("🗑"))
-			for _, paramName := range project.Cleanup.DimensionsToRemove {
-				err := client.DeleteDimension(project.PropertyID, paramName)
+			for _, paramName := range cfg.Cleanup.DimensionsToRemove {
+				err := client.DeleteDimension(propertyID, paramName)
 				if err != nil {
 					if strings.Contains(err.Error(), "not found") {
 						fmt.Printf("  %s %s (already archived)\n", yellow("○"), paramName)
@@ -195,8 +196,8 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 
 		if hasMetrics {
 			fmt.Printf("\n%s Archiving custom metrics...\n", red("🗑"))
-			for _, paramName := range project.Cleanup.MetricsToRemove {
-				err := client.DeleteMetric(project.PropertyID, paramName)
+			for _, paramName := range cfg.Cleanup.MetricsToRemove {
+				err := client.DeleteMetric(propertyID, paramName)
 				if err != nil {
 					if strings.Contains(err.Error(), "not found") {
 						fmt.Printf("  %s %s (already archived)\n", yellow("○"), paramName)

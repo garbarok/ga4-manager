@@ -9,7 +9,7 @@ import (
 	admin "google.golang.org/api/analyticsadmin/v1alpha"
 )
 
-func (c *Client) CreateDimension(propertyID string, dim config.CustomDimension) error {
+func (c *Client) CreateDimension(propertyID string, dim config.DimensionConfig) error {
 	// Validate inputs
 	if err := validation.ValidateDimensionParams(propertyID, dim.ParameterName, dim.DisplayName, dim.Scope); err != nil {
 		c.logger.Error("validation failed",
@@ -36,14 +36,7 @@ func (c *Client) CreateDimension(propertyID string, dim config.CustomDimension) 
 		slog.String("scope", dim.Scope),
 	)
 
-	dimension := &admin.GoogleAnalyticsAdminV1alphaCustomDimension{
-		ParameterName: dim.ParameterName,
-		DisplayName:   dim.DisplayName,
-		Description:   dim.Description,
-		Scope:         dim.Scope,
-	}
-
-	_, err := c.admin.Properties.CustomDimensions.Create(parent, dimension).Context(c.ctx).Do()
+	_, err := c.admin.Properties.CustomDimensions.Create(parent, dimToSDK(dim)).Context(c.ctx).Do()
 	if err != nil {
 		if isAlreadyExistsError(err) {
 			c.logger.Debug("dimension already exists",
@@ -68,9 +61,18 @@ func (c *Client) CreateDimension(propertyID string, dim config.CustomDimension) 
 	return nil
 }
 
-func (c *Client) SetupDimensions(project config.Project) error {
-	for _, dim := range project.Dimensions {
-		if err := c.CreateDimension(project.PropertyID, dim); err != nil {
+func dimToSDK(dim config.DimensionConfig) *admin.GoogleAnalyticsAdminV1alphaCustomDimension {
+	return &admin.GoogleAnalyticsAdminV1alphaCustomDimension{
+		ParameterName: dim.ParameterName,
+		DisplayName:   dim.DisplayName,
+		Description:   dim.Description,
+		Scope:         dim.Scope,
+	}
+}
+
+func (c *Client) SetupDimensions(propertyID string, dims []config.DimensionConfig) error {
+	for _, dim := range dims {
+		if err := c.CreateDimension(propertyID, dim); err != nil {
 			return err
 		}
 	}

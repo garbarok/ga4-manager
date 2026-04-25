@@ -32,7 +32,7 @@ type ProjectConfig struct {
 	Audiences []AudienceConfig `yaml:"audiences,omitempty"`
 
 	// Cleanup configuration (GA4)
-	Cleanup CleanupYAMLConfig `yaml:"cleanup,omitempty"`
+	Cleanup CleanupConfig `yaml:"cleanup,omitempty"`
 
 	// Data retention settings (GA4)
 	DataRetention *DataRetentionConfig `yaml:"data_retention,omitempty"`
@@ -172,21 +172,21 @@ type ConversionConfig struct {
 
 // DimensionConfig defines a custom dimension
 type DimensionConfig struct {
-	Parameter   string `yaml:"parameter"`
-	DisplayName string `yaml:"display_name"`
-	Description string `yaml:"description,omitempty"`
-	Scope       string `yaml:"scope"`              // USER or EVENT
-	Priority    string `yaml:"priority,omitempty"` // high, medium, low (for tier limits)
+	ParameterName string `yaml:"parameter"`
+	DisplayName   string `yaml:"display_name"`
+	Description   string `yaml:"description,omitempty"`
+	Scope         string `yaml:"scope"`              // USER or EVENT
+	Priority      string `yaml:"priority,omitempty"` // high, medium, low (for tier limits)
 }
 
 // MetricConfig defines a custom metric
 type MetricConfig struct {
-	Parameter   string `yaml:"parameter"`
-	DisplayName string `yaml:"display_name"`
-	Description string `yaml:"description,omitempty"`
-	Unit        string `yaml:"unit"`               // STANDARD, CURRENCY, DISTANCE, etc.
-	Scope       string `yaml:"scope"`              // EVENT
-	Priority    string `yaml:"priority,omitempty"` // high, medium, low (for tier limits)
+	ParameterName   string `yaml:"parameter"`
+	DisplayName     string `yaml:"display_name"`
+	Description     string `yaml:"description,omitempty"`
+	MeasurementUnit string `yaml:"unit"`               // STANDARD, CURRENCY, DISTANCE, etc.
+	Scope           string `yaml:"scope"`              // EVENT
+	Priority        string `yaml:"priority,omitempty"` // high, medium, low (for tier limits)
 }
 
 // CalculatedMetricConfig defines a calculated metric
@@ -205,9 +205,8 @@ type AudienceConfig struct {
 	Conditions  []string `yaml:"conditions,omitempty"`
 }
 
-// CleanupYAMLConfig defines items to remove from GA4 (YAML version)
-// This is separate from CleanupConfig in projects.go to avoid redeclaration
-type CleanupYAMLConfig struct {
+// CleanupConfig defines items to remove from GA4
+type CleanupConfig struct {
 	ConversionsToRemove []string `yaml:"conversions_to_remove,omitempty"`
 	DimensionsToRemove  []string `yaml:"dimensions_to_remove,omitempty"`
 	MetricsToRemove     []string `yaml:"metrics_to_remove,omitempty"`
@@ -232,59 +231,3 @@ type EnhancedMeasurementConfig struct {
 	FormInteractions bool `yaml:"form_interactions"`
 }
 
-// ConvertToLegacyProject converts the new config format to the legacy Project struct
-// This maintains backward compatibility with existing code
-func (pc *ProjectConfig) ConvertToLegacyProject() Project {
-	// Convert conversions
-	conversions := make([]Conversion, len(pc.Conversions))
-	for i, c := range pc.Conversions {
-		conversions[i] = Conversion{
-			Name:           c.Name,
-			CountingMethod: c.CountingMethod,
-		}
-	}
-
-	// Convert dimensions
-	dimensions := make([]CustomDimension, len(pc.Dimensions))
-	for i, d := range pc.Dimensions {
-		dimensions[i] = CustomDimension{
-			ParameterName: d.Parameter,
-			DisplayName:   d.DisplayName,
-			Description:   d.Description,
-			Scope:         d.Scope,
-		}
-	}
-
-	// Convert metrics
-	metrics := make([]CustomMetric, len(pc.Metrics))
-	for i, m := range pc.Metrics {
-		metrics[i] = CustomMetric{
-			EventParameter:  m.Parameter,
-			DisplayName:     m.DisplayName,
-			Description:     m.Description,
-			MeasurementUnit: m.Unit,
-			Scope:           m.Scope,
-		}
-	}
-
-	// Convert audiences
-	audiences := make([]Audience, len(pc.Audiences))
-	for i, a := range pc.Audiences {
-		audiences[i] = Audience(a)
-	}
-
-	return Project{
-		Name:        pc.Project.Name,
-		PropertyID:  pc.GetPropertyID(), // Use helper to get from Analytics or GA4
-		Conversions: conversions,
-		Dimensions:  dimensions,
-		Metrics:     metrics,
-		Audiences:   audiences,
-		Cleanup: CleanupConfig{
-			ConversionsToRemove: pc.Cleanup.ConversionsToRemove,
-			DimensionsToRemove:  pc.Cleanup.DimensionsToRemove,
-			MetricsToRemove:     pc.Cleanup.MetricsToRemove,
-			Reason:              pc.Cleanup.Reason,
-		},
-	}
-}

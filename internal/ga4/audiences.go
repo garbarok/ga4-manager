@@ -9,8 +9,14 @@ import (
 	"github.com/garbarok/ga4-manager/internal/config"
 )
 
+// SetupAudiences is a no-op: the GA4 Admin API does not support creating audiences
+// programmatically. Use GenerateAudienceGuide to produce step-by-step setup docs.
+func (c *Client) SetupAudiences(_ string, _ []config.AudienceConfig) error {
+	return nil
+}
+
 // GenerateAudienceGuide generates detailed documentation for creating audiences manually in GA4 UI
-func (c *Client) GenerateAudienceGuide(project config.Project, outputPath string) error {
+func (c *Client) GenerateAudienceGuide(cfg *config.ProjectConfig, outputPath string) error {
 	// Get audiences from project configuration
 	// Note: Audiences should be defined in the YAML config file
 	var audiences []config.EnhancedAudience
@@ -22,8 +28,8 @@ func (c *Client) GenerateAudienceGuide(project config.Project, outputPath string
 	}
 
 	// Generate main documentation file
-	mainDocPath := filepath.Join(outputPath, fmt.Sprintf("%s-audiences-guide.md", strings.ToLower(strings.ReplaceAll(project.Name, " ", "-"))))
-	if err := c.generateMainDoc(project, audiences, mainDocPath); err != nil {
+	mainDocPath := filepath.Join(outputPath, fmt.Sprintf("%s-audiences-guide.md", strings.ToLower(strings.ReplaceAll(cfg.Project.Name, " ", "-"))))
+	if err := c.generateMainDoc(cfg, audiences, mainDocPath); err != nil {
 		return err
 	}
 
@@ -35,7 +41,7 @@ func (c *Client) GenerateAudienceGuide(project config.Project, outputPath string
 
 	for _, audience := range audiences {
 		audiencePath := filepath.Join(audiencesDir, fmt.Sprintf("%s.md", strings.ToLower(strings.ReplaceAll(audience.Name, " ", "-"))))
-		if err := c.generateAudienceDoc(audience, project, audiencePath); err != nil {
+		if err := c.generateAudienceDoc(audience, cfg, audiencePath); err != nil {
 			return err
 		}
 	}
@@ -43,10 +49,10 @@ func (c *Client) GenerateAudienceGuide(project config.Project, outputPath string
 	return nil
 }
 
-func (c *Client) generateMainDoc(project config.Project, audiences []config.EnhancedAudience, outputPath string) error {
+func (c *Client) generateMainDoc(cfg *config.ProjectConfig, audiences []config.EnhancedAudience, outputPath string) error {
 	var doc strings.Builder
 
-	doc.WriteString(fmt.Sprintf("# Audience Configuration Guide: %s\n\n", project.Name))
+	doc.WriteString(fmt.Sprintf("# Audience Configuration Guide: %s\n\n", cfg.Project.Name))
 	doc.WriteString("**Important Note:** Google Analytics 4 Admin API does not currently support creating audiences programmatically due to the complexity of filter logic. This guide provides step-by-step instructions for manually creating audiences in the GA4 interface.\n\n")
 	doc.WriteString("---\n\n")
 
@@ -126,11 +132,11 @@ func (c *Client) generateMainDoc(project config.Project, audiences []config.Enha
 	return os.WriteFile(outputPath, []byte(doc.String()), 0644)
 }
 
-func (c *Client) generateAudienceDoc(audience config.EnhancedAudience, project config.Project, outputPath string) error {
+func (c *Client) generateAudienceDoc(audience config.EnhancedAudience, cfg *config.ProjectConfig, outputPath string) error {
 	var doc strings.Builder
 
 	doc.WriteString(fmt.Sprintf("# %s\n\n", audience.Name))
-	doc.WriteString(fmt.Sprintf("**Project:** %s\n", project.Name))
+	doc.WriteString(fmt.Sprintf("**Project:** %s\n", cfg.Project.Name))
 	doc.WriteString(fmt.Sprintf("**Category:** %s\n", audience.Category))
 	doc.WriteString(fmt.Sprintf("**Description:** %s\n\n", audience.Description))
 
@@ -206,7 +212,7 @@ func (c *Client) generateAudienceDoc(audience config.EnhancedAudience, project c
 	doc.WriteString("4. Test in a small campaign before full deployment\n\n")
 
 	doc.WriteString("## Related Audiences\n\n")
-	doc.WriteString(c.generateRelatedAudiences(audience, project))
+	doc.WriteString(c.generateRelatedAudiences(audience, cfg))
 	doc.WriteString("\n")
 
 	return os.WriteFile(outputPath, []byte(doc.String()), 0644)
@@ -263,7 +269,7 @@ func (c *Client) generateUseCases(audience config.EnhancedAudience) string {
 	return cases.String()
 }
 
-func (c *Client) generateRelatedAudiences(audience config.EnhancedAudience, project config.Project) string {
+func (c *Client) generateRelatedAudiences(audience config.EnhancedAudience, cfg *config.ProjectConfig) string {
 	var related strings.Builder
 
 	related.WriteString(fmt.Sprintf("Other audiences in the **%s** category:\n\n", audience.Category))
@@ -334,7 +340,7 @@ func (c *Client) ValidateAudienceDefinition(audience config.EnhancedAudience) []
 }
 
 // ListAudiencesByCategory returns audiences grouped by category
-func ListAudiencesByCategory(project config.Project) map[string][]config.EnhancedAudience {
+func ListAudiencesByCategory(cfg *config.ProjectConfig) map[string][]config.EnhancedAudience {
 	// TODO(#16): Audience configuration YAML support
 	var audiences []config.EnhancedAudience
 
@@ -347,7 +353,7 @@ func ListAudiencesByCategory(project config.Project) map[string][]config.Enhance
 }
 
 // GetAudienceSummary returns a summary of all audiences
-func GetAudienceSummary(project config.Project) string {
+func GetAudienceSummary(cfg *config.ProjectConfig) string {
 	// TODO(#16): Audience configuration YAML support
 	var audiences []config.EnhancedAudience
 

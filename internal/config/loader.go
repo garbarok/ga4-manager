@@ -115,7 +115,7 @@ func validateConfig(config *ProjectConfig) error {
 
 	// Validate dimensions
 	for i, dim := range config.Dimensions {
-		if dim.Parameter == "" {
+		if dim.ParameterName == "" {
 			return fmt.Errorf("dimensions[%d].parameter is required", i)
 		}
 		if dim.DisplayName == "" {
@@ -125,14 +125,14 @@ func validateConfig(config *ProjectConfig) error {
 			return fmt.Errorf("dimensions[%d].scope must be USER or EVENT", i)
 		}
 		// Check for reserved parameters
-		if IsReservedParameter(dim.Parameter) {
-			return fmt.Errorf("dimensions[%d].parameter '%s' is reserved by GA4 and cannot be used", i, dim.Parameter)
+		if IsReservedParameter(dim.ParameterName) {
+			return fmt.Errorf("dimensions[%d].parameter '%s' is reserved by GA4 and cannot be used", i, dim.ParameterName)
 		}
 	}
 
 	// Validate metrics
 	for i, metric := range config.Metrics {
-		if metric.Parameter == "" {
+		if metric.ParameterName == "" {
 			return fmt.Errorf("metrics[%d].parameter is required", i)
 		}
 		if metric.DisplayName == "" {
@@ -225,14 +225,3 @@ func validateSearchConsoleConfig(sc *SearchConsoleConfig) error {
 	return nil
 }
 
-// GetLegacyProject returns a legacy Project struct for backward compatibility
-// This allows existing commands to work with the new config format
-func GetLegacyProject(name string) (Project, error) {
-	// Load from config file
-	config, err := LoadConfigByName(name)
-	if err != nil {
-		return Project{}, fmt.Errorf("config file not found: %s (use --config to specify a YAML config file)", name)
-	}
-
-	return config.ConvertToLegacyProject(), nil
-}

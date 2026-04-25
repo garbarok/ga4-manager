@@ -64,17 +64,16 @@ func runLink(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w (use --project to specify a config file name)", err)
 	}
-	project := cfg.ConvertToLegacyProject()
 
-	fmt.Printf("📦 Project: %s (Property: %s)\n", project.Name, project.PropertyID)
+	fmt.Printf("📦 Project: %s (Property: %s)\n", cfg.Project.Name, cfg.GetPropertyID())
 	fmt.Println("───────────────────────────────────────────────")
 
 	if listLinks {
-		return listExistingLinks(client, project)
+		return listExistingLinks(client, cfg)
 	}
 
 	if unlinkService != "" {
-		return unlinkExternalService(client, project, unlinkService)
+		return unlinkExternalService(client, cfg, unlinkService)
 	}
 
 	if linkService == "" {
@@ -83,11 +82,11 @@ func runLink(cmd *cobra.Command, args []string) error {
 
 	switch linkService {
 	case "search-console", "gsc":
-		return linkSearchConsole(client, project)
+		return linkSearchConsole(client, cfg)
 	case "bigquery", "bq":
-		return linkBigQuery(client, project)
+		return linkBigQuery(client, cfg)
 	case "channels":
-		return setupChannelGroups(client, project)
+		return setupChannelGroups(client, cfg)
 	default:
 		return fmt.Errorf("unknown service: %s", linkService)
 	}
@@ -117,7 +116,6 @@ func handleLinkAction() {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		return
 	}
-	project := cfg.ConvertToLegacyProject()
 
 	// Create GA4 client
 	client, err := ga4.NewClient()
@@ -127,12 +125,12 @@ func handleLinkAction() {
 	}
 
 	// Show link management submenu
-	showLinkManagementMenu(client, project)
+	showLinkManagementMenu(client, cfg)
 }
 
 // showLinkManagementMenu displays and handles the link management submenu.
-func showLinkManagementMenu(client *ga4.Client, project config.Project) {
-	fmt.Printf("\n🔗 Link Management - %s (Property: %s)\n", project.Name, project.PropertyID)
+func showLinkManagementMenu(client *ga4.Client, cfg *config.ProjectConfig) {
+	fmt.Printf("\n🔗 Link Management - %s (Property: %s)\n", cfg.Project.Name, cfg.GetPropertyID())
 	fmt.Println(strings.Repeat("━", 50))
 
 	fmt.Println("\n📋 What would you like to do?")
@@ -147,22 +145,22 @@ func showLinkManagementMenu(client *ga4.Client, project config.Project) {
 	var choice string
 	_, _ = fmt.Scanln(&choice)
 
-	routeLinkOperation(client, project, choice)
+	routeLinkOperation(client, cfg, choice)
 }
 
 // routeLinkOperation routes to the selected link operation.
-func routeLinkOperation(client *ga4.Client, project config.Project, choice string) {
+func routeLinkOperation(client *ga4.Client, cfg *config.ProjectConfig, choice string) {
 	switch choice {
 	case "1":
-		handleViewLinks(client, project)
+		handleViewLinks(client, cfg)
 	case "2":
-		handleSetupChannels(client, project)
+		handleSetupChannels(client, cfg)
 	case "3":
-		handleSearchConsoleGuide(client, project)
+		handleSearchConsoleGuide(client, cfg)
 	case "4":
-		handleBigQueryGuide(client, project)
+		handleBigQueryGuide(client, cfg)
 	case "5":
-		handleDeleteChannels(client, project)
+		handleDeleteChannels(client, cfg)
 	case "6", "":
 		return
 	default:
@@ -171,17 +169,17 @@ func routeLinkOperation(client *ga4.Client, project config.Project, choice strin
 }
 
 // handleViewLinks displays existing links and connections.
-func handleViewLinks(client *ga4.Client, project config.Project) {
+func handleViewLinks(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Println()
 	fmt.Println("🔍 Checking existing links...")
 	fmt.Println()
-	if err := listExistingLinks(client, project); err != nil {
+	if err := listExistingLinks(client, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing links: %v\n", err)
 	}
 }
 
 // handleSetupChannels sets up default channel groups.
-func handleSetupChannels(client *ga4.Client, project config.Project) {
+func handleSetupChannels(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Println("\n📡 Setting up default channel groups...")
 	fmt.Println("\nThis will create the following channel groups:")
 
@@ -195,7 +193,7 @@ func handleSetupChannels(client *ga4.Client, project config.Project) {
 		return
 	}
 
-	if err := client.SetupDefaultChannelGroups(project.PropertyID); err != nil {
+	if err := client.SetupDefaultChannelGroups(cfg.GetPropertyID()); err != nil {
 		fmt.Fprintf(os.Stderr, "\n❌ Error setting up channel groups: %v\n", err)
 	} else {
 		fmt.Println("\n✅ Channel groups setup completed!")
@@ -203,7 +201,7 @@ func handleSetupChannels(client *ga4.Client, project config.Project) {
 }
 
 // handleSearchConsoleGuide generates Search Console setup guide.
-func handleSearchConsoleGuide(client *ga4.Client, project config.Project) {
+func handleSearchConsoleGuide(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Print("\n🔗 Enter your website URL (e.g., https://example.com): ")
 	var siteURL string
 	_, _ = fmt.Scanln(&siteURL)
@@ -214,14 +212,14 @@ func handleSearchConsoleGuide(client *ga4.Client, project config.Project) {
 	}
 
 	fmt.Println()
-	guide := client.GenerateSearchConsoleSetupGuide(project.PropertyID, siteURL)
+	guide := client.GenerateSearchConsoleSetupGuide(cfg.GetPropertyID(), siteURL)
 	fmt.Println(guide)
 	fmt.Printf("\nℹ️  The GA4 Admin API does not support programmatic Search Console linking.\n")
 	fmt.Println("Please follow the manual steps above.")
 }
 
 // handleBigQueryGuide generates BigQuery setup guide.
-func handleBigQueryGuide(client *ga4.Client, project config.Project) {
+func handleBigQueryGuide(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Print("\n📊 Enter GCP Project ID: ")
 	var gcpProject string
 	_, _ = fmt.Scanln(&gcpProject)
@@ -231,25 +229,26 @@ func handleBigQueryGuide(client *ga4.Client, project config.Project) {
 		return
 	}
 
-	fmt.Printf("Enter BigQuery Dataset ID (default: analytics_%s): ", project.PropertyID)
+	propertyID := cfg.GetPropertyID()
+	fmt.Printf("Enter BigQuery Dataset ID (default: analytics_%s): ", propertyID)
 	var dataset string
 	_, _ = fmt.Scanln(&dataset)
 
 	if dataset == "" {
-		dataset = fmt.Sprintf("analytics_%s", project.PropertyID)
+		dataset = fmt.Sprintf("analytics_%s", propertyID)
 	}
 
-	bqConfig := ga4.GetDefaultBigQueryConfig(project.PropertyID, gcpProject, dataset)
+	bqConfig := ga4.GetDefaultBigQueryConfig(propertyID, gcpProject, dataset)
 	guide := client.GenerateBigQuerySetupGuide(bqConfig)
 	fmt.Println(guide)
 	fmt.Printf("\nℹ️  BigQuery links must be created manually in the GA4 UI.\n")
 }
 
 // handleDeleteChannels manages channel group deletion.
-func handleDeleteChannels(client *ga4.Client, project config.Project) {
+func handleDeleteChannels(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Println("\n🗑️  Listing custom channel groups...")
 
-	groups, err := client.ListChannelGroups(project.PropertyID)
+	groups, err := client.ListChannelGroups(cfg.GetPropertyID())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing channel groups: %v\n", err)
 		return
@@ -366,7 +365,7 @@ func confirmDangerous(prompt string) bool {
 	return confirm == "yes"
 }
 
-func listExistingLinks(client *ga4.Client, project config.Project) error {
+func listExistingLinks(client *ga4.Client, cfg *config.ProjectConfig) error {
 	green := color.New(color.FgGreen).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
@@ -379,7 +378,7 @@ func listExistingLinks(client *ga4.Client, project config.Project) error {
 
 	// BigQuery
 	fmt.Println("\nBigQuery Export:")
-	bqLinks, err := client.ListBigQueryLinks(project.PropertyID)
+	bqLinks, err := client.ListBigQueryLinks(cfg.GetPropertyID())
 	if err != nil {
 		fmt.Printf("  %s Error: %v\n", color.New(color.FgRed).Sprint("✗"), err)
 	} else if len(bqLinks) == 0 {
@@ -393,7 +392,7 @@ func listExistingLinks(client *ga4.Client, project config.Project) error {
 
 	// Channel Groups
 	fmt.Println("\nChannel Groups:")
-	channelGroups, err := client.ListChannelGroups(project.PropertyID)
+	channelGroups, err := client.ListChannelGroups(cfg.GetPropertyID())
 	if err != nil {
 		fmt.Printf("  %s Error: %v\n", color.New(color.FgRed).Sprint("✗"), err)
 	} else if len(channelGroups) == 0 {
@@ -407,26 +406,27 @@ func listExistingLinks(client *ga4.Client, project config.Project) error {
 	return nil
 }
 
-func linkSearchConsole(client *ga4.Client, project config.Project) error {
+func linkSearchConsole(client *ga4.Client, cfg *config.ProjectConfig) error {
 	if linkURL == "" {
 		return fmt.Errorf("the --url flag is required for the Search Console service")
 	}
 
 	fmt.Printf("\n%s Search Console Link Setup Guide\n", color.New(color.FgCyan).SprintFunc()("🔗"))
-	guide := client.GenerateSearchConsoleSetupGuide(project.PropertyID, linkURL)
+	guide := client.GenerateSearchConsoleSetupGuide(cfg.GetPropertyID(), linkURL)
 	fmt.Println(guide)
 	fmt.Printf("%s The GA4 Admin API does not support programmatic Search Console linking. Please follow the manual steps above.\n", color.New(color.FgYellow).SprintFunc()("ℹ"))
 	return nil
 }
 
-func linkBigQuery(client *ga4.Client, project config.Project) error {
+func linkBigQuery(client *ga4.Client, cfg *config.ProjectConfig) error {
 	if linkGCPProject == "" || linkDataset == "" {
 		return fmt.Errorf("both --gcp-project and --dataset flags are required for BigQuery linking")
 	}
 
 	fmt.Printf("\n%s Linking BigQuery...\n", color.New(color.FgCyan).SprintFunc()("📊"))
 
-	exists, err := client.BigQueryLinkExists(project.PropertyID)
+	propertyID := cfg.GetPropertyID()
+	exists, err := client.BigQueryLinkExists(propertyID)
 	if err != nil {
 		return fmt.Errorf("could not check for existing BigQuery links: %w", err)
 	}
@@ -435,7 +435,7 @@ func linkBigQuery(client *ga4.Client, project config.Project) error {
 		return nil
 	}
 
-	bqCfg := ga4.GetDefaultBigQueryConfig(project.PropertyID, linkGCPProject, linkDataset)
+	bqCfg := ga4.GetDefaultBigQueryConfig(propertyID, linkGCPProject, linkDataset)
 	createdLink, err := client.CreateBigQueryLink(bqCfg)
 	if err != nil {
 		return fmt.Errorf("could not create BigQuery link: %w", err)
@@ -445,10 +445,10 @@ func linkBigQuery(client *ga4.Client, project config.Project) error {
 	return nil
 }
 
-func setupChannelGroups(client *ga4.Client, project config.Project) error {
+func setupChannelGroups(client *ga4.Client, cfg *config.ProjectConfig) error {
 	fmt.Printf("\n%s Setting up default Channel Groups...\n", color.New(color.FgCyan).SprintFunc()("📡"))
 
-	if err := client.SetupDefaultChannelGroups(project.PropertyID); err != nil {
+	if err := client.SetupDefaultChannelGroups(cfg.GetPropertyID()); err != nil {
 		_, _ = color.New(color.FgRed).Printf("✗ An error occurred during channel group setup: %v\n", err)
 		return err
 	}
@@ -458,12 +458,13 @@ func setupChannelGroups(client *ga4.Client, project config.Project) error {
 	return nil
 }
 
-func unlinkExternalService(client *ga4.Client, project config.Project, service string) error {
+func unlinkExternalService(client *ga4.Client, cfg *config.ProjectConfig, service string) error {
 	fmt.Printf("\n%s Unlinking service: %s\n", color.New(color.FgYellow).SprintFunc()("🔓"), service)
 
+	propertyID := cfg.GetPropertyID()
 	switch service {
 	case "bigquery", "bq":
-		links, err := client.ListBigQueryLinks(project.PropertyID)
+		links, err := client.ListBigQueryLinks(propertyID)
 		if err != nil {
 			return fmt.Errorf("could not list BigQuery links to unlink: %w", err)
 		}
@@ -480,7 +481,7 @@ func unlinkExternalService(client *ga4.Client, project config.Project, service s
 		}
 
 	case "channels":
-		groups, err := client.ListChannelGroups(project.PropertyID)
+		groups, err := client.ListChannelGroups(propertyID)
 		if err != nil {
 			return fmt.Errorf("could not list channel groups to unlink: %w", err)
 		}

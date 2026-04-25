@@ -90,36 +90,28 @@ func TestCreateConversion_AlreadyExists(t *testing.T) {
 func TestSetupConversions(t *testing.T) {
 	tests := []struct {
 		name           string
-		project        config.Project
+		conversions    []config.ConversionConfig
 		expectedLength int
 	}{
 		{
 			name: "setup_multiple_conversions",
-			project: config.Project{
-				Name:       "Test Project",
-				PropertyID: "123456789",
-				Conversions: []config.Conversion{
-					{Name: "event1", CountingMethod: "ONCE_PER_SESSION"},
-					{Name: "event2", CountingMethod: "ONCE_PER_EVENT"},
-					{Name: "event3", CountingMethod: "ONCE_PER_SESSION"},
-				},
+			conversions: []config.ConversionConfig{
+				{Name: "event1", CountingMethod: "ONCE_PER_SESSION"},
+				{Name: "event2", CountingMethod: "ONCE_PER_EVENT"},
+				{Name: "event3", CountingMethod: "ONCE_PER_SESSION"},
 			},
 			expectedLength: 3,
 		},
 		{
-			name: "setup_no_conversions",
-			project: config.Project{
-				Name:        "Empty Project",
-				PropertyID:  "987654321",
-				Conversions: []config.Conversion{},
-			},
+			name:           "setup_no_conversions",
+			conversions:    []config.ConversionConfig{},
 			expectedLength: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedLength, len(tt.project.Conversions))
+			assert.Equal(t, tt.expectedLength, len(tt.conversions))
 		})
 	}
 }
@@ -303,7 +295,7 @@ func TestConversionEventNaming(t *testing.T) {
 
 // TestConversionEventRelationships tests relationships between conversion events
 func TestConversionEventRelationships(t *testing.T) {
-	conversionList := []config.Conversion{
+	conversionList := []config.ConversionConfig{
 		{Name: "event1", CountingMethod: "ONCE_PER_SESSION"},
 		{Name: "event2", CountingMethod: "ONCE_PER_EVENT"},
 		{Name: "event3", CountingMethod: "ONCE_PER_SESSION"},
@@ -324,6 +316,40 @@ func TestConversionEventRelationships(t *testing.T) {
 
 	for _, conv := range conversionList {
 		require.True(t, validMethods[conv.CountingMethod], "invalid counting method")
+	}
+}
+
+// TestConversionToSDK asserts every ConversionConfig field reaches the SDK struct.
+// This guards against silent omissions when the config schema grows.
+func TestConversionToSDK(t *testing.T) {
+	tests := []struct {
+		name string
+		conv config.ConversionConfig
+	}{
+		{
+			name: "once_per_session",
+			conv: config.ConversionConfig{
+				Name:           "purchase",
+				CountingMethod: "ONCE_PER_SESSION",
+				Description:    "Purchase conversion",
+			},
+		},
+		{
+			name: "once_per_event",
+			conv: config.ConversionConfig{
+				Name:           "sign_up",
+				CountingMethod: "ONCE_PER_EVENT",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sdk := conversionToSDK(tt.conv)
+
+			assert.Equal(t, tt.conv.Name, sdk.EventName)
+			assert.Equal(t, tt.conv.CountingMethod, sdk.CountingMethod)
+		})
 	}
 }
 

@@ -240,7 +240,7 @@ func (pv *PreflightValidator) ValidateGA4Resources() ValidationResult {
 
 	// Validate dimensions
 	for _, dim := range pv.config.Dimensions {
-		if err := validation.ValidateParameterName(dim.Parameter); err != nil {
+		if err := validation.ValidateParameterName(dim.ParameterName); err != nil {
 			errors = append(errors, fmt.Sprintf("dimension %s parameter: %v", dim.DisplayName, err))
 		}
 		if err := validation.ValidateDisplayName(dim.DisplayName); err != nil {
@@ -253,13 +253,13 @@ func (pv *PreflightValidator) ValidateGA4Resources() ValidationResult {
 
 	// Validate metrics
 	for _, metric := range pv.config.Metrics {
-		if err := validation.ValidateParameterName(metric.Parameter); err != nil {
+		if err := validation.ValidateParameterName(metric.ParameterName); err != nil {
 			errors = append(errors, fmt.Sprintf("metric %s parameter: %v", metric.DisplayName, err))
 		}
 		if err := validation.ValidateDisplayName(metric.DisplayName); err != nil {
 			errors = append(errors, fmt.Sprintf("metric %s display_name: %v", metric.DisplayName, err))
 		}
-		if err := validation.ValidateMeasurementUnit(metric.Unit); err != nil {
+		if err := validation.ValidateMeasurementUnit(metric.MeasurementUnit); err != nil {
 			errors = append(errors, fmt.Sprintf("metric %s unit: %v", metric.DisplayName, err))
 		}
 	}
@@ -449,11 +449,11 @@ func (pv *PreflightValidator) DetectConflicts() ([]ConflictWarning, error) {
 		}
 
 		for _, dim := range pv.config.Dimensions {
-			if dimensionMap[dim.Parameter] {
+			if dimensionMap[dim.ParameterName] {
 				conflicts = append(conflicts, ConflictWarning{
 					ResourceType: "dimension",
 					ResourceName: dim.DisplayName,
-					Message:      fmt.Sprintf("Dimension '%s' (param: %s) already exists", dim.DisplayName, dim.Parameter),
+					Message:      fmt.Sprintf("Dimension '%s' (param: %s) already exists", dim.DisplayName, dim.ParameterName),
 					Action:       "skip",
 				})
 			}
@@ -471,11 +471,11 @@ func (pv *PreflightValidator) DetectConflicts() ([]ConflictWarning, error) {
 		}
 
 		for _, metric := range pv.config.Metrics {
-			if metricMap[metric.Parameter] {
+			if metricMap[metric.ParameterName] {
 				conflicts = append(conflicts, ConflictWarning{
 					ResourceType: "metric",
 					ResourceName: metric.DisplayName,
-					Message:      fmt.Sprintf("Metric '%s' (param: %s) already exists", metric.DisplayName, metric.Parameter),
+					Message:      fmt.Sprintf("Metric '%s' (param: %s) already exists", metric.DisplayName, metric.ParameterName),
 					Action:       "skip",
 				})
 			}

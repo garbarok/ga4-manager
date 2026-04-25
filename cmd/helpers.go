@@ -8,14 +8,14 @@ import (
 
 // loadProjects loads projects based on command flags
 // Supports --config and --project flags
-func loadProjects(configPath, projectName string, loadAll bool) ([]config.Project, error) {
+func loadProjects(configPath, projectName string, loadAll bool) ([]*config.ProjectConfig, error) {
 	// Priority 1: Load from config file path
 	if configPath != "" {
 		cfg, err := config.LoadConfig(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
-		return []config.Project{cfg.ConvertToLegacyProject()}, nil
+		return []*config.ProjectConfig{cfg}, nil
 	}
 
 	// Priority 2: Load all available configs (for --all flag)
@@ -25,13 +25,13 @@ func loadProjects(configPath, projectName string, loadAll bool) ([]config.Projec
 			return nil, fmt.Errorf("no config files found in configs/ or configs/examples/")
 		}
 
-		var projects []config.Project
+		var projects []*config.ProjectConfig
 		for _, name := range availableConfigs {
 			cfg, err := config.LoadConfigByName(name)
 			if err != nil {
 				continue // Skip configs that fail to load
 			}
-			projects = append(projects, cfg.ConvertToLegacyProject())
+			projects = append(projects, cfg)
 		}
 
 		if len(projects) == 0 {
@@ -47,7 +47,7 @@ func loadProjects(configPath, projectName string, loadAll bool) ([]config.Projec
 		if err != nil {
 			return nil, fmt.Errorf("config file not found: %s (use --config to specify a YAML config file)", projectName)
 		}
-		return []config.Project{cfg.ConvertToLegacyProject()}, nil
+		return []*config.ProjectConfig{cfg}, nil
 	}
 
 	return nil, fmt.Errorf("specify --project <name>, --config <path>, or --all")

@@ -21,42 +21,42 @@ func TestCreateCustomMetric_Success(t *testing.T) {
 	tests := []struct {
 		name        string
 		propertyID  string
-		metric      config.CustomMetric
+		metric      config.MetricConfig
 		expectError bool
 	}{
 		{
 			name:       "create_standard_metric",
 			propertyID: "123456789",
-			metric: config.CustomMetric{
+			metric: config.MetricConfig{
 				DisplayName:     "Engagement Rate",
 				Description:     "Percentage of engaged sessions",
 				MeasurementUnit: "STANDARD",
 				Scope:           "EVENT",
-				EventParameter:  "engagement_rate",
+				ParameterName:  "engagement_rate",
 			},
 			expectError: false,
 		},
 		{
 			name:       "create_currency_metric",
 			propertyID: "987654321",
-			metric: config.CustomMetric{
+			metric: config.MetricConfig{
 				DisplayName:     "Session Value",
 				Description:     "Average value per session",
 				MeasurementUnit: "CURRENCY",
 				Scope:           "EVENT",
-				EventParameter:  "session_value",
+				ParameterName:  "session_value",
 			},
 			expectError: false,
 		},
 		{
 			name:       "create_time_metric",
 			propertyID: "123456789",
-			metric: config.CustomMetric{
+			metric: config.MetricConfig{
 				DisplayName:     "Average Session Duration",
 				Description:     "Average time spent in session",
 				MeasurementUnit: "SECONDS",
 				Scope:           "EVENT",
-				EventParameter:  "session_duration",
+				ParameterName:  "session_duration",
 			},
 			expectError: false,
 		},
@@ -86,36 +86,28 @@ func TestCreateCustomMetric_Success(t *testing.T) {
 func TestSetupCustomMetrics(t *testing.T) {
 	tests := []struct {
 		name           string
-		project        config.Project
+		metrics        []config.MetricConfig
 		expectedLength int
 	}{
 		{
 			name: "setup_multiple_metrics",
-			project: config.Project{
-				Name:       "Test Project",
-				PropertyID: "123456789",
-				Metrics: []config.CustomMetric{
-					{DisplayName: "Metric 1", EventParameter: "metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
-					{DisplayName: "Metric 2", EventParameter: "metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
-					{DisplayName: "Metric 3", EventParameter: "metric_3", MeasurementUnit: "SECONDS", Scope: "EVENT"},
-				},
+			metrics: []config.MetricConfig{
+				{DisplayName: "Metric 1", ParameterName: "metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
+				{DisplayName: "Metric 2", ParameterName: "metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
+				{DisplayName: "Metric 3", ParameterName: "metric_3", MeasurementUnit: "SECONDS", Scope: "EVENT"},
 			},
 			expectedLength: 3,
 		},
 		{
-			name: "setup_no_metrics",
-			project: config.Project{
-				Name:       "Empty Project",
-				PropertyID: "987654321",
-				Metrics:    []config.CustomMetric{},
-			},
+			name:           "setup_no_metrics",
+			metrics:        []config.MetricConfig{},
 			expectedLength: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedLength, len(tt.project.Metrics))
+			assert.Equal(t, tt.expectedLength, len(tt.metrics))
 		})
 	}
 }
@@ -169,12 +161,12 @@ func TestUpdateCustomMetric(t *testing.T) {
 	tests := []struct {
 		name       string
 		metricName string
-		metric     config.CustomMetric
+		metric     config.MetricConfig
 	}{
 		{
 			name:       "update_metric_displayname",
 			metricName: "properties/123456789/customMetrics/metric1",
-			metric: config.CustomMetric{
+			metric: config.MetricConfig{
 				DisplayName: "Updated Metric Name",
 				Description: "Updated description",
 			},
@@ -377,17 +369,17 @@ func TestMetricResourceNames(t *testing.T) {
 
 // TestMetricRelationships tests relationships between metrics
 func TestMetricRelationships(t *testing.T) {
-	metricList := []config.CustomMetric{
-		{DisplayName: "Metric 1", EventParameter: "metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
-		{DisplayName: "Metric 2", EventParameter: "metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
-		{DisplayName: "Metric 3", EventParameter: "metric_3", MeasurementUnit: "SECONDS", Scope: "EVENT"},
+	metricList := []config.MetricConfig{
+		{DisplayName: "Metric 1", ParameterName: "metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
+		{DisplayName: "Metric 2", ParameterName: "metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
+		{DisplayName: "Metric 3", ParameterName: "metric_3", MeasurementUnit: "SECONDS", Scope: "EVENT"},
 	}
 
 	// Test no duplicate parameter names
 	seen := make(map[string]bool)
 	for _, metric := range metricList {
-		require.False(t, seen[metric.EventParameter], "duplicate parameter name found")
-		seen[metric.EventParameter] = true
+		require.False(t, seen[metric.ParameterName], "duplicate parameter name found")
+		seen[metric.ParameterName] = true
 	}
 
 	// Test all metrics are EVENT scope
@@ -420,6 +412,48 @@ func TestMetricLimits(t *testing.T) {
 	}
 }
 
+// TestMetricToSDK asserts every MetricConfig field reaches the SDK struct.
+// This guards against silent omissions when the config schema grows.
+func TestMetricToSDK(t *testing.T) {
+	tests := []struct {
+		name   string
+		metric config.MetricConfig
+	}{
+		{
+			name: "all_fields_populated",
+			metric: config.MetricConfig{
+				ParameterName:   "engagement_rate",
+				DisplayName:     "Engagement Rate",
+				Description:     "Percentage of engaged sessions",
+				MeasurementUnit: "STANDARD",
+				Scope:           "EVENT",
+				Priority:        "high",
+			},
+		},
+		{
+			name: "currency_metric_no_description",
+			metric: config.MetricConfig{
+				ParameterName:   "revenue",
+				DisplayName:     "Revenue",
+				MeasurementUnit: "CURRENCY",
+				Scope:           "EVENT",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sdk := metricToSDK(tt.metric)
+
+			assert.Equal(t, tt.metric.ParameterName, sdk.ParameterName)
+			assert.Equal(t, tt.metric.DisplayName, sdk.DisplayName)
+			assert.Equal(t, tt.metric.Description, sdk.Description)
+			assert.Equal(t, tt.metric.MeasurementUnit, sdk.MeasurementUnit)
+			assert.Equal(t, tt.metric.Scope, sdk.Scope)
+		})
+	}
+}
+
 // BenchmarkCreateCustomMetric benchmarks metric creation structure
 func BenchmarkCreateCustomMetric(b *testing.B) {
 	ctx, cancel := NewTestContext()
@@ -428,12 +462,12 @@ func BenchmarkCreateCustomMetric(b *testing.B) {
 	var c *Client
 	var m *admin.GoogleAnalyticsAdminV1alphaCustomMetric
 
-	metric := config.CustomMetric{
+	metric := config.MetricConfig{
 		DisplayName:     "Test Metric",
 		Description:     "Test metric description",
 		MeasurementUnit: "STANDARD",
 		Scope:           "EVENT",
-		EventParameter:  "test_metric",
+		ParameterName:  "test_metric",
 	}
 
 	b.ReportAllocs()
@@ -444,7 +478,7 @@ func BenchmarkCreateCustomMetric(b *testing.B) {
 			Description:          metric.Description,
 			MeasurementUnit:      metric.MeasurementUnit,
 			Scope:                metric.Scope,
-			ParameterName:        metric.EventParameter,
+			ParameterName:        metric.ParameterName,
 			RestrictedMetricType: []string{},
 		}
 	}

@@ -52,7 +52,7 @@ func TestCreateDimension_Success(t *testing.T) {
 				cancel: cancel,
 			}
 
-			dim := config.CustomDimension{
+			dim := config.DimensionConfig{
 				ParameterName: tt.parameterName,
 				DisplayName:   tt.displayName,
 				Scope:         tt.scope,
@@ -78,36 +78,28 @@ func TestCreateDimension_Success(t *testing.T) {
 func TestSetupDimensions(t *testing.T) {
 	tests := []struct {
 		name           string
-		project        config.Project
+		dims           []config.DimensionConfig
 		expectedLength int
 	}{
 		{
 			name: "setup_multiple_dimensions",
-			project: config.Project{
-				Name:       "Test Project",
-				PropertyID: "123456789",
-				Dimensions: []config.CustomDimension{
-					{ParameterName: "dim1", DisplayName: "Dimension 1", Scope: "USER"},
-					{ParameterName: "dim2", DisplayName: "Dimension 2", Scope: "EVENT"},
-					{ParameterName: "dim3", DisplayName: "Dimension 3", Scope: "USER"},
-				},
+			dims: []config.DimensionConfig{
+				{ParameterName: "dim1", DisplayName: "Dimension 1", Scope: "USER"},
+				{ParameterName: "dim2", DisplayName: "Dimension 2", Scope: "EVENT"},
+				{ParameterName: "dim3", DisplayName: "Dimension 3", Scope: "USER"},
 			},
 			expectedLength: 3,
 		},
 		{
-			name: "setup_no_dimensions",
-			project: config.Project{
-				Name:       "Empty Project",
-				PropertyID: "987654321",
-				Dimensions: []config.CustomDimension{},
-			},
+			name:           "setup_no_dimensions",
+			dims:           []config.DimensionConfig{},
 			expectedLength: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedLength, len(tt.project.Dimensions))
+			assert.Equal(t, tt.expectedLength, len(tt.dims))
 		})
 	}
 }
@@ -311,7 +303,7 @@ func TestDimensionResourceNames(t *testing.T) {
 
 // TestDimensionRelationships tests relationships between dimensions
 func TestDimensionRelationships(t *testing.T) {
-	dimensionList := []config.CustomDimension{
+	dimensionList := []config.DimensionConfig{
 		{ParameterName: "dim1", DisplayName: "Dimension 1", Scope: "USER"},
 		{ParameterName: "dim2", DisplayName: "Dimension 2", Scope: "EVENT"},
 		{ParameterName: "dim3", DisplayName: "Dimension 3", Scope: "USER"},
@@ -340,6 +332,45 @@ func TestDimensionRelationships(t *testing.T) {
 	assert.Equal(t, 1, eventCount)
 }
 
+// TestDimToSDK asserts every DimensionConfig field reaches the SDK struct.
+// This guards against silent omissions when the config schema grows.
+func TestDimToSDK(t *testing.T) {
+	tests := []struct {
+		name string
+		dim  config.DimensionConfig
+	}{
+		{
+			name: "all_fields_populated",
+			dim: config.DimensionConfig{
+				ParameterName: "user_type",
+				DisplayName:   "User Type",
+				Description:   "The type of user",
+				Scope:         "USER",
+				Priority:      "high",
+			},
+		},
+		{
+			name: "event_scope_no_description",
+			dim: config.DimensionConfig{
+				ParameterName: "file_format",
+				DisplayName:   "File Format",
+				Scope:         "EVENT",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sdk := dimToSDK(tt.dim)
+
+			assert.Equal(t, tt.dim.ParameterName, sdk.ParameterName)
+			assert.Equal(t, tt.dim.DisplayName, sdk.DisplayName)
+			assert.Equal(t, tt.dim.Description, sdk.Description)
+			assert.Equal(t, tt.dim.Scope, sdk.Scope)
+		})
+	}
+}
+
 // BenchmarkCreateDimension benchmarks dimension creation structure
 func BenchmarkCreateDimension(b *testing.B) {
 	ctx, cancel := NewTestContext()
@@ -348,7 +379,7 @@ func BenchmarkCreateDimension(b *testing.B) {
 	var c *Client
 	var d *admin.GoogleAnalyticsAdminV1alphaCustomDimension
 
-	dim := config.CustomDimension{
+	dim := config.DimensionConfig{
 		ParameterName: "test_param",
 		DisplayName:   "Test Parameter",
 		Scope:         "USER",

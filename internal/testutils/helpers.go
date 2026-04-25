@@ -7,36 +7,40 @@ import (
 )
 
 // NewTestProject creates a test project configuration
-func NewTestProject(name string, propertyID string) config.Project {
-	return config.Project{
-		Name:       name,
-		PropertyID: propertyID,
-		Conversions: []config.Conversion{
+func NewTestProject(name string, propertyID string) *config.ProjectConfig {
+	return &config.ProjectConfig{
+		Project: config.ProjectInfo{
+			Name: name,
+		},
+		GA4: config.GA4Config{
+			PropertyID: propertyID,
+		},
+		Conversions: []config.ConversionConfig{
 			{Name: "test_conversion_1", CountingMethod: "ONCE_PER_SESSION"},
 			{Name: "test_conversion_2", CountingMethod: "ONCE_PER_EVENT"},
 		},
-		Dimensions: []config.CustomDimension{
+		Dimensions: []config.DimensionConfig{
 			{ParameterName: "test_dimension_1", DisplayName: "Test Dimension 1", Scope: "USER"},
 			{ParameterName: "test_dimension_2", DisplayName: "Test Dimension 2", Scope: "EVENT"},
 		},
-		Metrics: []config.CustomMetric{
-			{DisplayName: "Test Metric 1", EventParameter: "test_metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
-			{DisplayName: "Test Metric 2", EventParameter: "test_metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
+		Metrics: []config.MetricConfig{
+			{DisplayName: "Test Metric 1", ParameterName: "test_metric_1", MeasurementUnit: "STANDARD", Scope: "EVENT"},
+			{DisplayName: "Test Metric 2", ParameterName: "test_metric_2", MeasurementUnit: "CURRENCY", Scope: "EVENT"},
 		},
 	}
 }
 
 // NewTestConversion creates a test conversion
-func NewTestConversion(name string, countingMethod string) config.Conversion {
-	return config.Conversion{
+func NewTestConversion(name string, countingMethod string) config.ConversionConfig {
+	return config.ConversionConfig{
 		Name:           name,
 		CountingMethod: countingMethod,
 	}
 }
 
 // NewTestDimension creates a test custom dimension
-func NewTestDimension(parameterName string, displayName string, scope string) config.CustomDimension {
-	return config.CustomDimension{
+func NewTestDimension(parameterName string, displayName string, scope string) config.DimensionConfig {
+	return config.DimensionConfig{
 		ParameterName: parameterName,
 		DisplayName:   displayName,
 		Scope:         scope,
@@ -44,10 +48,10 @@ func NewTestDimension(parameterName string, displayName string, scope string) co
 }
 
 // NewTestMetric creates a test custom metric
-func NewTestMetric(displayName string, eventParameter string, unit string) config.CustomMetric {
-	return config.CustomMetric{
+func NewTestMetric(displayName string, eventParameter string, unit string) config.MetricConfig {
+	return config.MetricConfig{
 		DisplayName:     displayName,
-		EventParameter:  eventParameter,
+		ParameterName:  eventParameter,
 		MeasurementUnit: unit,
 		Scope:           "EVENT",
 	}

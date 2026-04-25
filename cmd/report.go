@@ -222,7 +222,7 @@ func executeExport(projectPath string, all bool, format string) {
 }
 
 // exportReports handles exporting reports in various formats
-func exportReports(client *ga4.Client, projects []config.Project, format, outputPath string) error {
+func exportReports(client *ga4.Client, projects []*config.ProjectConfig, format, outputPath string) error {
 	format = strings.ToLower(format)
 
 	// Validate format
@@ -239,19 +239,19 @@ func exportReports(client *ga4.Client, projects []config.Project, format, output
 
 	// Export each project
 	for _, project := range projects {
-		fmt.Printf("Collecting data for %s...\n", project.Name)
+		fmt.Printf("Collecting data for %s...\n", project.Project.Name)
 
 		data, err := collectReportData(client, project)
 		if err != nil {
-			return fmt.Errorf("failed to collect report data for %s: %w", project.Name, err)
+			return fmt.Errorf("failed to collect report data for %s: %w", project.Project.Name, err)
 		}
 
 		// Generate output path if not specified
 		output := outputPath
 		if output == "" && len(projects) > 1 {
-			output = generateDefaultFilename(project.Name, format)
+			output = generateDefaultFilename(project.Project.Name, format)
 		} else if output == "" {
-			output = generateDefaultFilename(project.Name, format)
+			output = generateDefaultFilename(project.Project.Name, format)
 		}
 
 		// Export based on format
@@ -277,17 +277,19 @@ func exportReports(client *ga4.Client, projects []config.Project, format, output
 	return nil
 }
 
-func reportProject(client *ga4.Client, project config.Project) error {
+func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	blue := color.New(color.FgBlue, color.Bold).SprintFunc()
 
-	fmt.Printf("%s %s (Property: %s)\n", blue("📦"), project.Name, project.PropertyID)
+	fmt.Printf("%s %s (Property: %s)\n", blue("📦"), cfg.Project.Name, cfg.GetPropertyID())
 	fmt.Println("───────────────────────────────────────────────")
 	fmt.Println()
+
+	propertyID := cfg.GetPropertyID()
 
 	// List conversions
 	fmt.Println("🎯 Conversions")
 	fmt.Println("───────────────────────────────────────────────")
-	conversions, err := client.ListConversions(project.PropertyID)
+	conversions, err := client.ListConversions(propertyID)
 	if err != nil {
 		return fmt.Errorf("failed to list conversions: %w", err)
 	}
@@ -305,7 +307,7 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("📊 Custom Dimensions")
 	fmt.Println("───────────────────────────────────────────────")
-	dimensions, err := client.ListDimensions(project.PropertyID)
+	dimensions, err := client.ListDimensions(propertyID)
 	if err != nil {
 		return fmt.Errorf("failed to list dimensions: %w", err)
 	}
@@ -323,7 +325,7 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("📈 Custom Metrics")
 	fmt.Println("───────────────────────────────────────────────")
-	metrics, err := client.ListCustomMetrics(project.PropertyID)
+	metrics, err := client.ListCustomMetrics(propertyID)
 	if err != nil {
 		fmt.Printf("Warning: failed to list custom metrics: %v\n", err)
 	} else {
@@ -341,7 +343,7 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("🧮 Recommended Calculated Metrics (create manually in GA4 UI)")
 	fmt.Println("───────────────────────────────────────────────")
-	calculatedMetrics, err := client.ListCalculatedMetrics(project.PropertyID)
+	calculatedMetrics, err := client.ListCalculatedMetrics(propertyID)
 	if err != nil {
 		fmt.Printf("Warning: failed to list calculated metrics: %v\n", err)
 	} else {
@@ -360,10 +362,10 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("👥 Configured Audiences")
 	fmt.Println("───────────────────────────────────────────────")
-	audienceSummary := ga4.GetAudienceSummary(project)
+	audienceSummary := ga4.GetAudienceSummary(cfg)
 	fmt.Println(audienceSummary)
 
-	audienceCategories := ga4.ListAudiencesByCategory(project)
+	audienceCategories := ga4.ListAudiencesByCategory(cfg)
 	audienceTable := tablewriter.NewWriter(os.Stdout)
 	audienceTable.SetHeader([]string{"Name", "Category", "Duration (days)"})
 	audienceTable.SetBorder(false)
@@ -384,7 +386,7 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("🗄️  Data Retention Settings")
 	fmt.Println("───────────────────────────────────────────────")
-	retentionSettings, err := client.GetDataRetention(project.PropertyID)
+	retentionSettings, err := client.GetDataRetention(propertyID)
 	if err != nil {
 		fmt.Printf("Warning: failed to get data retention settings: %v\n", err)
 	} else {
@@ -397,7 +399,7 @@ func reportProject(client *ga4.Client, project config.Project) error {
 	fmt.Println()
 	fmt.Println("⚡ Enhanced Measurement")
 	fmt.Println("───────────────────────────────────────────────")
-	emSummary, err := client.GetEnhancedMeasurementSummary(project.PropertyID)
+	emSummary, err := client.GetEnhancedMeasurementSummary(propertyID)
 	if err != nil {
 		fmt.Printf("Warning: failed to get enhanced measurement settings: %v\n", err)
 	} else {

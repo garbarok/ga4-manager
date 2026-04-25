@@ -63,9 +63,16 @@ func (c *Client) CreateConversion(propertyID, eventName, countingMethod string) 
 	return nil
 }
 
-func (c *Client) SetupConversions(project config.Project) error {
-	for _, conv := range project.Conversions {
-		if err := c.CreateConversion(project.PropertyID, conv.Name, conv.CountingMethod); err != nil {
+func conversionToSDK(conv config.ConversionConfig) *admin.GoogleAnalyticsAdminV1alphaConversionEvent {
+	return &admin.GoogleAnalyticsAdminV1alphaConversionEvent{
+		EventName:      conv.Name,
+		CountingMethod: conv.CountingMethod,
+	}
+}
+
+func (c *Client) SetupConversions(propertyID string, conversions []config.ConversionConfig) error {
+	for _, conv := range conversions {
+		if err := c.CreateConversion(propertyID, conv.Name, conv.CountingMethod); err != nil {
 			return err
 		}
 	}

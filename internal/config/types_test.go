@@ -1,75 +1,14 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
-
-// TestConvertToLegacyProject tests conversion from ProjectConfig to Project
-func TestConvertToLegacyProject(t *testing.T) {
-	pc := &ProjectConfig{
-		Project: ProjectInfo{
-			Name:        "Test Project",
-			Description: "A test project",
-			Version:     "1.0.0",
-		},
-		GA4: GA4Config{
-			PropertyID:    "123456789",
-			MeasurementID: "G-XXXXXXXXXX",
-		},
-		Conversions: []ConversionConfig{
-			{
-				Name:           "test_conversion",
-				CountingMethod: "ONCE_PER_SESSION",
-				Description:    "Test conversion",
-			},
-		},
-		Dimensions: []DimensionConfig{
-			{
-				Parameter:   "test_param",
-				DisplayName: "Test Dimension",
-				Scope:       "USER",
-			},
-		},
-		Metrics: []MetricConfig{
-			{
-				Parameter:   "test_metric",
-				DisplayName: "Test Metric",
-				Unit:        "STANDARD",
-				Scope:       "EVENT",
-			},
-		},
-		Cleanup: CleanupYAMLConfig{
-			ConversionsToRemove: []string{"old_conversion"},
-			DimensionsToRemove:  []string{"old_dimension"},
-			MetricsToRemove:     []string{"old_metric"},
-			Reason:              "Not used",
-		},
-	}
-
-	legacy := pc.ConvertToLegacyProject()
-
-	assert.Equal(t, "Test Project", legacy.Name)
-	assert.Equal(t, "123456789", legacy.PropertyID)
-	assert.Equal(t, 1, len(legacy.Conversions))
-	assert.Equal(t, "test_conversion", legacy.Conversions[0].Name)
-	assert.Equal(t, "ONCE_PER_SESSION", legacy.Conversions[0].CountingMethod)
-
-	assert.Equal(t, 1, len(legacy.Dimensions))
-	assert.Equal(t, "test_param", legacy.Dimensions[0].ParameterName)
-	assert.Equal(t, "Test Dimension", legacy.Dimensions[0].DisplayName)
-	assert.Equal(t, "USER", legacy.Dimensions[0].Scope)
-
-	assert.Equal(t, 1, len(legacy.Metrics))
-	assert.Equal(t, "test_metric", legacy.Metrics[0].EventParameter)
-	assert.Equal(t, "Test Metric", legacy.Metrics[0].DisplayName)
-	assert.Equal(t, "STANDARD", legacy.Metrics[0].MeasurementUnit)
-
-	assert.Equal(t, "old_conversion", legacy.Cleanup.ConversionsToRemove[0])
-	assert.Equal(t, "old_dimension", legacy.Cleanup.DimensionsToRemove[0])
-	assert.Equal(t, "old_metric", legacy.Cleanup.MetricsToRemove[0])
-}
 
 // TestProjectConfigBasics tests basic ProjectConfig structure
 func TestProjectConfigBasics(t *testing.T) {
@@ -86,6 +25,135 @@ func TestProjectConfigBasics(t *testing.T) {
 	assert.Equal(t, "123456789", pc.GA4.PropertyID)
 }
 
+// TestGetPropertyID returns the property ID from either Analytics or legacy GA4 config
+func TestGetPropertyID(t *testing.T) {
+	t.Run("from_legacy_ga4", func(t *testing.T) {
+		pc := &ProjectConfig{GA4: GA4Config{PropertyID: "111"}}
+		assert.Equal(t, "111", pc.GetPropertyID())
+	})
+
+	t.Run("from_analytics_config", func(t *testing.T) {
+		pc := &ProjectConfig{Analytics: &AnalyticsConfig{PropertyID: "222"}}
+		assert.Equal(t, "222", pc.GetPropertyID())
+	})
+
+	t.Run("analytics_takes_precedence", func(t *testing.T) {
+		pc := &ProjectConfig{
+			Analytics: &AnalyticsConfig{PropertyID: "222"},
+			GA4:       GA4Config{PropertyID: "111"},
+		}
+		assert.Equal(t, "222", pc.GetPropertyID())
+	})
+}
+
+// TestDimensionConfigFields verifies struct field names match YAML keys
+func TestDimensionConfigFields(t *testing.T) {
+	yaml := `parameter: user_type
+display_name: User Type
+description: Type of user
+scope: USER
+priority: high`
+
+	var dim DimensionConfig
+	require.NoError(t, unmarshalYAML([]byte(yaml), &dim))
+
+	assert.Equal(t, "user_type", dim.ParameterName)
+	assert.Equal(t, "User Type", dim.DisplayName)
+	assert.Equal(t, "Type of user", dim.Description)
+	assert.Equal(t, "USER", dim.Scope)
+	assert.Equal(t, "high", dim.Priority)
+}
+
+// TestMetricConfigFields verifies struct field names match YAML keys
+func TestMetricConfigFields(t *testing.T) {
+	yaml := `parameter: engagement_rate
+display_name: Engagement Rate
+description: Rate of engaged sessions
+unit: STANDARD
+scope: EVENT
+priority: high`
+
+	var m MetricConfig
+	require.NoError(t, unmarshalYAML([]byte(yaml), &m))
+
+	assert.Equal(t, "engagement_rate", m.ParameterName)
+	assert.Equal(t, "Engagement Rate", m.DisplayName)
+	assert.Equal(t, "Rate of engaged sessions", m.Description)
+	assert.Equal(t, "STANDARD", m.MeasurementUnit)
+	assert.Equal(t, "EVENT", m.Scope)
+	assert.Equal(t, "high", m.Priority)
+}
+
+// TestCleanupConfigFields verifies CleanupConfig (not CleanupYAMLConfig)
+func TestCleanupConfigFields(t *testing.T) {
+	tests := []struct {
+		name           string
+		cleanup        CleanupConfig
+		hasConversions bool
+		hasDimensions  bool
+		hasMetrics     bool
+	}{
+		{
+			name: "all_cleanup_items",
+			cleanup: CleanupConfig{
+				ConversionsToRemove: []string{"old_conv"},
+				DimensionsToRemove:  []string{"old_dim"},
+				MetricsToRemove:     []string{"old_metric"},
+				Reason:              "Cleanup",
+			},
+			hasConversions: true,
+			hasDimensions:  true,
+			hasMetrics:     true,
+		},
+		{
+			name:           "empty_cleanup",
+			cleanup:        CleanupConfig{},
+			hasConversions: false,
+			hasDimensions:  false,
+			hasMetrics:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.hasConversions, len(tt.cleanup.ConversionsToRemove) > 0)
+			assert.Equal(t, tt.hasDimensions, len(tt.cleanup.DimensionsToRemove) > 0)
+			assert.Equal(t, tt.hasMetrics, len(tt.cleanup.MetricsToRemove) > 0)
+		})
+	}
+}
+
+// TestYAMLRoundTrip verifies existing example configs parse without modification
+func TestYAMLRoundTrip(t *testing.T) {
+	examplesDir := filepath.Join("..", "..", "configs", "examples")
+	entries, err := os.ReadDir(examplesDir)
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
+			continue
+		}
+		t.Run(entry.Name(), func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join(examplesDir, entry.Name()))
+			require.NoError(t, err)
+
+			var pc ProjectConfig
+			require.NoError(t, yaml.Unmarshal(data, &pc), "YAML unmarshal failed")
+
+			// Verify dimensions use ParameterName (yaml key: parameter)
+			for i, dim := range pc.Dimensions {
+				assert.NotEmpty(t, dim.ParameterName, "dimensions[%d].parameter must parse into ParameterName", i)
+			}
+
+			// Verify metrics use ParameterName (yaml key: parameter) and MeasurementUnit (yaml key: unit)
+			for i, m := range pc.Metrics {
+				assert.NotEmpty(t, m.ParameterName, "metrics[%d].parameter must parse into ParameterName", i)
+				assert.NotEmpty(t, m.MeasurementUnit, "metrics[%d].unit must parse into MeasurementUnit", i)
+			}
+		})
+	}
+}
+
 // TestConversionConfigValidation tests ConversionConfig validation
 func TestConversionConfigValidation(t *testing.T) {
 	tests := []struct {
@@ -94,24 +162,9 @@ func TestConversionConfigValidation(t *testing.T) {
 		countingMethod string
 		isValid        bool
 	}{
-		{
-			name:           "valid_once_per_session",
-			conversionName: "purchase",
-			countingMethod: "ONCE_PER_SESSION",
-			isValid:        true,
-		},
-		{
-			name:           "valid_once_per_event",
-			conversionName: "page_view",
-			countingMethod: "ONCE_PER_EVENT",
-			isValid:        true,
-		},
-		{
-			name:           "invalid_method",
-			conversionName: "test",
-			countingMethod: "INVALID",
-			isValid:        false,
-		},
+		{"valid_once_per_session", "purchase", "ONCE_PER_SESSION", true},
+		{"valid_once_per_event", "page_view", "ONCE_PER_EVENT", true},
+		{"invalid_method", "test", "INVALID", false},
 	}
 
 	for _, tt := range tests {
@@ -126,45 +179,21 @@ func TestConversionConfigValidation(t *testing.T) {
 // TestDimensionConfigValidation tests DimensionConfig validation
 func TestDimensionConfigValidation(t *testing.T) {
 	tests := []struct {
-		name        string
-		parameter   string
-		displayName string
-		scope       string
-		isValid     bool
+		name          string
+		parameterName string
+		displayName   string
+		scope         string
+		isValid       bool
 	}{
-		{
-			name:        "valid_user_scope",
-			parameter:   "user_id",
-			displayName: "User ID",
-			scope:       "USER",
-			isValid:     true,
-		},
-		{
-			name:        "valid_event_scope",
-			parameter:   "event_type",
-			displayName: "Event Type",
-			scope:       "EVENT",
-			isValid:     true,
-		},
-		{
-			name:        "invalid_scope",
-			parameter:   "test",
-			displayName: "Test",
-			scope:       "INVALID",
-			isValid:     false,
-		},
-		{
-			name:        "empty_parameter",
-			parameter:   "",
-			displayName: "Test",
-			scope:       "USER",
-			isValid:     false,
-		},
+		{"valid_user_scope", "user_id", "User ID", "USER", true},
+		{"valid_event_scope", "event_type", "Event Type", "EVENT", true},
+		{"invalid_scope", "test", "Test", "INVALID", false},
+		{"empty_parameter", "", "Test", "USER", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isValid := tt.parameter != "" && tt.displayName != "" &&
+			isValid := tt.parameterName != "" && tt.displayName != "" &&
 				(tt.scope == "USER" || tt.scope == "EVENT")
 			assert.Equal(t, tt.isValid, isValid)
 		})
@@ -181,128 +210,23 @@ func TestMetricConfigValidation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		parameter   string
-		displayName string
-		unit        string
-		scope       string
-		isValid     bool
+		name            string
+		parameterName   string
+		displayName     string
+		measurementUnit string
+		scope           string
+		isValid         bool
 	}{
-		{
-			name:        "valid_metric",
-			parameter:   "engagement",
-			displayName: "Engagement Rate",
-			unit:        "STANDARD",
-			scope:       "EVENT",
-			isValid:     true,
-		},
-		{
-			name:        "valid_currency",
-			parameter:   "revenue",
-			displayName: "Revenue",
-			unit:        "CURRENCY",
-			scope:       "EVENT",
-			isValid:     true,
-		},
-		{
-			name:        "invalid_unit",
-			parameter:   "test",
-			displayName: "Test",
-			unit:        "INVALID",
-			scope:       "EVENT",
-			isValid:     false,
-		},
+		{"valid_metric", "engagement", "Engagement Rate", "STANDARD", "EVENT", true},
+		{"valid_currency", "revenue", "Revenue", "CURRENCY", "EVENT", true},
+		{"invalid_unit", "test", "Test", "INVALID", "EVENT", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isValid := tt.parameter != "" && tt.displayName != "" &&
-				validUnits[tt.unit] && tt.scope == "EVENT"
+			isValid := tt.parameterName != "" && tt.displayName != "" &&
+				validUnits[tt.measurementUnit] && tt.scope == "EVENT"
 			assert.Equal(t, tt.isValid, isValid)
-		})
-	}
-}
-
-// TestAudienceConfigValidation tests AudienceConfig validation
-func TestAudienceConfigValidation(t *testing.T) {
-	tests := []struct {
-		name     string
-		audName  string
-		duration int
-		isValid  bool
-	}{
-		{
-			name:     "valid_audience",
-			audName:  "returning_users",
-			duration: 30,
-			isValid:  true,
-		},
-		{
-			name:     "empty_name",
-			audName:  "",
-			duration: 30,
-			isValid:  false,
-		},
-		{
-			name:     "invalid_duration",
-			audName:  "test_audience",
-			duration: 0,
-			isValid:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			isValid := tt.audName != "" && tt.duration > 0
-			assert.Equal(t, tt.isValid, isValid)
-		})
-	}
-}
-
-// TestCleanupYAMLConfigValidation tests CleanupYAMLConfig validation
-func TestCleanupYAMLConfigValidation(t *testing.T) {
-	tests := []struct {
-		name           string
-		cleanup        CleanupYAMLConfig
-		hasConversions bool
-		hasDimensions  bool
-		hasMetrics     bool
-	}{
-		{
-			name: "all_cleanup_items",
-			cleanup: CleanupYAMLConfig{
-				ConversionsToRemove: []string{"old_conv"},
-				DimensionsToRemove:  []string{"old_dim"},
-				MetricsToRemove:     []string{"old_metric"},
-				Reason:              "Cleanup",
-			},
-			hasConversions: true,
-			hasDimensions:  true,
-			hasMetrics:     true,
-		},
-		{
-			name: "conversions_only",
-			cleanup: CleanupYAMLConfig{
-				ConversionsToRemove: []string{"old_conv"},
-			},
-			hasConversions: true,
-			hasDimensions:  false,
-			hasMetrics:     false,
-		},
-		{
-			name:           "empty_cleanup",
-			cleanup:        CleanupYAMLConfig{},
-			hasConversions: false,
-			hasDimensions:  false,
-			hasMetrics:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.hasConversions, len(tt.cleanup.ConversionsToRemove) > 0)
-			assert.Equal(t, tt.hasDimensions, len(tt.cleanup.DimensionsToRemove) > 0)
-			assert.Equal(t, tt.hasMetrics, len(tt.cleanup.MetricsToRemove) > 0)
 		})
 	}
 }
@@ -319,27 +243,14 @@ func TestDataRetentionConfigValidation(t *testing.T) {
 		retention string
 		isValid   bool
 	}{
-		{
-			name:      "two_months",
-			retention: "TWO_MONTHS",
-			isValid:   true,
-		},
-		{
-			name:      "fourteen_months",
-			retention: "FOURTEEN_MONTHS",
-			isValid:   true,
-		},
-		{
-			name:      "invalid_retention",
-			retention: "ONE_YEAR",
-			isValid:   false,
-		},
+		{"two_months", "TWO_MONTHS", true},
+		{"fourteen_months", "FOURTEEN_MONTHS", true},
+		{"invalid_retention", "ONE_YEAR", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isValid := validRetention[tt.retention]
-			assert.Equal(t, tt.isValid, isValid)
+			assert.Equal(t, tt.isValid, validRetention[tt.retention])
 		})
 	}
 }
@@ -354,39 +265,19 @@ func TestEnhancedMeasurementConfigValidation(t *testing.T) {
 		{
 			name: "all_enabled",
 			config: EnhancedMeasurementConfig{
-				PageViews:        true,
-				Scrolls:          true,
-				OutboundClicks:   true,
-				SiteSearch:       true,
-				VideoEngagement:  true,
-				FileDownloads:    true,
-				PageChanges:      true,
-				FormInteractions: true,
+				PageViews: true, Scrolls: true, OutboundClicks: true, SiteSearch: true,
+				VideoEngagement: true, FileDownloads: true, PageChanges: true, FormInteractions: true,
 			},
 			enabled: 8,
 		},
 		{
-			name: "none_enabled",
-			config: EnhancedMeasurementConfig{
-				PageViews:        false,
-				Scrolls:          false,
-				OutboundClicks:   false,
-				SiteSearch:       false,
-				VideoEngagement:  false,
-				FileDownloads:    false,
-				PageChanges:      false,
-				FormInteractions: false,
-			},
+			name:    "none_enabled",
+			config:  EnhancedMeasurementConfig{},
 			enabled: 0,
 		},
 		{
-			name: "some_enabled",
-			config: EnhancedMeasurementConfig{
-				PageViews:        true,
-				Scrolls:          true,
-				OutboundClicks:   false,
-				FormInteractions: true,
-			},
+			name:    "some_enabled",
+			config:  EnhancedMeasurementConfig{PageViews: true, Scrolls: true, FormInteractions: true},
 			enabled: 3,
 		},
 	}
@@ -394,114 +285,21 @@ func TestEnhancedMeasurementConfigValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			count := 0
-			if tt.config.PageViews {
-				count++
+			for _, v := range []bool{
+				tt.config.PageViews, tt.config.Scrolls, tt.config.OutboundClicks,
+				tt.config.SiteSearch, tt.config.VideoEngagement, tt.config.FileDownloads,
+				tt.config.PageChanges, tt.config.FormInteractions,
+			} {
+				if v {
+					count++
+				}
 			}
-			if tt.config.Scrolls {
-				count++
-			}
-			if tt.config.OutboundClicks {
-				count++
-			}
-			if tt.config.SiteSearch {
-				count++
-			}
-			if tt.config.VideoEngagement {
-				count++
-			}
-			if tt.config.FileDownloads {
-				count++
-			}
-			if tt.config.PageChanges {
-				count++
-			}
-			if tt.config.FormInteractions {
-				count++
-			}
-
 			assert.Equal(t, tt.enabled, count)
 		})
 	}
 }
 
-// TestMultipleConversionsConversion tests converting multiple conversions
-func TestMultipleConversionsConversion(t *testing.T) {
-	pc := &ProjectConfig{
-		Project: ProjectInfo{Name: "Test"},
-		GA4:     GA4Config{PropertyID: "123456789"},
-		Conversions: []ConversionConfig{
-			{Name: "conv1", CountingMethod: "ONCE_PER_SESSION"},
-			{Name: "conv2", CountingMethod: "ONCE_PER_EVENT"},
-			{Name: "conv3", CountingMethod: "ONCE_PER_SESSION"},
-		},
-	}
-
-	legacy := pc.ConvertToLegacyProject()
-
-	assert.Equal(t, 3, len(legacy.Conversions))
-	assert.Equal(t, "conv1", legacy.Conversions[0].Name)
-	assert.Equal(t, "conv2", legacy.Conversions[1].Name)
-	assert.Equal(t, "conv3", legacy.Conversions[2].Name)
-}
-
-// TestMultipleDimensionsConversion tests converting multiple dimensions
-func TestMultipleDimensionsConversion(t *testing.T) {
-	pc := &ProjectConfig{
-		Project: ProjectInfo{Name: "Test"},
-		GA4:     GA4Config{PropertyID: "123456789"},
-		Dimensions: []DimensionConfig{
-			{Parameter: "dim1", DisplayName: "Dimension 1", Scope: "USER"},
-			{Parameter: "dim2", DisplayName: "Dimension 2", Scope: "EVENT"},
-			{Parameter: "dim3", DisplayName: "Dimension 3", Scope: "USER"},
-		},
-	}
-
-	legacy := pc.ConvertToLegacyProject()
-
-	assert.Equal(t, 3, len(legacy.Dimensions))
-	assert.Equal(t, "dim1", legacy.Dimensions[0].ParameterName)
-	assert.Equal(t, "dim2", legacy.Dimensions[1].ParameterName)
-	assert.Equal(t, "dim3", legacy.Dimensions[2].ParameterName)
-}
-
-// TestMultipleMetricsConversion tests converting multiple metrics
-func TestMultipleMetricsConversion(t *testing.T) {
-	pc := &ProjectConfig{
-		Project: ProjectInfo{Name: "Test"},
-		GA4:     GA4Config{PropertyID: "123456789"},
-		Metrics: []MetricConfig{
-			{Parameter: "metric1", DisplayName: "Metric 1", Unit: "STANDARD", Scope: "EVENT"},
-			{Parameter: "metric2", DisplayName: "Metric 2", Unit: "CURRENCY", Scope: "EVENT"},
-			{Parameter: "metric3", DisplayName: "Metric 3", Unit: "SECONDS", Scope: "EVENT"},
-		},
-	}
-
-	legacy := pc.ConvertToLegacyProject()
-
-	assert.Equal(t, 3, len(legacy.Metrics))
-	assert.Equal(t, "metric1", legacy.Metrics[0].EventParameter)
-	assert.Equal(t, "metric2", legacy.Metrics[1].EventParameter)
-	assert.Equal(t, "metric3", legacy.Metrics[2].EventParameter)
-}
-
-// BenchmarkConvertToLegacyProject benchmarks the conversion function
-func BenchmarkConvertToLegacyProject(b *testing.B) {
-	pc := &ProjectConfig{
-		Project: ProjectInfo{Name: "Test"},
-		GA4:     GA4Config{PropertyID: "123456789"},
-		Conversions: []ConversionConfig{
-			{Name: "conv1", CountingMethod: "ONCE_PER_SESSION"},
-		},
-		Dimensions: []DimensionConfig{
-			{Parameter: "dim1", DisplayName: "Dimension 1", Scope: "USER"},
-		},
-		Metrics: []MetricConfig{
-			{Parameter: "metric1", DisplayName: "Metric 1", Unit: "STANDARD", Scope: "EVENT"},
-		},
-	}
-
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = pc.ConvertToLegacyProject()
-	}
+// unmarshalYAML is a helper to unmarshal YAML bytes into a value
+func unmarshalYAML(data []byte, v any) error {
+	return yaml.Unmarshal(data, v)
 }

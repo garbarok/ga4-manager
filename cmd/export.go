@@ -70,15 +70,16 @@ type EnhancedMeasurementData struct {
 }
 
 // collectReportData gathers all report data from a project
-func collectReportData(client *ga4.Client, project config.Project) (*ReportData, error) {
+func collectReportData(client *ga4.Client, cfg *config.ProjectConfig) (*ReportData, error) {
+	propertyID := cfg.GetPropertyID()
 	data := &ReportData{
-		ProjectName: project.Name,
-		PropertyID:  project.PropertyID,
+		ProjectName: cfg.Project.Name,
+		PropertyID:  propertyID,
 		Timestamp:   time.Now().Format(time.RFC3339),
 	}
 
 	// Collect conversions
-	conversions, err := client.ListConversions(project.PropertyID)
+	conversions, err := client.ListConversions(propertyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list conversions: %w", err)
 	}
@@ -90,7 +91,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect dimensions
-	dimensions, err := client.ListDimensions(project.PropertyID)
+	dimensions, err := client.ListDimensions(propertyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list dimensions: %w", err)
 	}
@@ -103,7 +104,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect metrics
-	metrics, err := client.ListCustomMetrics(project.PropertyID)
+	metrics, err := client.ListCustomMetrics(propertyID)
 	if err == nil {
 		for _, metric := range metrics {
 			data.Metrics = append(data.Metrics, MetricData{
@@ -116,7 +117,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect calculated metrics
-	calculatedMetrics, err := client.ListCalculatedMetrics(project.PropertyID)
+	calculatedMetrics, err := client.ListCalculatedMetrics(propertyID)
 	if err == nil {
 		for _, calc := range calculatedMetrics {
 			data.CalculatedMetrics = append(data.CalculatedMetrics, CalculatedMetricData{
@@ -128,7 +129,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect audiences
-	audienceCategories := ga4.ListAudiencesByCategory(project)
+	audienceCategories := ga4.ListAudiencesByCategory(cfg)
 	for _, category := range []string{"SEO", "Conversion", "Content", "Behavioral"} {
 		if audiences, ok := audienceCategories[category]; ok {
 			for _, aud := range audiences {
@@ -142,7 +143,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect data retention
-	retentionSettings, err := client.GetDataRetention(project.PropertyID)
+	retentionSettings, err := client.GetDataRetention(propertyID)
 	if err == nil {
 		data.DataRetention = DataRetentionData{
 			EventDataRetention:         retentionSettings.EventDataRetention,
@@ -151,7 +152,7 @@ func collectReportData(client *ga4.Client, project config.Project) (*ReportData,
 	}
 
 	// Collect enhanced measurement (simplified)
-	emSummary, _ := client.GetEnhancedMeasurementSummary(project.PropertyID)
+	emSummary, _ := client.GetEnhancedMeasurementSummary(propertyID)
 	if emSummary != "" {
 		data.EnhancedMeasure = EnhancedMeasurementData{
 			StreamName: "Enhanced Measurement Enabled",
