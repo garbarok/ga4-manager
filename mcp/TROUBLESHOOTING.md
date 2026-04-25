@@ -331,6 +331,48 @@ To override the UA freely:
 
 ---
 
+### `seo_page_audit` — PSI returns 429 with `quota_limit_value: "0"`
+
+```json
+{
+  "warnings": [
+    "psi_unavailable: PSI API error (HTTP 429): ... \"quota_limit_value\": \"0\", \"quota_limit\": \"defaultPerDayPerProject\" ..."
+  ]
+}
+```
+
+**Cause:** Even though the tool calls PSI without an Authorization header, Google attributes the request to your gcloud-configured quota project (visible in the error as `consumer: projects/<number>`). The default per-project per-day PSI quota is **0**, not the documented 25k. Without an API key, the request lands in the zero-allocation lane and gets immediately rejected — no warm-up grace, no fallback to keyless rate-limited mode.
+
+This affects every user who follows `scripts/setup.sh` exactly: the API enables fine, the smoke test fails, and `check_cwv: true` calls fail forever until the API key is provisioned.
+
+**Fix — create a free PSI API key:**
+
+1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. Select your project (the same one used for `GCP_PROJECT` / quota project, e.g. `portfolio-blog-479009`).
+3. **+ Create Credentials** → **API key**.
+4. Click **Edit** on the new key:
+   - **Application restrictions:** None (or HTTP referrers if calling from a browser).
+   - **API restrictions:** Restrict key → check **PageSpeed Insights API** only.
+   - Save.
+5. Copy the key.
+6. Pass the key to `seo_page_audit` calls:
+
+   ```jsonc
+   {
+     "url": "https://example.com",
+     "check_cwv": true,
+     "psi_api_key": "AIzaSy...your-key"
+   }
+   ```
+
+   Or set the `PSI_API_KEY` env var in your MCP client config so you don't have to pass it every call (when supported — see `mcp/CONFIGURATION.md`).
+
+**Why this is required:** with an API key, PSI bills against your project at the documented 25k requests/day free tier. Without a key, the default per-project allocation is 0 — Google reserves "free unauthenticated" PSI for anonymous traffic with no GCP context, and once Google's edge identifies you as a gcloud user, you're routed to the per-project lane that has zero allocation by default.
+
+The tool's keyless throttle (`bottleneck` 1 req per 100s) still applies as a safety net, but it doesn't help when the per-day allocation itself is zero.
+
+---
+
 ### `gsc_traffic_compare` — periods overlap warning
 
 ```json
