@@ -352,8 +352,11 @@ ${C_BOLD}2. Configure your MCP client${C_OFF}
 
 ${C_BOLD}3. Verify with the CLI${C_OFF}
 
-   ./ga4 validate
-   ./ga4 report --property-id <YOUR_NUMERIC_PROPERTY_ID> --days 28
+   ./ga4 --version                              # binary works
+   ./ga4 validate --all                         # validates every config under configs/
+   ./ga4 report --config configs/<your-file>.yaml   # report from a config file
+   # or after editing configs/examples/*.yaml with your real GA4 property ID:
+   ./ga4 report --project basic-ecommerce
 
 ${C_BOLD}4. Common errors${C_OFF}
 
