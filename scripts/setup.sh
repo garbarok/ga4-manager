@@ -150,7 +150,7 @@ esac
 
 step "Running auth flow"
 
-SCOPES="openid,https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/userinfo.email"
+SCOPES="openid,https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/webmasters,https://www.googleapis.com/auth/userinfo.email"
 
 if [[ "$AUTH_PATH" == "A" ]]; then
   ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
@@ -158,7 +158,7 @@ if [[ "$AUTH_PATH" == "A" ]]; then
   REQUIRED_SCOPES=(
     "https://www.googleapis.com/auth/cloud-platform"
     "https://www.googleapis.com/auth/analytics.readonly"
-    "https://www.googleapis.com/auth/webmasters.readonly"
+    "https://www.googleapis.com/auth/webmasters"
   )
 
   # If ADC already exists, check whether its token has the required scopes
@@ -182,7 +182,7 @@ if [[ "$AUTH_PATH" == "A" ]]; then
     done
 
     if [[ ${#MISSING[@]} -eq 0 ]]; then
-      ok "All required scopes already granted (cloud-platform, analytics.readonly, webmasters.readonly)"
+      ok "All required scopes already granted (cloud-platform, analytics.readonly, webmasters)"
       RELOGIN=0
     else
       warn "Existing ADC is missing ${#MISSING[@]} required scope(s):"
