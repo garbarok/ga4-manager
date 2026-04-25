@@ -1,0 +1,27 @@
+## Iteration 1 — 2026-04-25
+
+### State found
+- go.mod on `main` already has `github.com/olekukonko/tablewriter v0.0.5`
+- No v1.1.4 upgrade exists on main or any committed branch
+- `go build ./...` exits 0 on origin/main
+- `go mod tidy` changes nothing — go.sum already clean, only v0.0.5 entries
+- `go test ./...` passes
+- `make lint` fails with 70 pre-existing QF1012 issues (fmt.Fprintf vs WriteString(fmt.Sprintf)) — same 70 on origin/main, zero are tablewriter-related
+
+### Decision
+Option 2 (pin v0.0.5) is already in effect. No code changes needed. Formal verification pass suffices to close acceptance criteria.
+
+### Acceptance criteria status
+- [x] Decision recorded: stay on v0.0.5 (option 2 — revert/pin already applied)
+- [x] go.mod at v0.0.5
+- [x] go.sum clean (go mod tidy no-op)
+- [x] make build green
+- [x] make test green
+- [~] make lint: 70 pre-existing QF1012 failures on main, NOT introduced by this change, NOT tablewriter-related — noted in PR
+- [x] No transitive dep brings v1 back (grep confirmed only v0.0.5 in go.sum)
+
+### Files touched
+- progress-30.txt (new)
+
+### Notes
+No Go source files changed. The issue describes a bug that never landed on main (v1.1.4 bump may have been proposed/discussed but never committed). PR documents the verification.
