@@ -73,6 +73,10 @@ describe('ga4_report tool', () => {
 
   describe('parseReportOutput', () => {
     it('parses report with conversions table', () => {
+      // Format matches the real tablewriter output emitted by the Go binary:
+      // pipe-separated cells with `+---+---+` border lines. The previous
+      // fixture used whitespace-only alignment which never appears in
+      // production output.
       const output = `
 📊 GA4 Configuration Report
 ═══════════════════════════════════════════════
@@ -82,30 +86,34 @@ describe('ga4_report tool', () => {
 
 🎯 Conversions
 ───────────────────────────────────────────────
-   EVENT NAME             COUNTING METHOD
-   download_image         ONCE_PER_EVENT
-   compression_complete   ONCE_PER_SESSION
+       EVENT NAME       | COUNTING METHOD
+------------------------+-------------------
+  download_image        | ONCE_PER_EVENT
+  compression_complete  | ONCE_PER_SESSION
 
 📊 Custom Dimensions
 ───────────────────────────────────────────────
-   DISPLAY NAME       PARAMETER        SCOPE
-   User Type          user_type        USER
-   File Format        file_format      EVENT
+   DISPLAY NAME |   PARAMETER   | SCOPE
+----------------+---------------+--------
+  User Type     | user_type     | USER
+  File Format   | file_format   | EVENT
 
 📈 Custom Metrics
 ───────────────────────────────────────────────
-   DISPLAY NAME        PARAMETER          UNIT       SCOPE
-   Processing Time     processing_time    STANDARD   EVENT
+    DISPLAY NAME    |     PARAMETER     |   UNIT   | SCOPE
+--------------------+-------------------+----------+--------
+  Processing Time   | processing_time   | STANDARD | EVENT
 
 🧮 Recommended Calculated Metrics (create manually in GA4 UI)
 ───────────────────────────────────────────────
-   DISPLAY NAME   FORMULA   UNIT
+  DISPLAY NAME | FORMULA | UNIT
 
 👥 Configured Audiences
 ───────────────────────────────────────────────
 Total audiences configured: 0
 
-   NAME   CATEGORY   DURATION (DAYS)
+  NAME | CATEGORY | DURATION (DAYS)
+-------+----------+------------------
 
 Note: Audiences must be created manually in GA4 UI.
 
@@ -254,10 +262,11 @@ Enhanced Measurement enabled
 
 📈 Custom Metrics
 ───────────────────────────────────────────────
-   DISPLAY NAME        PARAMETER          UNIT       SCOPE
-   Processing Time     processing_time    STANDARD   EVENT
-   Product Price       product_price      CURRENCY   EVENT
-   Duration            duration_sec       SECONDS    EVENT
+   DISPLAY NAME    |     PARAMETER     |   UNIT   | SCOPE
+-------------------+-------------------+----------+--------
+  Processing Time  | processing_time   | STANDARD | EVENT
+  Product Price    | product_price     | CURRENCY | EVENT
+  Duration         | duration_sec      | SECONDS  | EVENT
 `;
 
       const result = parseReportOutput(output);
