@@ -1,0 +1,21 @@
+progress-27.txt — issue #27: fetch/output limits + tail summary + sort modes + min_clicks_a
+
+Branch: mcp-tools/issue-27
+Parent: main (issues #25 merged via PRs #38, #39)
+
+--- Iteration 1 ---
+Completed: All acceptance criteria in one pass (all checkboxes)
+
+Files touched:
+- mcp/src/tools/compute-traffic-diff.ts — added TrafficTail type; added drops_tail/gains_tail to TrafficDiffResult and computeTrafficDiff return value
+- mcp/src/tools/compute-traffic-diff.test.ts — added tail summary tests (count, total_clicks_delta, sample), 1000-row integration test
+- mcp/src/tools/gsc-traffic-compare.ts — renamed limit→fetch_limit (default 5000), added output_limit (default 50, max 500); added fetch_limit>output_limit validation; updated result type with drops_tail/gains_tail; updated tool description to mention all new controls
+- mcp/src/tools/gsc-traffic-compare.test.ts — updated tests for new schema fields; added fetch_limit<=output_limit INVALID_INPUT test; checked drops_tail/gains_tail in happy path
+
+Decisions:
+- fetch_limit default raised 500→5000 per issue spec
+- output_limit default stays 50 per spec
+- validation: fetch_limit>output_limit is a runtime check (not zod) since it involves two fields
+- tail sample = top-5 of the tail rows (already sorted same as drops/gains)
+
+Blockers: none
