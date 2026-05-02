@@ -64,14 +64,25 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.MetricConfi
 }
 
 func metricToSDK(metric config.MetricConfig) *analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric {
-	return &analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric{
-		DisplayName:          metric.DisplayName,
-		Description:          metric.Description,
-		MeasurementUnit:      metric.MeasurementUnit,
-		Scope:                metric.Scope,
-		ParameterName:        metric.ParameterName,
-		RestrictedMetricType: []string{},
+	// GA4 API rules (analyticsadmin v1alpha CustomMetric.restricted_metric_type):
+	//   - REQUIRED for CURRENCY metrics (must be COST_DATA or REVENUE_DATA).
+	//   - MUST BE EMPTY for non-CURRENCY metrics.
+	// Default CURRENCY → REVENUE_DATA. Override via YAML `restricted_metric_type` if needed.
+	m := &analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric{
+		DisplayName:     metric.DisplayName,
+		Description:     metric.Description,
+		MeasurementUnit: metric.MeasurementUnit,
+		Scope:           metric.Scope,
+		ParameterName:   metric.ParameterName,
 	}
+	if metric.MeasurementUnit == "CURRENCY" {
+		rt := metric.RestrictedMetricType
+		if rt == "" {
+			rt = "REVENUE_DATA"
+		}
+		m.RestrictedMetricType = []string{rt}
+	}
+	return m
 }
 
 // ListCustomMetrics returns all custom metrics for a property

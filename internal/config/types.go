@@ -187,6 +187,10 @@ type MetricConfig struct {
 	MeasurementUnit string `yaml:"unit"`               // STANDARD, CURRENCY, DISTANCE, etc.
 	Scope           string `yaml:"scope"`              // EVENT
 	Priority        string `yaml:"priority,omitempty"` // high, medium, low (for tier limits)
+	// RestrictedMetricType is required for CURRENCY metrics: COST_DATA or REVENUE_DATA.
+	// Defaults to REVENUE_DATA when MeasurementUnit==CURRENCY and this is empty.
+	// Must be empty for non-CURRENCY metrics.
+	RestrictedMetricType string `yaml:"restricted_metric_type,omitempty"`
 }
 
 // CalculatedMetricConfig defines a calculated metric
