@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
-import { ToolError, ErrorCode } from '../utils/errors.js'
+import {
+  ToolError,
+  ErrorCode,
+  errorResult,
+  toolErrorToFailure,
+  type ToolFailureResult,
+} from '../utils/errors.js'
 import { normalizeGa4Property } from '../utils/url-normalize.js'
 import {
   computeConsentHealth,
@@ -62,14 +68,7 @@ export type Ga4ConsentHealthSuccess = {
   period: string
 } & ConsentHealthResult
 
-export interface Ga4ConsentHealthError {
-  success: false
-  error: {
-    code: ErrorCode
-    message: string
-    hint?: string
-  }
-}
+export type Ga4ConsentHealthError = ToolFailureResult
 
 export type Ga4ConsentHealthResult =
   | Ga4ConsentHealthSuccess
@@ -141,10 +140,7 @@ export async function runGa4ConsentHealth(
     propertyId = normalizeGa4Property(input.property_id)
   } catch (err) {
     if (err instanceof ToolError) {
-      return {
-        success: false,
-        error: { code: err.code, message: err.message, ...(err.hint !== undefined ? { hint: err.hint } : {}) },
-      }
+      return toolErrorToFailure(err)
     }
     throw err
   }
@@ -189,18 +185,12 @@ export async function runGa4ConsentHealth(
     }
   } catch (err) {
     if (err instanceof ToolError) {
-      return {
-        success: false,
-        error: { code: err.code, message: err.message, ...(err.hint !== undefined ? { hint: err.hint } : {}) },
-      }
+      return toolErrorToFailure(err)
     }
-    return {
-      success: false,
-      error: {
-        code: ErrorCode.UPSTREAM_5XX,
-        message: err instanceof Error ? err.message : String(err),
-      },
-    }
+    return errorResult(
+      ErrorCode.UPSTREAM_5XX,
+      err instanceof Error ? err.message : String(err),
+    )
   }
 }
 

@@ -40,6 +40,11 @@ go.work
 
 # Dependency directories
 vendor/
+node_modules/
+
+# Node/TypeScript build output & caches (mcp/)
+mcp/dist/
+.vite/
 
 # IDE
 .vscode/

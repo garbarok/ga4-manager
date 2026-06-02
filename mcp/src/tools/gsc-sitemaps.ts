@@ -43,7 +43,7 @@ export interface SitemapsListOutput {
  * Build CLI arguments for sitemaps list
  */
 export function buildSitemapsListArgs(input: GscSitemapsListInput): string[] {
-  return ['gsc', 'sitemaps', 'list', '--site', input.site];
+  return ['sitemaps', 'list', '--site', input.site];
 }
 
 /**
@@ -156,7 +156,7 @@ export interface SitemapsSubmitOutput {
  * Build CLI arguments for sitemaps submit
  */
 export function buildSitemapsSubmitArgs(input: GscSitemapsSubmitInput): string[] {
-  return ['gsc', 'sitemaps', 'submit', '--site', input.site, '--url', input.url];
+  return ['sitemaps', 'submit', '--site', input.site, '--url', input.url];
 }
 
 /**
@@ -248,7 +248,7 @@ export interface SitemapsDeleteOutput {
  * Build CLI arguments for sitemaps delete
  */
 export function buildSitemapsDeleteArgs(input: GscSitemapsDeleteInput): string[] {
-  return ['gsc', 'sitemaps', 'delete', '--site', input.site, '--url', input.url];
+  return ['sitemaps', 'delete', '--site', input.site, '--url', input.url];
 }
 
 /**
@@ -365,7 +365,7 @@ export interface SitemapsGetOutput {
  * Build CLI arguments for sitemaps get
  */
 export function buildSitemapsGetArgs(input: GscSitemapsGetInput): string[] {
-  return ['gsc', 'sitemaps', 'get', '--site', input.site, '--url', input.url];
+  return ['sitemaps', 'get', '--site', input.site, '--url', input.url];
 }
 
 /**

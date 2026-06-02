@@ -109,7 +109,7 @@ export interface DryRunQuery {
  * Build CLI arguments for index coverage
  */
 export function buildIndexCoverageArgs(input: GscIndexCoverageInput): string[] {
-  const args: string[] = ['gsc', 'coverage'];
+  const args: string[] = ['coverage'];
 
   if (input.config) {
     args.push('--config', input.config);

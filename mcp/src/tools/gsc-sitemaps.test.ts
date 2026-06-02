@@ -55,13 +55,13 @@ describe('gsc_sitemaps_list tool', () => {
     it('builds args for domain property site', () => {
       const input: GscSitemapsListInput = { site: 'sc-domain:example.com' };
       const args = buildSitemapsListArgs(input);
-      expect(args).toEqual(['gsc', 'sitemaps', 'list', '--site', 'sc-domain:example.com']);
+      expect(args).toEqual(['sitemaps', 'list', '--site', 'sc-domain:example.com']);
     });
 
     it('builds args for URL prefix site', () => {
       const input: GscSitemapsListInput = { site: 'https://example.com/' };
       const args = buildSitemapsListArgs(input);
-      expect(args).toEqual(['gsc', 'sitemaps', 'list', '--site', 'https://example.com/']);
+      expect(args).toEqual(['sitemaps', 'list', '--site', 'https://example.com/']);
     });
   });
 
@@ -193,7 +193,7 @@ describe('gsc_sitemaps_submit tool', () => {
       };
       const args = buildSitemapsSubmitArgs(input);
       expect(args).toEqual([
-        'gsc', 'sitemaps', 'submit',
+        'sitemaps', 'submit',
         '--site', 'sc-domain:example.com',
         '--url', 'https://example.com/sitemap.xml',
       ]);
@@ -264,7 +264,7 @@ describe('gsc_sitemaps_delete tool', () => {
       };
       const args = buildSitemapsDeleteArgs(input);
       expect(args).toEqual([
-        'gsc', 'sitemaps', 'delete',
+        'sitemaps', 'delete',
         '--site', 'sc-domain:example.com',
         '--url', 'https://example.com/old-sitemap.xml',
       ]);
@@ -335,7 +335,7 @@ describe('gsc_sitemaps_get tool', () => {
       };
       const args = buildSitemapsGetArgs(input);
       expect(args).toEqual([
-        'gsc', 'sitemaps', 'get',
+        'sitemaps', 'get',
         '--site', 'sc-domain:example.com',
         '--url', 'https://example.com/sitemap.xml',
       ]);

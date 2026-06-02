@@ -202,12 +202,12 @@ describe('validateDimensions', () => {
 describe('buildAnalyticsRunArgs', () => {
   it('builds args with site only', () => {
     const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com' } as GscAnalyticsRunInput);
-    expect(args).toEqual(['gsc', 'analytics', 'run', '--site', 'sc-domain:example.com']);
+    expect(args).toEqual(['analytics', 'run', '--site', 'sc-domain:example.com']);
   });
 
   it('builds args with config only', () => {
     const args = buildAnalyticsRunArgs({ config: 'configs/mysite.yaml' } as GscAnalyticsRunInput);
-    expect(args).toEqual(['gsc', 'analytics', 'run', '--config', 'configs/mysite.yaml']);
+    expect(args).toEqual(['analytics', 'run', '--config', 'configs/mysite.yaml']);
   });
 
   it('builds args with custom days', () => {

@@ -141,32 +141,32 @@ describe('gsc_monitor_urls tool', () => {
     it('builds basic args with config only', () => {
       const input: GscMonitorUrlsInput = { config: 'configs/mysite.yaml' };
       const args = buildMonitorUrlsArgs(input);
-      expect(args).toEqual(['gsc', 'monitor', 'run', '--config', 'configs/mysite.yaml']);
+      expect(args).toEqual(['monitor', 'run', '--config', 'configs/mysite.yaml']);
     });
 
     it('builds args with dry_run flag', () => {
       const input: GscMonitorUrlsInput = { config: 'configs/mysite.yaml', dry_run: true };
       const args = buildMonitorUrlsArgs(input);
-      expect(args).toEqual(['gsc', 'monitor', 'run', '--config', 'configs/mysite.yaml', '--dry-run']);
+      expect(args).toEqual(['monitor', 'run', '--config', 'configs/mysite.yaml', '--dry-run']);
     });
 
     it('builds args with json format (default, not added)', () => {
       const input: GscMonitorUrlsInput = { config: 'configs/mysite.yaml', format: 'json' };
       const args = buildMonitorUrlsArgs(input);
-      expect(args).toEqual(['gsc', 'monitor', 'run', '--config', 'configs/mysite.yaml', '--format', 'json']);
+      expect(args).toEqual(['monitor', 'run', '--config', 'configs/mysite.yaml', '--format', 'json']);
     });
 
     it('builds args with markdown format', () => {
       const input: GscMonitorUrlsInput = { config: 'configs/mysite.yaml', format: 'markdown' };
       const args = buildMonitorUrlsArgs(input);
-      expect(args).toEqual(['gsc', 'monitor', 'run', '--config', 'configs/mysite.yaml', '--format', 'markdown']);
+      expect(args).toEqual(['monitor', 'run', '--config', 'configs/mysite.yaml', '--format', 'markdown']);
     });
 
     it('builds args with all options', () => {
       const input: GscMonitorUrlsInput = { config: 'configs/mysite.yaml', dry_run: true, format: 'markdown' };
       const args = buildMonitorUrlsArgs(input);
       expect(args).toEqual([
-        'gsc', 'monitor', 'run',
+        'monitor', 'run',
         '--config', 'configs/mysite.yaml',
         '--dry-run',
         '--format', 'markdown',

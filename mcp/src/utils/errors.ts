@@ -35,12 +35,10 @@ export interface ToolFailureResult {
   error: ToolErrorShape
 }
 
-export interface ToolSuccessResult<T extends Record<string, unknown>> {
-  success: true
-  warnings: string[]
-  data: T
-}
-
+/**
+ * Build a standardized failure result. The `hint` field is omitted entirely
+ * when not provided so it never serializes as `"hint": undefined`.
+ */
 export function errorResult(
   code: ErrorCode,
   message: string,
@@ -52,11 +50,13 @@ export function errorResult(
   }
 }
 
-export function successResult<T extends Record<string, unknown>>(
-  data: T,
-  warnings: string[] = [],
-): ToolSuccessResult<T> {
-  return { success: true, warnings, data }
+/**
+ * Convert a thrown {@link ToolError} into a {@link ToolFailureResult}.
+ * This is the single conversion point native tools use in their catch blocks,
+ * replacing hand-rolled `{ success: false, error: { ... } }` literals.
+ */
+export function toolErrorToFailure(err: ToolError): ToolFailureResult {
+  return errorResult(err.code, err.message, err.hint)
 }
 
 // ============================================================================

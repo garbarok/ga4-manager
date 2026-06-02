@@ -167,12 +167,12 @@ describe('gsc_index_coverage input schema', () => {
 describe('buildIndexCoverageArgs', () => {
   it('builds args with site only', () => {
     const args = buildIndexCoverageArgs({ site: 'sc-domain:example.com' } as GscIndexCoverageInput);
-    expect(args).toEqual(['gsc', 'coverage', '--site', 'sc-domain:example.com']);
+    expect(args).toEqual(['coverage', '--site', 'sc-domain:example.com']);
   });
 
   it('builds args with config only', () => {
     const args = buildIndexCoverageArgs({ config: 'configs/mysite.yaml' } as GscIndexCoverageInput);
-    expect(args).toEqual(['gsc', 'coverage', '--config', 'configs/mysite.yaml']);
+    expect(args).toEqual(['coverage', '--config', 'configs/mysite.yaml']);
   });
 
   it('builds args with custom days', () => {
