@@ -125,7 +125,7 @@ export function buildMonitorUrlsArgs(input: GscMonitorUrlsInput): string[] {
     throw new Error('buildMonitorUrlsArgs() requires config-based input');
   }
 
-  const args = ['gsc', 'monitor', 'run', '--config', input.config];
+  const args = ['monitor', 'run', '--config', input.config];
 
   if (input.dry_run) {
     args.push('--dry-run');
@@ -576,7 +576,7 @@ export function parseMonitorUrlsOutput(output: string, input: GscMonitorUrlsInpu
   }
 
   // Parse results based on format
-  let results: URLInspectionResult[] = [];
+  let results: URLInspectionResult[];
 
   if (input.format === 'json') {
     results = parseJSONOutput(output);

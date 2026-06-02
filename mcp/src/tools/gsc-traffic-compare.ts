@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
-import { ToolError, ErrorCode } from '../utils/errors.js'
+import {
+  ToolError,
+  ErrorCode,
+  errorResult,
+  toolErrorToFailure,
+  type ToolFailureResult,
+} from '../utils/errors.js'
 import { normalizeGscSite } from '../utils/url-normalize.js'
 import {
   computeTrafficDiff,
@@ -100,10 +106,7 @@ export type GscTrafficCompareResult =
       unchanged: number
       normalize_mode_used: string
     }
-  | {
-      success: false
-      error: { code: string; message: string; hint?: string }
-    }
+  | ToolFailureResult
 
 // ============================================================================
 // GSC API
@@ -182,38 +185,29 @@ export async function runGscTrafficCompare(
   // ── Input validation ────────────────────────────────────────────────────
 
   if (fetch_limit <= output_limit) {
-    return {
-      success: false,
-      error: {
-        code: ErrorCode.INVALID_INPUT,
-        message: `fetch_limit (${fetch_limit}) must be greater than output_limit (${output_limit})`,
-        hint: 'Increase fetch_limit or decrease output_limit so output_limit < fetch_limit',
-      },
-    }
+    return errorResult(
+      ErrorCode.INVALID_INPUT,
+      `fetch_limit (${fetch_limit}) must be greater than output_limit (${output_limit})`,
+      'Increase fetch_limit or decrease output_limit so output_limit < fetch_limit',
+    )
   }
 
   // ── Date-range validation ────────────────────────────────────────────────
 
   if (period_a.start > period_a.end) {
-    return {
-      success: false,
-      error: {
-        code: ErrorCode.INVALID_INPUT,
-        message: `period_a start (${period_a.start}) is after end (${period_a.end})`,
-        hint: 'Ensure start <= end in YYYY-MM-DD format',
-      },
-    }
+    return errorResult(
+      ErrorCode.INVALID_INPUT,
+      `period_a start (${period_a.start}) is after end (${period_a.end})`,
+      'Ensure start <= end in YYYY-MM-DD format',
+    )
   }
 
   if (period_b.start > period_b.end) {
-    return {
-      success: false,
-      error: {
-        code: ErrorCode.INVALID_INPUT,
-        message: `period_b start (${period_b.start}) is after end (${period_b.end})`,
-        hint: 'Ensure start <= end in YYYY-MM-DD format',
-      },
-    }
+    return errorResult(
+      ErrorCode.INVALID_INPUT,
+      `period_b start (${period_b.start}) is after end (${period_b.end})`,
+      'Ensure start <= end in YYYY-MM-DD format',
+    )
   }
 
   const warnings: string[] = []
@@ -259,34 +253,15 @@ export async function runGscTrafficCompare(
   const bFailed = resultB.status === 'rejected'
 
   if (aFailed && bFailed) {
-    // Both failed — propagate specific code when available
-    const err = resultA.reason as unknown
-    if (err instanceof ToolError) {
-      return {
-        success: false,
-        error: {
-          code: err.code,
-          message: err.message,
-          ...(err.hint !== undefined ? { hint: err.hint } : {}),
-        },
-      }
-    }
-    const bErr = (resultB as PromiseRejectedResult).reason as unknown
-    if (bErr instanceof ToolError) {
-      return {
-        success: false,
-        error: {
-          code: bErr.code,
-          message: bErr.message,
-          ...(bErr.hint !== undefined ? { hint: bErr.hint } : {}),
-        },
-      }
-    }
-    const msg = err instanceof Error ? err.message : String(err)
-    return {
-      success: false,
-      error: { code: ErrorCode.UPSTREAM_5XX, message: msg },
-    }
+    // Both failed — propagate the first specific ToolError code when available
+    const reasonA = resultA.reason as unknown
+    const reasonB = (resultB as PromiseRejectedResult).reason as unknown
+    if (reasonA instanceof ToolError) return toolErrorToFailure(reasonA)
+    if (reasonB instanceof ToolError) return toolErrorToFailure(reasonB)
+    return errorResult(
+      ErrorCode.UPSTREAM_5XX,
+      reasonA instanceof Error ? reasonA.message : String(reasonA),
+    )
   }
 
   if (aFailed || bFailed) {
@@ -296,14 +271,11 @@ export async function runGscTrafficCompare(
       ? resultA.reason
       : (resultB as PromiseRejectedResult).reason
     const msg = rawErr instanceof Error ? rawErr.message : String(rawErr)
-    return {
-      success: false,
-      error: {
-        code: ErrorCode.PARTIAL_FETCH_FAILED,
-        message: `${failedLabel} failed: ${msg}`,
-        hint: `${succeededLabel} succeeded; retry ${failedLabel} only`,
-      },
-    }
+    return errorResult(
+      ErrorCode.PARTIAL_FETCH_FAILED,
+      `${failedLabel} failed: ${msg}`,
+      `${succeededLabel} succeeded; retry ${failedLabel} only`,
+    )
   }
 
   const rowsA = (resultA as PromiseFulfilledResult<GscRow[]>).value

@@ -266,7 +266,7 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   let finalUrl: string
   let statusCode: number
   let html: string
-  let chain: RedirectHop[] = []
+  let chain: RedirectHop[]
 
   try {
     const traceResult = await limiter.schedule(() =>

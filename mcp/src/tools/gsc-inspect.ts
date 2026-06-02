@@ -83,7 +83,7 @@ export interface InspectUrlOutput {
  * Build CLI arguments for URL inspection
  */
 export function buildInspectUrlArgs(input: GscInspectUrlInput): string[] {
-  return ['gsc', 'inspect', 'url', '--site', input.site, '--url', input.url];
+  return ['inspect', 'url', '--site', input.site, '--url', input.url];
 }
 
 /**

@@ -65,7 +65,6 @@ describe('gsc_inspect_url tool', () => {
       };
       const args = buildInspectUrlArgs(input);
       expect(args).toEqual([
-        'gsc',
         'inspect',
         'url',
         '--site',
@@ -82,7 +81,6 @@ describe('gsc_inspect_url tool', () => {
       };
       const args = buildInspectUrlArgs(input);
       expect(args).toEqual([
-        'gsc',
         'inspect',
         'url',
         '--site',

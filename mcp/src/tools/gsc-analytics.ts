@@ -170,7 +170,7 @@ export function validateDimensions(dimensionsStr: string): { valid: boolean; dim
  * Build CLI arguments for analytics run
  */
 export function buildAnalyticsRunArgs(input: GscAnalyticsRunInput): string[] {
-  const args: string[] = ['gsc', 'analytics', 'run'];
+  const args: string[] = ['analytics', 'run'];
 
   if (input.config) {
     args.push('--config', input.config);
