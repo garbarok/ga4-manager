@@ -74,3 +74,5 @@ Thumbs.db
 thoughts/
 docs/internal/
 !tools
+# Codegraph index
+.codegraph/
