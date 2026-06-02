@@ -8,6 +8,7 @@ GA4 Manager handles sensitive Google Analytics credentials and API access. This 
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 2.x     | :white_check_mark: |
 | 1.1.x   | :white_check_mark: |
 | 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
@@ -36,9 +37,10 @@ Use the principle of least privilege. The minimum required scopes are:
 ```
 https://www.googleapis.com/auth/analytics.edit       # For setup/cleanup operations
 https://www.googleapis.com/auth/analytics.readonly   # For report operations
+https://www.googleapis.com/auth/webmasters            # For Search Console operations
 ```
 
-For read-only operations (like `ga4 report`), consider using a separate service account with only the `readonly` scope.
+For read-only operations (like `ga4 report`), consider using a separate service account with only the `readonly` scope. The `webmasters` scope is required for any Search Console tool (`gsc_*`). Use `scripts/setup.sh` to configure all scopes interactively.
 
 ### 3. Environment Configuration
 
@@ -270,9 +272,9 @@ If you discover a security vulnerability in GA4 Manager, please report it respon
 
 | Date       | Version | Changes |
 |------------|---------|---------|
+| 2026-04-25 | 2.2.0   | Added webmasters OAuth scope; updated supported versions to include 2.x |
 | 2025-11-22 | 1.1.0   | Initial security policy, credential validation, enhanced .gitignore |
 
 ---
 
-**Last Updated:** 2025-11-22
-**Contact:** [UPDATE WITH YOUR CONTACT INFO]
+**Last Updated:** 2026-04-25

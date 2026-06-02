@@ -166,8 +166,7 @@ For detailed instructions, see [SECURITY.md](../SECURITY.md).
    ```
 
 3. **Test your changes**
-   - Build and run the binary
-   - Test with both projects (SnapCompress, Personal Website)
+   - Build and run the binary against a real GA4 property
    - Verify error handling
 
 ### PR Description Template
@@ -183,11 +182,9 @@ Brief description of your changes
 - [ ] Documentation update
 
 ## Testing
-- [ ] Tested with SnapCompress project
-- [ ] Tested with Personal Website project
-- [ ] All tests passing
-- [ ] Lint checks passing
-- [ ] Security audit passing
+- [ ] All tests passing (`make test`)
+- [ ] Lint checks passing (`make lint`)
+- [ ] Security audit passing (`./scripts/security-audit.sh`)
 
 ## Checklist
 - [ ] Code follows the project's style guidelines
@@ -368,7 +365,7 @@ make lint
 - [README.md](../README.md) - Project overview and usage
 - [CLAUDE.md](../CLAUDE.md) - Architecture and development guide
 - [SECURITY.md](../SECURITY.md) - Security guidelines
-- [OPEN_SOURCE_READINESS.md](../OPEN_SOURCE_READINESS.md) - Security audit report
+- [SECURITY.md](../SECURITY.md) - Security guidelines and vulnerability reporting
 
 ### Resources
 - [Google Analytics Admin API](https://developers.google.com/analytics/devguides/config/admin/v1)

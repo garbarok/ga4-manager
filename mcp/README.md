@@ -4,10 +4,10 @@
 
 A Model Context Protocol (MCP) server that exposes GA4 Manager CLI commands as 13 structured tools for AI assistants. Configure Google Analytics 4 properties, manage Search Console, and query analytics data using natural language with Claude Code, Claude Desktop, and other MCP clients.
 
-[![Tests](https://img.shields.io/badge/tests-720%2B%20passing-brightgreen)]()
+[![Tests](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
 [![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.25-purple)]()
-[![Tools](https://img.shields.io/badge/MCP%20Tools-13-orange)]()
+[![Tools](https://img.shields.io/badge/MCP%20Tools-16-orange)]()
 
 ---
 
@@ -36,7 +36,7 @@ This MCP server bridges AI assistants like **Claude Code** with the GA4 Manager 
 ## Features
 
 - ✅ **13 Production-Ready Tools** - Complete GA4 and GSC operation coverage
-- ✅ **720+ Passing Tests** - Comprehensive test suite ensures reliability
+- ✅ **Comprehensive Test Suite** - All tools covered by unit and integration tests
 - ✅ **Structured JSON Output** - All CLI responses parsed to machine-readable format
 - ✅ **Intelligent Parsing** - Auto-detects and handles JSON, tables, CSV, markdown
 - ✅ **Dry-Run Support** - Preview changes before applying (safe operations)
@@ -116,12 +116,12 @@ See **[CONFIGURATION.md](./CONFIGURATION.md)** for setup guides:
 **Claude Desktop:**
 - Restart Claude Desktop
 - Click 🔌 icon in bottom-left
-- Should show "ga4-manager" with 13 tools
+- Should show "ga4-manager" with 16 tools
 
 **Claude CLI:**
 ```bash
 claude mcp list
-# Should show: ga4-manager (13 tools)
+# Should show: ga4-manager (16 tools)
 ```
 
 **VS Code/Cursor:**
@@ -129,7 +129,7 @@ claude mcp list
 
 ---
 
-## Available Tools (13)
+## Available Tools (16)
 
 ### Tool Categories
 
@@ -150,10 +150,15 @@ claude mcp list
 - `gsc_monitor_urls` - Batch URL monitoring
 - `gsc_index_coverage` - Index coverage report
 
+**Diagnostics & SEO (3 tools)** - Traffic analysis and page auditing
+- `gsc_traffic_compare` - Diff GSC traffic between two date ranges per URL
+- `ga4_consent_health` - Consent banner grant/deny rates and health score
+- `seo_page_audit` - On-page SEO audit with optional Core Web Vitals
+
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`
+- `ga4_report`, `ga4_validate`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`
 
 **Modifying (Use with caution):**
 - `ga4_setup`, `ga4_cleanup`, `ga4_link`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
@@ -906,6 +911,116 @@ Generates index coverage analysis showing indexed, excluded, and error pages bas
 - Track coverage after site updates
 - Estimate indexed page count
 
+### Diagnostics & SEO Tools
+
+#### `gsc_traffic_compare` - Compare GSC Traffic Between Date Ranges
+
+Diffs Google Search Console search analytics between two date ranges per URL to surface the biggest drops and gains.
+
+**Input Schema:**
+
+```typescript
+{
+  site: string;                     // Required: "sc-domain:example.com" or URL-prefix
+  period_a_start: string;           // Required: ISO date "YYYY-MM-DD"
+  period_a_end: string;             // Required: ISO date "YYYY-MM-DD"
+  period_b_start: string;           // Required: ISO date "YYYY-MM-DD"
+  period_b_end: string;             // Required: ISO date "YYYY-MM-DD"
+  fetch_limit?: number;             // Max URLs to fetch per period (default 500)
+  output_limit?: number;            // Max rows in output (default 50)
+  sort_by?: "clicks" | "impressions" | "delta"; // Sort mode (default "clicks")
+  min_clicks_a?: number;            // Minimum clicks in period A to include URL
+  url_normalization?: "none" | "minimal" | "aggressive";
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "site": "sc-domain:example.com",
+  "period_a": { "start": "2024-12-01", "end": "2024-12-14" },
+  "period_b": { "start": "2024-11-17", "end": "2024-11-30" },
+  "summary": { "urls_analyzed": 120, "total_click_delta": -340 },
+  "rows": [
+    {
+      "url": "https://example.com/pricing",
+      "clicks_a": 45, "clicks_b": 120,
+      "delta_clicks": -75, "delta_pct": -62.5
+    }
+  ]
+}
+```
+
+---
+
+#### `ga4_consent_health` - Consent Banner Health Report
+
+Reports consent banner grant/deny rates and a composite health score from `consent_granted` / `consent_denied` custom events in GA4.
+
+**Input Schema:**
+
+```typescript
+{
+  property_id: string;  // Required: GA4 property ID (e.g. "123456789")
+  days?: number;        // Lookback window in days (default 30)
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "property_id": "123456789",
+  "period_days": 30,
+  "consent_rate_pct": 72.4,
+  "consent_visibility_pct": 89.1,
+  "health_score": 64.5,
+  "granted": 14821,
+  "denied": 5641,
+  "note": "Uses consent_granted/consent_denied custom events. Requires Consent Mode v2 event instrumentation."
+}
+```
+
+---
+
+#### `seo_page_audit` - On-Page SEO Audit
+
+Single-URL on-page SEO audit: title/description length and pixel-width checks, canonical severity escalation, JSON-LD extraction, redirect chain tracing, robots.txt respect, and optional Core Web Vitals via PageSpeed Insights.
+
+**Input Schema:**
+
+```typescript
+{
+  url: string;                    // Required: page URL to audit
+  include_cwv?: boolean;          // Include Core Web Vitals via PSI (default false)
+  psi_api_key?: string;           // PageSpeed Insights API key (required for CWV)
+  strategy?: "mobile" | "desktop"; // PSI strategy (default "mobile")
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "url": "https://example.com/pricing",
+  "issues": [
+    { "type": "title_too_long", "severity": "warning", "value": "62 chars / 498px" },
+    { "type": "canonical_mismatch", "severity": "error", "canonical": "https://example.com/pricing/" }
+  ],
+  "meta": {
+    "title": "Pricing - Example",
+    "description": "Choose the right plan.",
+    "canonical": "https://example.com/pricing/"
+  },
+  "redirects": [],
+  "schema_types": ["Product", "BreadcrumbList"]
+}
+```
+
 ---
 
 ## Configuration Files
@@ -1229,7 +1344,7 @@ npm run dev          # Run with tsx (no compile)
 ### Testing
 
 ```bash
-npm test             # Run all 720+ tests
+npm test             # Run all tests
 npm run test:watch   # Watch mode
 npm run test:run     # Single run (CI)
 ```
@@ -1249,7 +1364,7 @@ mcp/
 │   ├── cli/
 │   │   ├── executor.ts       # Subprocess execution
 │   │   └── parser.ts         # Output parsing
-│   ├── tools/                # 13 tool implementations
+│   ├── tools/                # 16 tool implementations
 │   │   ├── ga4-setup.ts
 │   │   ├── ga4-report.ts
 │   │   ├── ga4-cleanup.ts
@@ -1266,7 +1381,7 @@ mcp/
 │   └── types/
 │       ├── cli.ts            # CLI response types
 │       └── mcp.ts            # MCP schemas
-└── tests/                     # 720+ comprehensive tests
+└── tests/                     # comprehensive tests
 ```
 
 ---
@@ -1356,7 +1471,7 @@ MIT - See [LICENSE](../LICENSE) for details
 
 See [CHANGELOG.md](./CHANGELOG.md) for complete version history and release notes.
 
-**Current Version:** 2.0.0+ (720+ tests passing)
+**Current Version:** 2.2.0
 
 ---
 
