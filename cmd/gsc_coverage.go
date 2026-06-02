@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
+	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 
 	"github.com/garbarok/ga4-manager/internal/config"
@@ -139,7 +140,7 @@ func runGSCCoverage(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate inputs
-	if err := validateCoverageInputs(siteURL, days, gscCoverageState); err != nil {
+	if err := gsc.ValidateCoverageParams(siteURL, days, gscCoverageState); err != nil {
 		color.Red("✗ Validation failed: %v", err)
 		return err
 	}
@@ -184,36 +185,15 @@ func runGSCCoverage(cmd *cobra.Command, args []string) error {
 	case "markdown":
 		displayCoverageMarkdown(report)
 	default:
-		displayCoverageTable(report)
+		if err := displayCoverageTable(report); err != nil {
+			return err
+		}
 	}
 
 	// Display summary and quota status
 	if gscCoverageFormat == "table" || gscCoverageFormat == "markdown" {
 		displayCoverageSummary(report)
 		displayCoverageQuotaStatus(client)
-	}
-
-	return nil
-}
-
-func validateCoverageInputs(siteURL string, days int, state string) error {
-	if siteURL == "" {
-		return fmt.Errorf("site URL is required")
-	}
-
-	if days < 1 || days > 180 {
-		return fmt.Errorf("days must be between 1 and 180, got %d", days)
-	}
-
-	validStates := map[string]bool{
-		"all":             true,
-		"indexed":         true,
-		"low_impressions": true,
-		"no_impressions":  true,
-	}
-
-	if !validStates[state] {
-		return fmt.Errorf("invalid state '%s': must be one of: all, indexed, low_impressions, no_impressions", state)
 	}
 
 	return nil
@@ -239,7 +219,7 @@ func displayCoverageDryRun(siteURL, startDate, endDate, state string, topIssues 
 	color.Blue("ℹ️  No API call made. Remove --dry-run to execute query.")
 }
 
-func displayCoverageTable(report *gsc.IndexCoverageReport) {
+func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 	// Display coverage summary
 	color.Cyan("═══ Index Coverage Summary ═══")
 	fmt.Printf("Total Pages Found:    %s\n", color.BlueString("%d", report.TotalPages))
@@ -255,31 +235,27 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) {
 	if len(report.TopIssues) > 0 {
 		color.Cyan("═══ Coverage Issues ═══")
 		issueTable := tablewriter.NewWriter(os.Stdout)
-		issueTable.SetHeader([]string{"Issue Type", "Count", "Percentage"})
+		issueTable.Header([]string{"Issue Type", "Count", "Percentage"})
 
 		// Table styling
-		issueTable.SetAutoWrapText(false)
-		issueTable.SetAutoFormatHeaders(true)
-		issueTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		issueTable.SetAlignment(tablewriter.ALIGN_LEFT)
-		issueTable.SetCenterSeparator("")
-		issueTable.SetColumnSeparator("")
-		issueTable.SetRowSeparator("")
-		issueTable.SetHeaderLine(false)
-		issueTable.SetBorder(false)
-		issueTable.SetTablePadding("\t")
-		issueTable.SetNoWhiteSpace(true)
+		issueTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
+		issueTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
+		issueTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 		for _, issue := range report.TopIssues {
 			percentage := float64(issue.Count) / float64(report.TotalPages) * 100
-			issueTable.Append([]string{
+			if err := issueTable.Append([]string{
 				issue.Issue,
 				fmt.Sprintf("%d", issue.Count),
 				fmt.Sprintf("%.1f%%", percentage),
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
 
-		issueTable.Render()
+		if err := issueTable.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 		fmt.Println()
 	}
 
@@ -287,20 +263,12 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) {
 	if len(report.PagesSample) > 0 {
 		color.Cyan("═══ Page Samples (Top 20) ═══")
 		pageTable := tablewriter.NewWriter(os.Stdout)
-		pageTable.SetHeader([]string{"URL", "Status", "Impressions", "Clicks", "CTR", "Position"})
+		pageTable.Header([]string{"URL", "Status", "Impressions", "Clicks", "CTR", "Position"})
 
 		// Table styling
-		pageTable.SetAutoWrapText(false)
-		pageTable.SetAutoFormatHeaders(true)
-		pageTable.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		pageTable.SetAlignment(tablewriter.ALIGN_LEFT)
-		pageTable.SetCenterSeparator("")
-		pageTable.SetColumnSeparator("")
-		pageTable.SetRowSeparator("")
-		pageTable.SetHeaderLine(false)
-		pageTable.SetBorder(false)
-		pageTable.SetTablePadding("\t")
-		pageTable.SetNoWhiteSpace(true)
+		pageTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
+		pageTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
+		pageTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 		displayLimit := len(report.PagesSample)
 		if displayLimit > 20 {
@@ -316,17 +284,21 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) {
 				url = url[:47] + "..."
 			}
 
-			pageTable.Append([]string{
+			if err := pageTable.Append([]string{
 				url,
 				page.Status,
 				fmt.Sprintf("%d", page.Impressions),
 				fmt.Sprintf("%d", page.Clicks),
 				fmt.Sprintf("%.1f%%", page.CTR*100),
 				fmt.Sprintf("%.1f", page.Position),
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
 
-		pageTable.Render()
+		if err := pageTable.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 
 		if len(report.PagesSample) > 20 {
 			fmt.Println()
@@ -334,6 +306,7 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) {
 		}
 		fmt.Println()
 	}
+	return nil
 }
 
 func displayCoverageJSON(report *gsc.IndexCoverageReport) {

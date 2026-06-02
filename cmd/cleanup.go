@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/garbarok/ga4-manager/internal/ga4"
 	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/olekukonko/tablewriter"
+	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 )
 
@@ -79,10 +79,11 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 	}
 
 	// Create GA4 client
-	client, err := ga4.NewClient()
+	client, err := newGA4Client()
 	if err != nil {
-		return fmt.Errorf("failed to create GA4 client: %w", err)
+		return err
 	}
+	defer client.Close()
 
 	// Load projects based on flags
 	projects, err := loadProjects(cfgPath, projName, all)
@@ -114,40 +115,49 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 		if hasConversions {
 			fmt.Printf("\n%s Conversion Events to Remove:\n", red("🗑"))
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"Event Name", "Status"})
-			table.SetAutoWrapText(false)
-			table.SetAlignment(tablewriter.ALIGN_LEFT)
+			table.Header([]string{"Event Name", "Status"})
+			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
 
 			for _, eventName := range cfg.Cleanup.ConversionsToRemove {
-				table.Append([]string{eventName, "Will be deleted"})
+				if err := table.Append([]string{eventName, "Will be deleted"}); err != nil {
+					return fmt.Errorf("failed to append table row: %w", err)
+				}
 			}
-			table.Render()
+			if err := table.Render(); err != nil {
+				return fmt.Errorf("failed to render table: %w", err)
+			}
 		}
 
 		if hasDimensions {
 			fmt.Printf("\n%s Custom Dimensions to Remove:\n", red("🗑"))
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"Parameter Name", "Status"})
-			table.SetAutoWrapText(false)
-			table.SetAlignment(tablewriter.ALIGN_LEFT)
+			table.Header([]string{"Parameter Name", "Status"})
+			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
 
 			for _, paramName := range cfg.Cleanup.DimensionsToRemove {
-				table.Append([]string{paramName, "Will be archived"})
+				if err := table.Append([]string{paramName, "Will be archived"}); err != nil {
+					return fmt.Errorf("failed to append table row: %w", err)
+				}
 			}
-			table.Render()
+			if err := table.Render(); err != nil {
+				return fmt.Errorf("failed to render table: %w", err)
+			}
 		}
 
 		if hasMetrics {
 			fmt.Printf("\n%s Custom Metrics to Remove:\n", red("🗑"))
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"Parameter Name", "Status"})
-			table.SetAutoWrapText(false)
-			table.SetAlignment(tablewriter.ALIGN_LEFT)
+			table.Header([]string{"Parameter Name", "Status"})
+			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
 
 			for _, paramName := range cfg.Cleanup.MetricsToRemove {
-				table.Append([]string{paramName, "Will be archived"})
+				if err := table.Append([]string{paramName, "Will be archived"}); err != nil {
+					return fmt.Errorf("failed to append table row: %w", err)
+				}
 			}
-			table.Render()
+			if err := table.Render(); err != nil {
+				return fmt.Errorf("failed to render table: %w", err)
+			}
 		}
 
 		if dryRun {

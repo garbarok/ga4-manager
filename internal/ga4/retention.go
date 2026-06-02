@@ -41,8 +41,7 @@ func (c *Client) SetDataRetention(propertyID string, months int, resetOnNewActiv
 
 	updateMask := "eventDataRetention,resetUserDataOnNewActivity"
 
-	_, err := c.admin.Properties.UpdateDataRetentionSettings(settingsPath, settings).UpdateMask(updateMask).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.updateDataRetentionSettings(c.ctx, settingsPath, settings, updateMask); err != nil {
 		return fmt.Errorf("failed to update data retention: %w", err)
 	}
 
@@ -53,7 +52,7 @@ func (c *Client) SetDataRetention(propertyID string, months int, resetOnNewActiv
 func (c *Client) GetDataRetention(propertyID string) (*DataRetentionSettings, error) {
 	settingsPath := fmt.Sprintf("properties/%s/dataRetentionSettings", propertyID)
 
-	settings, err := c.admin.Properties.GetDataRetentionSettings(settingsPath).Context(c.ctx).Do()
+	settings, err := c.admin.getDataRetentionSettings(c.ctx, settingsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data retention settings: %w", err)
 	}
@@ -79,8 +78,7 @@ func (c *Client) DisableUserDataRetention(propertyID string) error {
 
 	updateMask := "resetUserDataOnNewActivity"
 
-	_, err := c.admin.Properties.UpdateDataRetentionSettings(settingsPath, settings).UpdateMask(updateMask).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.updateDataRetentionSettings(c.ctx, settingsPath, settings, updateMask); err != nil {
 		return fmt.Errorf("failed to disable user data retention: %w", err)
 	}
 

@@ -83,9 +83,9 @@ func executeSetup(cfgPath, projName string, all, dryRun bool) error {
 
 		// Create GA4 client if needed
 		if cfg.HasAnalytics() {
-			ga4Client, err = ga4.NewClient()
+			ga4Client, err = newGA4Client()
 			if err != nil {
-				return fmt.Errorf("failed to create GA4 client: %w", err)
+				return err
 			}
 			defer ga4Client.Close()
 		}

@@ -11,7 +11,6 @@ import (
 
 // CreateCustomMetric creates a custom metric in GA4
 func (c *Client) CreateCustomMetric(propertyID string, metric config.MetricConfig) error {
-	// Validate inputs
 	if err := validation.ValidateMetricParams(propertyID, metric.ParameterName, metric.DisplayName, metric.MeasurementUnit, metric.Scope); err != nil {
 		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
@@ -24,11 +23,6 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.MetricConfi
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "CreateCustomMetric"); err != nil {
-		return err
-	}
-
 	c.logger.Debug("creating custom metric",
 		slog.String("property_id", propertyID),
 		slog.String("parameter_name", metric.ParameterName),
@@ -36,31 +30,9 @@ func (c *Client) CreateCustomMetric(propertyID string, metric config.MetricConfi
 		slog.String("scope", metric.Scope),
 	)
 
-	property := fmt.Sprintf("properties/%s", propertyID)
-	_, err := c.admin.Properties.CustomMetrics.Create(property, metricToSDK(metric)).Context(c.ctx).Do()
-	if err != nil {
-		if isAlreadyExistsError(err) {
-			c.logger.Debug("custom metric already exists",
-				slog.String("display_name", metric.DisplayName),
-				slog.String("parameter_name", metric.ParameterName),
-			)
-			return nil // Already exists, not an error
-		}
-		c.logger.Error("failed to create custom metric",
-			slog.String("display_name", metric.DisplayName),
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("failed to create custom metric '%s' for property %s: %w", metric.DisplayName, propertyID, err)
-	}
-
-	c.logger.Info("custom metric created successfully",
-		slog.String("parameter_name", metric.ParameterName),
-		slog.String("display_name", metric.DisplayName),
-		slog.String("property_id", propertyID),
-	)
-
-	return nil
+	return c.createResource("custom metric", propertyID, metric.DisplayName, func(parent string) error {
+		return c.admin.createCustomMetric(c.ctx, parent, metricToSDK(metric))
+	})
 }
 
 func metricToSDK(metric config.MetricConfig) *analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric {
@@ -87,40 +59,9 @@ func metricToSDK(metric config.MetricConfig) *analyticsadmin.GoogleAnalyticsAdmi
 
 // ListCustomMetrics returns all custom metrics for a property
 func (c *Client) ListCustomMetrics(propertyID string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric, error) {
-	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "ListCustomMetrics"); err != nil {
-		return nil, err
-	}
-
-	c.logger.Debug("listing custom metrics",
-		slog.String("property_id", propertyID),
-	)
-
-	property := fmt.Sprintf("properties/%s", propertyID)
-	resp, err := c.admin.Properties.CustomMetrics.List(property).Context(c.ctx).Do()
-	if err != nil {
-		c.logger.Error("failed to list custom metrics",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("failed to list custom metrics for property %s: %w", propertyID, err)
-	}
-
-	c.logger.Debug("custom metrics listed successfully",
-		slog.String("property_id", propertyID),
-		slog.Int("count", len(resp.CustomMetrics)),
-	)
-
-	return resp.CustomMetrics, nil
+	return listResource(c, "custom metric", propertyID, func(parent string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric, error) {
+		return c.admin.listCustomMetrics(c.ctx, parent)
+	})
 }
 
 // SetupCustomMetrics creates all custom metrics for a project
@@ -150,8 +91,7 @@ func (c *Client) UpdateCustomMetric(metricName string, metric config.MetricConfi
 		Description: metric.Description,
 	}
 
-	_, err := c.admin.Properties.CustomMetrics.Patch(metricName, customMetric).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.patchCustomMetric(c.ctx, metricName, customMetric); err != nil {
 		c.logger.Error("failed to update custom metric",
 			slog.String("metric_name", metricName),
 			slog.String("error", err.Error()),
@@ -177,8 +117,7 @@ func (c *Client) ArchiveCustomMetric(metricName string) error {
 		slog.String("metric_name", metricName),
 	)
 
-	_, err := c.admin.Properties.CustomMetrics.Archive(metricName, &analyticsadmin.GoogleAnalyticsAdminV1alphaArchiveCustomMetricRequest{}).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.archiveCustomMetric(c.ctx, metricName); err != nil {
 		c.logger.Error("failed to archive custom metric",
 			slog.String("metric_name", metricName),
 			slog.String("error", err.Error()),
@@ -193,9 +132,22 @@ func (c *Client) ArchiveCustomMetric(metricName string) error {
 	return nil
 }
 
+// findMetricByParameterName searches for a custom metric by parameter name.
+// Returns (metric, nil) if found, (nil, nil) if not found, (nil, err) on API failure.
+func (c *Client) findMetricByParameterName(propertyID, parameterName string) (*analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric, error) {
+	metrics, err := c.ListCustomMetrics(propertyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list custom metrics: %w", err)
+	}
+
+	metric, _ := firstMatch(metrics, func(m *analyticsadmin.GoogleAnalyticsAdminV1alphaCustomMetric) string {
+		return m.ParameterName
+	}, parameterName)
+	return metric, nil
+}
+
 // DeleteMetric deletes a custom metric by parameter name (finds and archives it)
 func (c *Client) DeleteMetric(propertyID, parameterName string) error {
-	// Validate inputs
 	if err := validation.ValidatePropertyID(propertyID); err != nil {
 		c.logger.Error("invalid property ID",
 			slog.String("property_id", propertyID),
@@ -217,35 +169,17 @@ func (c *Client) DeleteMetric(propertyID, parameterName string) error {
 		slog.String("parameter_name", parameterName),
 	)
 
-	// List all metrics to find the one with matching parameter name
-	property := fmt.Sprintf("properties/%s", propertyID)
-
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "DeleteMetric-List"); err != nil {
-		return err
-	}
-
-	resp, err := c.admin.Properties.CustomMetrics.List(property).Context(c.ctx).Do()
+	metric, err := c.findMetricByParameterName(propertyID, parameterName)
 	if err != nil {
-		c.logger.Error("failed to list custom metrics",
+		return fmt.Errorf("failed to find custom metric '%s': %w", parameterName, err)
+	}
+	if metric == nil {
+		c.logger.Warn("custom metric not found",
+			slog.String("parameter_name", parameterName),
 			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
 		)
-		return fmt.Errorf("failed to list custom metrics for property %s: %w", propertyID, err)
+		return fmt.Errorf("custom metric with parameter '%s' not found in property %s", parameterName, propertyID)
 	}
 
-	// Find metric with matching parameter name
-	for _, metric := range resp.CustomMetrics {
-		if metric.ParameterName == parameterName {
-			// Archive the metric
-			return c.ArchiveCustomMetric(metric.Name)
-		}
-	}
-
-	c.logger.Warn("custom metric not found",
-		slog.String("parameter_name", parameterName),
-		slog.String("property_id", propertyID),
-	)
-
-	return fmt.Errorf("custom metric with parameter '%s' not found in property %s", parameterName, propertyID)
+	return c.ArchiveCustomMetric(metric.Name)
 }

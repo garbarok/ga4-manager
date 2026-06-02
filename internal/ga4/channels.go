@@ -247,7 +247,7 @@ func (c *Client) CreateChannelGroup(propertyID string, group ChannelGroup) (*ana
 		GroupingRule: groupingRules,
 	}
 
-	createdGroup, err := c.admin.Properties.ChannelGroups.Create(propertyPath, channelGroup).Do()
+	createdGroup, err := c.admin.createChannelGroup(c.ctx, propertyPath, channelGroup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create channel group '%s': %w", group.DisplayName, err)
 	}
@@ -259,12 +259,12 @@ func (c *Client) CreateChannelGroup(propertyID string, group ChannelGroup) (*ana
 func (c *Client) ListChannelGroups(propertyID string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroup, error) {
 	propertyPath := fmt.Sprintf("properties/%s", propertyID)
 
-	resp, err := c.admin.Properties.ChannelGroups.List(propertyPath).Do()
+	groups, err := c.admin.listChannelGroups(c.ctx, propertyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list channel groups: %w", err)
 	}
 
-	return resp.ChannelGroups, nil
+	return groups, nil
 }
 
 // UpdateChannelGroup updates an existing channel group
@@ -290,9 +290,7 @@ func (c *Client) UpdateChannelGroup(channelGroupName string, group ChannelGroup)
 
 	updateMask := "display_name,description,grouping_rule"
 
-	_, err := c.admin.Properties.ChannelGroups.Patch(channelGroupName, channelGroup).
-		UpdateMask(updateMask).Do()
-	if err != nil {
+	if err := c.admin.patchChannelGroup(c.ctx, channelGroupName, channelGroup, updateMask); err != nil {
 		return fmt.Errorf("failed to update channel group: %w", err)
 	}
 
@@ -301,8 +299,7 @@ func (c *Client) UpdateChannelGroup(channelGroupName string, group ChannelGroup)
 
 // DeleteChannelGroup deletes a channel group
 func (c *Client) DeleteChannelGroup(channelGroupName string) error {
-	_, err := c.admin.Properties.ChannelGroups.Delete(channelGroupName).Do()
-	if err != nil {
+	if err := c.admin.deleteChannelGroup(c.ctx, channelGroupName); err != nil {
 		return fmt.Errorf("failed to delete channel group: %w", err)
 	}
 
@@ -311,7 +308,7 @@ func (c *Client) DeleteChannelGroup(channelGroupName string) error {
 
 // GetChannelGroup retrieves a specific channel group
 func (c *Client) GetChannelGroup(channelGroupName string) (*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroup, error) {
-	group, err := c.admin.Properties.ChannelGroups.Get(channelGroupName).Do()
+	group, err := c.admin.getChannelGroup(c.ctx, channelGroupName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get channel group: %w", err)
 	}

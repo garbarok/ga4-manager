@@ -114,8 +114,7 @@ func runGSCMonitor(cmd *cobra.Command, args []string) error {
 
 	// Dry-run mode
 	if gscMonitorDryRun {
-		displayDryRunPreview(siteURL, priorityURLs)
-		return nil
+		return displayDryRunPreview(siteURL, priorityURLs)
 	}
 
 	// Create client
@@ -143,7 +142,9 @@ func runGSCMonitor(cmd *cobra.Command, args []string) error {
 	case "markdown":
 		displayMarkdownResults(results, siteURL)
 	default:
-		displayTableResults(results)
+		if err := displayTableResults(results); err != nil {
+			return err
+		}
 	}
 
 	// Summary
@@ -155,7 +156,7 @@ func runGSCMonitor(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func displayDryRunPreview(siteURL string, priorityURLs []string) {
+func displayDryRunPreview(siteURL string, priorityURLs []string) error {
 	color.Cyan("═══ Dry-Run Mode ═══")
 	fmt.Println()
 
@@ -164,32 +165,33 @@ func displayDryRunPreview(siteURL string, priorityURLs []string) {
 	fmt.Println()
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"#", "URL"})
-	table.SetBorder(true)
+	table.Header([]string{"#", "URL"})
 
 	for i, url := range priorityURLs {
-		table.Append([]string{
+		if err := table.Append([]string{
 			fmt.Sprintf("%d", i+1),
 			url,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 	fmt.Println()
 
 	color.Yellow("ℹ️  Dry-run mode enabled - no API calls will be made")
 	color.Yellow("ℹ️  Remove --dry-run flag to perform actual inspection")
+	return nil
 }
 
-func displayTableResults(results []gsc.URLInspectionResult) {
+func displayTableResults(results []gsc.URLInspectionResult) error {
 	color.Cyan("═══ Inspection Results ═══")
 	fmt.Println()
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"URL", "Index Status", "Coverage", "Mobile", "Issues"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
-	table.SetAutoWrapText(false)
+	table.Header([]string{"URL", "Index Status", "Coverage", "Mobile", "Issues"})
 
 	for _, r := range results {
 		// Color-coded index status
@@ -212,17 +214,22 @@ func displayTableResults(results []gsc.URLInspectionResult) {
 			url = url[:57] + "..."
 		}
 
-		table.Append([]string{
+		if err := table.Append([]string{
 			url,
 			status,
 			r.CoverageState,
 			mobile,
 			issues,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 	fmt.Println()
+	return nil
 }
 
 func displayJSONResults(results []gsc.URLInspectionResult) {

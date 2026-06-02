@@ -5,6 +5,32 @@ import (
 	"sort"
 )
 
+// ValidCoverageStates lists the index-coverage state filters the report accepts.
+var ValidCoverageStates = map[string]bool{
+	"all":             true,
+	"indexed":         true,
+	"low_impressions": true,
+	"no_impressions":  true,
+}
+
+// ValidateCoverageParams validates the inputs for an index coverage report: a
+// non-empty site URL, a lookback window of 1-180 days, and a known state filter.
+func ValidateCoverageParams(siteURL string, days int, state string) error {
+	if siteURL == "" {
+		return fmt.Errorf("site URL is required")
+	}
+
+	if days < 1 || days > 180 {
+		return fmt.Errorf("days must be between 1 and 180, got %d", days)
+	}
+
+	if !ValidCoverageStates[state] {
+		return fmt.Errorf("invalid state '%s': must be one of: all, indexed, low_impressions, no_impressions", state)
+	}
+
+	return nil
+}
+
 // IndexCoverageReport contains aggregated indexing statistics for a site
 // Note: This is an estimate based on Search Analytics data, not real-time coverage data
 type IndexCoverageReport struct {

@@ -99,7 +99,9 @@ func runGSCInspectURL(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display detailed results
-	displayInspectionResult(result, gscRichResultsOnly)
+	if err := displayInspectionResult(result, gscRichResultsOnly); err != nil {
+		return err
+	}
 
 	// Display quota status (skip if rich-results-only mode)
 	if !gscRichResultsOnly {
@@ -109,7 +111,7 @@ func runGSCInspectURL(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bool) {
+func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bool) error {
 	// Header
 	if richResultsOnly {
 		color.Cyan("═══ Rich Results Validation ═══")
@@ -125,7 +127,7 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 	// If rich-results-only mode, skip to rich results section
 	if richResultsOnly {
 		displayRichResults(result)
-		return
+		return nil
 	}
 
 	// Index Status
@@ -208,9 +210,7 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 	if len(result.IndexingIssues) > 0 {
 		color.Cyan("Issues Found:")
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Severity", "Issue Type", "Message"})
-		table.SetBorder(true)
-		table.SetAutoWrapText(false)
+		table.Header([]string{"Severity", "Issue Type", "Message"})
 
 		for _, issue := range result.IndexingIssues {
 			var severity string
@@ -223,19 +223,24 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 				severity = issue.Severity
 			}
 
-			table.Append([]string{
+			if err := table.Append([]string{
 				severity,
 				issue.IssueType,
 				issue.Message,
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
 
-		table.Render()
+		if err := table.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 		fmt.Println()
 	} else {
 		color.Green("✓ No issues detected")
 		fmt.Println()
 	}
+	return nil
 }
 
 // displayRichResults shows rich results information including types and detected items

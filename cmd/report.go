@@ -11,6 +11,7 @@ import (
 	"github.com/garbarok/ga4-manager/internal/ga4"
 	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/olekukonko/tablewriter"
+	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 )
 
@@ -47,10 +48,11 @@ func executeReport(cfgPath, projName string, all bool, export, output string) er
 	cyan := color.New(color.FgCyan).SprintFunc()
 
 	// Create GA4 client
-	client, err := ga4.NewClient()
+	client, err := newGA4Client()
 	if err != nil {
-		return fmt.Errorf("failed to create GA4 client: %w", err)
+		return err
 	}
+	defer client.Close()
 
 	// Load projects based on flags
 	projects, err := loadProjects(cfgPath, projName, all)
@@ -202,11 +204,12 @@ func executeExport(projectPath string, all bool, format string) {
 	fmt.Printf("\n📤 Exporting as %s...\n\n", strings.ToUpper(format))
 
 	// Create GA4 client
-	client, err := ga4.NewClient()
+	client, err := newGA4Client()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating client: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		return
 	}
+	defer client.Close()
 
 	// Load projects
 	projects, err := loadProjects(projectPath, "", all)
@@ -295,13 +298,17 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	}
 
 	convTable := tablewriter.NewWriter(os.Stdout)
-	convTable.SetHeader([]string{"Event Name", "Counting Method"})
-	convTable.SetBorder(false)
+	convTable.Header([]string{"Event Name", "Counting Method"})
+	convTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 	for _, conv := range conversions {
-		convTable.Append([]string{conv.EventName, conv.CountingMethod})
+		if err := convTable.Append([]string{conv.EventName, conv.CountingMethod}); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
-	convTable.Render()
+	if err := convTable.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 
 	// List dimensions
 	fmt.Println()
@@ -313,13 +320,17 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	}
 
 	dimTable := tablewriter.NewWriter(os.Stdout)
-	dimTable.SetHeader([]string{"Display Name", "Parameter", "Scope"})
-	dimTable.SetBorder(false)
+	dimTable.Header([]string{"Display Name", "Parameter", "Scope"})
+	dimTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 	for _, dim := range dimensions {
-		dimTable.Append([]string{dim.DisplayName, dim.ParameterName, dim.Scope})
+		if err := dimTable.Append([]string{dim.DisplayName, dim.ParameterName, dim.Scope}); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
-	dimTable.Render()
+	if err := dimTable.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 
 	// List custom metrics
 	fmt.Println()
@@ -330,13 +341,17 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 		fmt.Printf("Warning: failed to list custom metrics: %v\n", err)
 	} else {
 		metricTable := tablewriter.NewWriter(os.Stdout)
-		metricTable.SetHeader([]string{"Display Name", "Parameter", "Unit", "Scope"})
-		metricTable.SetBorder(false)
+		metricTable.Header([]string{"Display Name", "Parameter", "Unit", "Scope"})
+		metricTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 		for _, metric := range metrics {
-			metricTable.Append([]string{metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope})
+			if err := metricTable.Append([]string{metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
-		metricTable.Render()
+		if err := metricTable.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 	}
 
 	// List calculated metrics (recommended)
@@ -348,14 +363,17 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 		fmt.Printf("Warning: failed to list calculated metrics: %v\n", err)
 	} else {
 		calcTable := tablewriter.NewWriter(os.Stdout)
-		calcTable.SetHeader([]string{"Display Name", "Formula", "Unit"})
-		calcTable.SetBorder(false)
-		calcTable.SetColWidth(50)
+		calcTable.Header([]string{"Display Name", "Formula", "Unit"})
+		calcTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 		for _, calc := range calculatedMetrics {
-			calcTable.Append([]string{calc.DisplayName, calc.Formula, calc.MetricUnit})
+			if err := calcTable.Append([]string{calc.DisplayName, calc.Formula, calc.MetricUnit}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
-		calcTable.Render()
+		if err := calcTable.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 	}
 
 	// List audiences
@@ -367,17 +385,21 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 
 	audienceCategories := ga4.ListAudiencesByCategory(cfg)
 	audienceTable := tablewriter.NewWriter(os.Stdout)
-	audienceTable.SetHeader([]string{"Name", "Category", "Duration (days)"})
-	audienceTable.SetBorder(false)
+	audienceTable.Header([]string{"Name", "Category", "Duration (days)"})
+	audienceTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 	for _, category := range []string{"SEO", "Conversion", "Content", "Behavioral"} {
 		if audiences, ok := audienceCategories[category]; ok {
 			for _, aud := range audiences {
-				audienceTable.Append([]string{aud.Name, aud.Category, fmt.Sprintf("%d", aud.MembershipDuration)})
+				if err := audienceTable.Append([]string{aud.Name, aud.Category, fmt.Sprintf("%d", aud.MembershipDuration)}); err != nil {
+					return fmt.Errorf("failed to append table row: %w", err)
+				}
 			}
 		}
 	}
-	audienceTable.Render()
+	if err := audienceTable.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 
 	fmt.Println()
 	fmt.Printf("Note: Audiences must be created manually in GA4 UI. Use './ga4 export --audiences' to generate setup guides.\n")

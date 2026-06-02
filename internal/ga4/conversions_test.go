@@ -1,7 +1,7 @@
 package ga4
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/garbarok/ga4-manager/internal/config"
@@ -10,357 +10,150 @@ import (
 	admin "google.golang.org/api/analyticsadmin/v1alpha"
 )
 
-// Package-level variables to prevent compiler optimizations in benchmarks
-var (
-	benchClient     *Client
-	benchConversion *admin.GoogleAnalyticsAdminV1alphaConversionEvent
-	benchString     string
-)
+// Tracer bullet: CreateConversion drives the API with the right parent path and
+// payload. Proves the seam + fake + test client wire together end-to-end.
+func TestCreateConversion_CallsAPIWithParentAndPayload(t *testing.T) {
+	fake := &fakeAdminAPI{}
+	c := newTestClient(fake)
 
-// TestCreateConversion_Success tests successful conversion creation
-func TestCreateConversion_Success(t *testing.T) {
+	err := c.CreateConversion("123456789", "purchase", "ONCE_PER_EVENT")
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.createConvCalls)
+	assert.Equal(t, "properties/123456789", fake.gotCreateConvParent)
+	require.NotNil(t, fake.gotCreateConv)
+	assert.Equal(t, "purchase", fake.gotCreateConv.EventName)
+	assert.Equal(t, "ONCE_PER_EVENT", fake.gotCreateConv.CountingMethod)
+}
+
+// An "already exists" API error is idempotent success, not a failure.
+func TestCreateConversion_AlreadyExistsTreatedAsSuccess(t *testing.T) {
+	fake := &fakeAdminAPI{createConvErr: errAlreadyExists}
+	c := newTestClient(fake)
+
+	err := c.CreateConversion("123456789", "purchase", "ONCE_PER_EVENT")
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.createConvCalls)
+}
+
+// Invalid input is rejected before any API call is made.
+func TestCreateConversion_ValidationRejectedBeforeAPICall(t *testing.T) {
 	tests := []struct {
 		name           string
 		propertyID     string
 		eventName      string
 		countingMethod string
 	}{
-		{
-			name:           "create_once_per_session",
-			propertyID:     "123456789",
-			eventName:      "download_image",
-			countingMethod: "ONCE_PER_SESSION",
-		},
-		{
-			name:           "create_once_per_event",
-			propertyID:     "987654321",
-			eventName:      "compression_complete",
-			countingMethod: "ONCE_PER_EVENT",
-		},
+		{"empty property", "", "purchase", "ONCE_PER_EVENT"},
+		{"non-numeric property", "abc", "purchase", "ONCE_PER_EVENT"},
+		{"empty event", "123456789", "", "ONCE_PER_EVENT"},
+		{"reserved prefix event", "123456789", "google_purchase", "ONCE_PER_EVENT"},
+		{"invalid counting method", "123456789", "purchase", "TWICE"},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := NewTestContext()
-			defer cancel()
+			fake := &fakeAdminAPI{}
+			c := newTestClient(fake)
 
-			client := &Client{
-				ctx:    ctx,
-				cancel: cancel,
-			}
+			err := c.CreateConversion(tt.propertyID, tt.eventName, tt.countingMethod)
 
-			// Since we don't have a real API, we'll test the function structure
-			// In a real scenario, this would call the API
-			expectedParent := fmt.Sprintf("properties/%s", tt.propertyID)
-			expectedConversion := &admin.GoogleAnalyticsAdminV1alphaConversionEvent{
-				EventName:      tt.eventName,
-				CountingMethod: tt.countingMethod,
-			}
-
-			assert.NotNil(t, client)
-			assert.Equal(t, expectedParent, fmt.Sprintf("properties/%s", tt.propertyID))
-			assert.Equal(t, tt.eventName, expectedConversion.EventName)
-			assert.Equal(t, tt.countingMethod, expectedConversion.CountingMethod)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "validation failed")
+			assert.Equal(t, 0, fake.createConvCalls, "API must not be called on invalid input")
 		})
 	}
 }
 
-// TestCreateConversion_AlreadyExists tests handling of already existing conversion
-func TestCreateConversion_AlreadyExists(t *testing.T) {
-	ctx, cancel := NewTestContext()
-	defer cancel()
+// A non-"already exists" API error is wrapped with resource context.
+func TestCreateConversion_APIErrorWrapped(t *testing.T) {
+	fake := &fakeAdminAPI{createConvErr: errors.New("boom")}
+	c := newTestClient(fake)
 
-	client := &Client{
-		ctx:    ctx,
-		cancel: cancel,
-	}
+	err := c.CreateConversion("123456789", "purchase", "ONCE_PER_EVENT")
 
-	// Test that the error handling logic for "already exists" is correct
-	propertyID := "123456789"
-	eventName := "existing_event"
-
-	// The function checks for "already exists" string in error
-	// We'll verify the logic separately
-	assert.NotNil(t, client)
-	assert.NotEmpty(t, propertyID)
-	assert.NotEmpty(t, eventName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create conversion 'purchase' for property 123456789")
+	assert.ErrorContains(t, err, "boom")
 }
 
-// TestSetupConversions tests setting up multiple conversions
-func TestSetupConversions(t *testing.T) {
-	tests := []struct {
-		name           string
-		conversions    []config.ConversionConfig
-		expectedLength int
-	}{
-		{
-			name: "setup_multiple_conversions",
-			conversions: []config.ConversionConfig{
-				{Name: "event1", CountingMethod: "ONCE_PER_SESSION"},
-				{Name: "event2", CountingMethod: "ONCE_PER_EVENT"},
-				{Name: "event3", CountingMethod: "ONCE_PER_SESSION"},
-			},
-			expectedLength: 3,
-		},
-		{
-			name:           "setup_no_conversions",
-			conversions:    []config.ConversionConfig{},
-			expectedLength: 0,
-		},
-	}
+func TestListConversions_ReturnsItems(t *testing.T) {
+	fake := &fakeAdminAPI{convList: []*admin.GoogleAnalyticsAdminV1alphaConversionEvent{
+		{Name: "properties/123456789/conversionEvents/a", EventName: "a"},
+		{Name: "properties/123456789/conversionEvents/b", EventName: "b"},
+	}}
+	c := newTestClient(fake)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedLength, len(tt.conversions))
-		})
-	}
+	got, err := c.ListConversions("123456789")
+
+	require.NoError(t, err)
+	assert.Len(t, got, 2)
+	assert.Equal(t, 1, fake.listConvCalls)
 }
 
-// TestListConversions tests listing conversions from GA4
-func TestListConversions(t *testing.T) {
-	tests := []struct {
-		name        string
-		propertyID  string
-		conversions []*admin.GoogleAnalyticsAdminV1alphaConversionEvent
-		expectError bool
-	}{
-		{
-			name:       "list_with_results",
-			propertyID: "123456789",
-			conversions: []*admin.GoogleAnalyticsAdminV1alphaConversionEvent{
-				NewTestConversionEvent("properties/123456789/conversionEvents/download_image", "download_image"),
-				NewTestConversionEvent("properties/123456789/conversionEvents/compression_complete", "compression_complete"),
-			},
-			expectError: false,
-		},
-		{
-			name:        "list_empty_results",
-			propertyID:  "987654321",
-			conversions: []*admin.GoogleAnalyticsAdminV1alphaConversionEvent{},
-			expectError: false,
-		},
-	}
+func TestListConversions_InvalidPropertyIDRejected(t *testing.T) {
+	fake := &fakeAdminAPI{}
+	c := newTestClient(fake)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := NewTestContext()
-			defer cancel()
+	_, err := c.ListConversions("not-numeric")
 
-			client := &Client{
-				ctx:    ctx,
-				cancel: cancel,
-			}
-
-			expectedParent := fmt.Sprintf("properties/%s", tt.propertyID)
-			assert.NotNil(t, client)
-			assert.Equal(t, expectedParent, fmt.Sprintf("properties/%s", tt.propertyID))
-
-			// Verify conversion event structure
-			for _, conv := range tt.conversions {
-				assert.NotEmpty(t, conv.EventName)
-				assert.NotEmpty(t, conv.Name)
-			}
-		})
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validation failed")
+	assert.Equal(t, 0, fake.listConvCalls)
 }
 
-// TestDeleteConversion tests deleting a conversion
-func TestDeleteConversion(t *testing.T) {
-	tests := []struct {
-		name       string
-		propertyID string
-		eventName  string
-	}{
-		{
-			name:       "delete_existing_conversion",
-			propertyID: "123456789",
-			eventName:  "old_event",
-		},
-		{
-			name:       "delete_another_conversion",
-			propertyID: "987654321",
-			eventName:  "deprecated_event",
-		},
-	}
+func TestListConversions_APIErrorWrapped(t *testing.T) {
+	fake := &fakeAdminAPI{listConvErr: errors.New("api down")}
+	c := newTestClient(fake)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.NotEmpty(t, tt.propertyID)
-			assert.NotEmpty(t, tt.eventName)
-		})
-	}
+	_, err := c.ListConversions("987654321")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list conversions for property 987654321")
 }
 
-// BenchmarkCreateConversion benchmarks conversion creation structure
-func BenchmarkCreateConversion(b *testing.B) {
-	ctx, cancel := NewTestContext()
-	defer cancel()
+func TestDeleteConversion_FoundArchivesByResourceName(t *testing.T) {
+	fake := &fakeAdminAPI{convList: []*admin.GoogleAnalyticsAdminV1alphaConversionEvent{
+		{Name: "properties/123456789/conversionEvents/xyz", EventName: "old_event"},
+	}}
+	c := newTestClient(fake)
 
-	var c *Client
-	var conv *admin.GoogleAnalyticsAdminV1alphaConversionEvent
-	var s string
+	err := c.DeleteConversion("123456789", "old_event")
 
-	propertyID := "123456789"
-	eventName := "test_event"
-	countingMethod := "ONCE_PER_EVENT"
-
-	b.ReportAllocs()
-	for b.Loop() {
-		c = &Client{ctx: ctx, cancel: cancel}
-		s = fmt.Sprintf("properties/%s", propertyID)
-		conv = &admin.GoogleAnalyticsAdminV1alphaConversionEvent{
-			EventName:      eventName,
-			CountingMethod: countingMethod,
-		}
-	}
-
-	// Assign to package-level vars to prevent optimization
-	benchClient = c
-	benchString = s
-	benchConversion = conv
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.deleteConvCalls)
+	assert.Equal(t, "properties/123456789/conversionEvents/xyz", fake.gotDeleteConvName)
 }
 
-// TestConversionEventValidation tests conversion event validation
-func TestConversionEventValidation(t *testing.T) {
-	tests := []struct {
-		name           string
-		eventName      string
-		countingMethod string
-		isValid        bool
-	}{
-		{
-			name:           "valid_once_per_session",
-			eventName:      "download_event",
-			countingMethod: "ONCE_PER_SESSION",
-			isValid:        true,
-		},
-		{
-			name:           "valid_once_per_event",
-			eventName:      "purchase_event",
-			countingMethod: "ONCE_PER_EVENT",
-			isValid:        true,
-		},
-		{
-			name:           "invalid_counting_method",
-			eventName:      "test_event",
-			countingMethod: "INVALID_METHOD",
-			isValid:        false,
-		},
-		{
-			name:           "empty_event_name",
-			eventName:      "",
-			countingMethod: "ONCE_PER_SESSION",
-			isValid:        false,
-		},
-	}
+func TestDeleteConversion_NotFound(t *testing.T) {
+	fake := &fakeAdminAPI{convList: nil}
+	c := newTestClient(fake)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			isValid := tt.eventName != "" && (tt.countingMethod == "ONCE_PER_SESSION" || tt.countingMethod == "ONCE_PER_EVENT")
-			assert.Equal(t, tt.isValid, isValid)
-		})
-	}
+	err := c.DeleteConversion("123456789", "missing_event")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conversion event 'missing_event' not found in property 123456789")
+	assert.Equal(t, 0, fake.deleteConvCalls, "delete must not be called when the event is absent")
 }
 
-// TestConversionEventNaming tests conversion event naming conventions
-func TestConversionEventNaming(t *testing.T) {
-	tests := []struct {
-		name      string
-		eventName string
-		pattern   string // Expected pattern characteristics
-	}{
-		{
-			name:      "snake_case_naming",
-			eventName: "download_image",
-			pattern:   "contains_underscore",
-		},
-		{
-			name:      "lowercase_only",
-			eventName: "compressioncomplete",
-			pattern:   "lowercase",
-		},
-		{
-			name:      "numeric_suffix",
-			eventName: "event_123",
-			pattern:   "numeric",
-		},
-	}
+func TestDeleteConversion_InvalidInputsRejected(t *testing.T) {
+	fake := &fakeAdminAPI{}
+	c := newTestClient(fake)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.NotEmpty(t, tt.eventName)
-		})
-	}
+	err := c.DeleteConversion("", "old_event")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validation failed")
+	assert.Equal(t, 0, fake.listConvCalls)
 }
 
-// TestConversionEventRelationships tests relationships between conversion events
-func TestConversionEventRelationships(t *testing.T) {
-	conversionList := []config.ConversionConfig{
-		{Name: "event1", CountingMethod: "ONCE_PER_SESSION"},
-		{Name: "event2", CountingMethod: "ONCE_PER_EVENT"},
-		{Name: "event3", CountingMethod: "ONCE_PER_SESSION"},
-	}
-
-	// Test deduplication
-	seen := make(map[string]bool)
-	for _, conv := range conversionList {
-		require.False(t, seen[conv.Name], "duplicate event name found")
-		seen[conv.Name] = true
-	}
-
-	// Test counting method values
-	validMethods := map[string]bool{
-		"ONCE_PER_SESSION": true,
-		"ONCE_PER_EVENT":   true,
-	}
-
-	for _, conv := range conversionList {
-		require.True(t, validMethods[conv.CountingMethod], "invalid counting method")
-	}
-}
-
-// TestConversionToSDK asserts every ConversionConfig field reaches the SDK struct.
-// This guards against silent omissions when the config schema grows.
+// conversionToSDK maps every config field onto the SDK struct.
 func TestConversionToSDK(t *testing.T) {
-	tests := []struct {
-		name string
-		conv config.ConversionConfig
-	}{
-		{
-			name: "once_per_session",
-			conv: config.ConversionConfig{
-				Name:           "purchase",
-				CountingMethod: "ONCE_PER_SESSION",
-				Description:    "Purchase conversion",
-			},
-		},
-		{
-			name: "once_per_event",
-			conv: config.ConversionConfig{
-				Name:           "sign_up",
-				CountingMethod: "ONCE_PER_EVENT",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sdk := conversionToSDK(tt.conv)
-
-			assert.Equal(t, tt.conv.Name, sdk.EventName)
-			assert.Equal(t, tt.conv.CountingMethod, sdk.CountingMethod)
-		})
-	}
-}
-
-// TestConversionResourceNames tests GA4 resource name format
-func TestConversionResourceNames(t *testing.T) {
-	propertyID := "123456789"
-	eventName := "test_event"
-
-	expectedResourceName := fmt.Sprintf("properties/%s/conversionEvents/%s", propertyID, eventName)
-
-	assert.NotEmpty(t, expectedResourceName)
-	assert.Contains(t, expectedResourceName, "properties/")
-	assert.Contains(t, expectedResourceName, "/conversionEvents/")
+	sdk := conversionToSDK(config.ConversionConfig{
+		Name:           "purchase",
+		CountingMethod: "ONCE_PER_SESSION",
+		Description:    "Purchase conversion",
+	})
+	assert.Equal(t, "purchase", sdk.EventName)
+	assert.Equal(t, "ONCE_PER_SESSION", sdk.CountingMethod)
 }

@@ -36,17 +36,17 @@ type EnhancedMeasurement struct {
 func (c *Client) ListDataStreams(propertyID string) ([]*admin.GoogleAnalyticsAdminV1alphaDataStream, error) {
 	parent := fmt.Sprintf("properties/%s", propertyID)
 
-	resp, err := c.admin.Properties.DataStreams.List(parent).Context(c.ctx).Do()
+	streams, err := c.admin.listDataStreams(c.ctx, parent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list data streams: %w", err)
 	}
 
-	return resp.DataStreams, nil
+	return streams, nil
 }
 
 // GetDataStream retrieves a specific data stream
 func (c *Client) GetDataStream(streamName string) (*admin.GoogleAnalyticsAdminV1alphaDataStream, error) {
-	stream, err := c.admin.Properties.DataStreams.Get(streamName).Context(c.ctx).Do()
+	stream, err := c.admin.getDataStream(c.ctx, streamName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data stream: %w", err)
 	}
@@ -72,10 +72,7 @@ func (c *Client) GetWebDataStreamByProperty(propertyID string) (*admin.GoogleAna
 
 // GetEnhancedMeasurementSettings retrieves enhanced measurement settings for a data stream
 func (c *Client) GetEnhancedMeasurementSettings(streamName string) (*admin.GoogleAnalyticsAdminV1alphaEnhancedMeasurementSettings, error) {
-	settings, err := c.admin.Properties.DataStreams.GetEnhancedMeasurementSettings(
-		fmt.Sprintf("%s/enhancedMeasurementSettings", streamName),
-	).Context(c.ctx).Do()
-
+	settings, err := c.admin.getEnhancedMeasurementSettings(c.ctx, fmt.Sprintf("%s/enhancedMeasurementSettings", streamName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get enhanced measurement settings: %w", err)
 	}
@@ -89,12 +86,7 @@ func (c *Client) UpdateEnhancedMeasurement(streamName string, settings *admin.Go
 
 	updateMask := "scrollsEnabled,outboundClicksEnabled,siteSearchEnabled,videoEngagementEnabled,fileDownloadsEnabled,pageChangesEnabled,formInteractionsEnabled,searchQueryParameter,uriQueryParameter"
 
-	_, err := c.admin.Properties.DataStreams.UpdateEnhancedMeasurementSettings(settingsPath, settings).
-		UpdateMask(updateMask).
-		Context(c.ctx).
-		Do()
-
-	if err != nil {
+	if err := c.admin.updateEnhancedMeasurementSettings(c.ctx, settingsPath, settings, updateMask); err != nil {
 		return fmt.Errorf("failed to update enhanced measurement: %w", err)
 	}
 

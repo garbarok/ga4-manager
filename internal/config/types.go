@@ -75,13 +75,11 @@ type AnalyticsConfig struct {
 	Tier          string `yaml:"tier,omitempty"` // "standard" (free) or "360" (paid)
 }
 
-// GA4Config contains GA4-specific identifiers (legacy, use AnalyticsConfig)
-type GA4Config struct {
-	PropertyID    string `yaml:"property_id"`
-	MeasurementID string `yaml:"measurement_id,omitempty"`
-	DataStreamID  string `yaml:"data_stream_id,omitempty"`
-	Tier          string `yaml:"tier,omitempty"` // "standard" (free) or "360" (paid)
-}
+// GA4Config contains GA4-specific identifiers (legacy, use AnalyticsConfig).
+// It is an alias for AnalyticsConfig: the two structs were field-for-field
+// identical, so they share one definition. The distinct YAML keys (`ga4` vs
+// `analytics`) come from the field tags on ProjectConfig, not from the type.
+type GA4Config = AnalyticsConfig
 
 // SearchConsoleConfig contains Google Search Console configuration
 type SearchConsoleConfig struct {
@@ -234,4 +232,3 @@ type EnhancedMeasurementConfig struct {
 	PageChanges      bool `yaml:"page_changes"` // For SPAs
 	FormInteractions bool `yaml:"form_interactions"`
 }
-

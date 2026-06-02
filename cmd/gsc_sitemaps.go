@@ -117,10 +117,7 @@ func runGSCSitemapsList(cmd *cobra.Command, args []string) error {
 
 	// Display sitemaps in a table
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Sitemap URL", "URLs", "Errors", "Warnings", "Last Submitted", "Status"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
-	table.SetAutoWrapText(false)
+	table.Header([]string{"Sitemap URL", "URLs", "Errors", "Warnings", "Last Submitted", "Status"})
 
 	for _, sm := range sitemaps {
 		var status string
@@ -149,17 +146,21 @@ func runGSCSitemapsList(cmd *cobra.Command, args []string) error {
 			sitemapType += " (Index)"
 		}
 
-		table.Append([]string{
+		if err := table.Append([]string{
 			sitemapType,
 			fmt.Sprintf("%d", sm.ContentsCount),
 			fmt.Sprintf("%d", sm.Errors),
 			fmt.Sprintf("%d", sm.Warnings),
 			lastSubmitted,
 			status,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
 	color.Green("\n✓ Found %d sitemap(s)", len(sitemaps))
 	return nil
 }
@@ -284,8 +285,7 @@ func runGSCSitemapsGet(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 		color.Cyan("═══ Content Breakdown ═══")
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Type", "Submitted", "Indexed"})
-		table.SetBorder(true)
+		table.Header([]string{"Type", "Submitted", "Indexed"})
 
 		for _, content := range sm.Contents {
 			indexedPct := 0.0
@@ -293,14 +293,18 @@ func runGSCSitemapsGet(cmd *cobra.Command, args []string) error {
 				indexedPct = (float64(content.Indexed) / float64(content.Submitted)) * 100
 			}
 
-			table.Append([]string{
+			if err := table.Append([]string{
 				content.Type,
 				fmt.Sprintf("%d", content.Submitted),
 				fmt.Sprintf("%d (%.1f%%)", content.Indexed, indexedPct),
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to append table row: %w", err)
+			}
 		}
 
-		table.Render()
+		if err := table.Render(); err != nil {
+			return fmt.Errorf("failed to render table: %w", err)
+		}
 	}
 
 	return nil

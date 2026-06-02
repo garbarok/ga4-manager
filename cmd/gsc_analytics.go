@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
+	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -181,7 +182,7 @@ func runGSCAnalytics(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate inputs
-	if err := validateAnalyticsInputs(siteURL, days, dimensions, rowLimit); err != nil {
+	if err := gsc.ValidateAnalyticsParams(siteURL, days, dimensions, rowLimit); err != nil {
 		color.Red("✗ Validation failed: %v", err)
 		return err
 	}
@@ -234,33 +235,15 @@ func runGSCAnalytics(cmd *cobra.Command, args []string) error {
 	case "markdown":
 		displayAnalyticsMarkdown(report)
 	default:
-		displayAnalyticsTable(report)
+		if err := displayAnalyticsTable(report); err != nil {
+			return err
+		}
 	}
 
 	// Display summary and quota status
 	if gscAnalyticsFormat == "table" || gscAnalyticsFormat == "markdown" {
 		displayAnalyticsSummary(report)
 		displayAnalyticsQuotaStatus(client)
-	}
-
-	return nil
-}
-
-func validateAnalyticsInputs(siteURL string, days int, dimensions []string, rowLimit int) error {
-	if siteURL == "" {
-		return fmt.Errorf("site URL is required")
-	}
-
-	if days < 1 || days > 180 {
-		return fmt.Errorf("days must be between 1 and 180, got %d", days)
-	}
-
-	if err := gsc.ValidateDimensions(dimensions); err != nil {
-		return err
-	}
-
-	if rowLimit < 1 || rowLimit > 25000 {
-		return fmt.Errorf("row limit must be between 1 and 25,000, got %d", rowLimit)
 	}
 
 	return nil
@@ -288,10 +271,10 @@ func displayAnalyticsDryRun(query *gsc.SearchAnalyticsQuery) {
 	color.Blue("ℹ️  No API call made. Remove --dry-run to execute query.")
 }
 
-func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) {
+func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) error {
 	if report.TotalRows == 0 {
 		color.Yellow("⚠ No data found for this query")
-		return
+		return nil
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
@@ -302,20 +285,12 @@ func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) {
 		header = append(header, cases.Title(language.English).String(dim))
 	}
 	header = append(header, "Clicks", "Impressions", "CTR", "Position")
-	table.SetHeader(header)
+	table.Header(header)
 
 	// Table styling
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("\t")
-	table.SetNoWhiteSpace(true)
+	table.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
+	table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
+	table.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
 
 	// Add rows
 	for _, row := range report.Rows {
@@ -339,10 +314,15 @@ func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) {
 			fmt.Sprintf("%.1f", row.Position),
 		)
 
-		table.Append(rowData)
+		if err := table.Append(rowData); err != nil {
+			return fmt.Errorf("failed to append table row: %w", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("failed to render table: %w", err)
+	}
+	return nil
 }
 
 func displayAnalyticsJSON(report *gsc.SearchAnalyticsReport) {

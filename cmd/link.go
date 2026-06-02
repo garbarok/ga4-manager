@@ -10,7 +10,6 @@ import (
 	"github.com/garbarok/ga4-manager/internal/ga4"
 	"github.com/garbarok/ga4-manager/internal/tui"
 	"github.com/spf13/cobra"
-	"google.golang.org/api/analyticsadmin/v1alpha"
 )
 
 var (
@@ -54,10 +53,11 @@ func runLink(cmd *cobra.Command, args []string) error {
 	fmt.Println("🔗 GA4 Manager - Link External Services")
 	fmt.Println("═══════════════════════════════════════════════")
 
-	client, err := ga4.NewClient()
+	client, err := newGA4Client()
 	if err != nil {
-		return fmt.Errorf("failed to create GA4 client: %w", err)
+		return err
 	}
+	defer client.Close()
 
 	// Load project from config file
 	cfg, err := config.LoadConfigByName(projectName)
@@ -118,11 +118,12 @@ func handleLinkAction() {
 	}
 
 	// Create GA4 client
-	client, err := ga4.NewClient()
+	client, err := newGA4Client()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating client: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		return
 	}
+	defer client.Close()
 
 	// Show link management submenu
 	showLinkManagementMenu(client, cfg)
@@ -248,43 +249,30 @@ func handleBigQueryGuide(client *ga4.Client, cfg *config.ProjectConfig) {
 func handleDeleteChannels(client *ga4.Client, cfg *config.ProjectConfig) {
 	fmt.Println("\n🗑️  Listing custom channel groups...")
 
-	groups, err := client.ListChannelGroups(cfg.GetPropertyID())
+	groups, err := client.ListCustomChannelGroups(cfg.GetPropertyID())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing channel groups: %v\n", err)
 		return
 	}
 
-	customGroups := filterCustomChannelGroups(groups)
-
-	if len(customGroups) == 0 {
+	if len(groups) == 0 {
 		fmt.Println("\n✓ No custom channel groups found to delete.")
 		return
+	}
+
+	customGroups := make([]channelGroupInfo, len(groups))
+	for i, g := range groups {
+		customGroups[i] = channelGroupInfo{Name: g.Name, DisplayName: g.DisplayName}
 	}
 
 	displayCustomChannelGroups(customGroups)
 	executeChannelGroupDeletion(client, customGroups)
 }
 
-// channelGroupInfo holds channel group information.
+// channelGroupInfo holds channel group information for interactive display.
 type channelGroupInfo struct {
 	Name        string
 	DisplayName string
-}
-
-// filterCustomChannelGroups filters out system-defined channel groups.
-func filterCustomChannelGroups(groups []*analyticsadmin.GoogleAnalyticsAdminV1alphaChannelGroup) []channelGroupInfo {
-	var custom []channelGroupInfo
-
-	for _, g := range groups {
-		if !g.SystemDefined {
-			custom = append(custom, channelGroupInfo{
-				Name:        g.Name,
-				DisplayName: g.DisplayName,
-			})
-		}
-	}
-
-	return custom
 }
 
 // displayCustomChannelGroups displays the list of custom channel groups.
@@ -461,49 +449,18 @@ func setupChannelGroups(client *ga4.Client, cfg *config.ProjectConfig) error {
 func unlinkExternalService(client *ga4.Client, cfg *config.ProjectConfig, service string) error {
 	fmt.Printf("\n%s Unlinking service: %s\n", color.New(color.FgYellow).SprintFunc()("🔓"), service)
 
-	propertyID := cfg.GetPropertyID()
-	switch service {
-	case "bigquery", "bq":
-		links, err := client.ListBigQueryLinks(propertyID)
-		if err != nil {
-			return fmt.Errorf("could not list BigQuery links to unlink: %w", err)
-		}
-		if len(links) == 0 {
-			_, _ = color.New(color.FgYellow).Println("No BigQuery links found to unlink.")
-			return nil
-		}
-		for _, link := range links {
-			fmt.Printf("Deleting link: %s\n", link.Name)
-			if err := client.DeleteBigQueryLink(link.Name); err != nil {
-				return fmt.Errorf("failed to delete BigQuery link %s: %w", link.Name, err)
-			}
-			_, _ = color.New(color.FgGreen).Printf("✓ Successfully deleted %s\n", link.Name)
-		}
-
-	case "channels":
-		groups, err := client.ListChannelGroups(propertyID)
-		if err != nil {
-			return fmt.Errorf("could not list channel groups to unlink: %w", err)
-		}
-		if len(groups) == 0 {
-			_, _ = color.New(color.FgYellow).Println("No custom channel groups found to unlink.")
-			return nil
-		}
-		for _, group := range groups {
-			// We should not delete the system-defined "Primary Channel Group"
-			if group.SystemDefined {
-				continue
-			}
-			fmt.Printf("Deleting channel group: %s\n", group.Name)
-			if err := client.DeleteChannelGroup(group.Name); err != nil {
-				return fmt.Errorf("failed to delete channel group %s: %w", group.Name, err)
-			}
-			_, _ = color.New(color.FgGreen).Printf("✓ Successfully deleted %s\n", group.Name)
-		}
-
-	default:
-		return fmt.Errorf("unlinking not supported for service: %s", service)
+	deleted, err := client.UnlinkService(cfg.GetPropertyID(), service)
+	if err != nil {
+		return err
 	}
 
+	if len(deleted) == 0 {
+		_, _ = color.New(color.FgYellow).Println("No links found to unlink.")
+		return nil
+	}
+
+	for _, name := range deleted {
+		_, _ = color.New(color.FgGreen).Printf("✓ Successfully deleted %s\n", name)
+	}
 	return nil
 }

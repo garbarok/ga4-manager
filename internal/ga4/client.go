@@ -16,7 +16,7 @@ import (
 )
 
 type Client struct {
-	admin       *admin.Service
+	admin       adminAPI
 	ctx         context.Context
 	cancel      context.CancelFunc
 	rateLimiter *rate.Limiter
@@ -91,7 +91,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		return nil, fmt.Errorf("failed to create admin service: %w", err)
 	}
 
-	client.admin = adminService
+	client.admin = &realAdminAPI{svc: adminService}
 
 	// Initialize rate limiter
 	client.rateLimiter = rate.NewLimiter(

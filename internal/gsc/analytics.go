@@ -244,6 +244,29 @@ func ValidateDimensions(dimensions []string) error {
 	return nil
 }
 
+// ValidateAnalyticsParams validates the inputs for a search analytics query:
+// a non-empty site URL, a lookback window of 1-180 days, valid dimensions, and a
+// row limit of 1-25000. It is the canonical entry point for CLI input validation.
+func ValidateAnalyticsParams(siteURL string, days int, dimensions []string, rowLimit int) error {
+	if siteURL == "" {
+		return fmt.Errorf("site URL is required")
+	}
+
+	if days < 1 || days > 180 {
+		return fmt.Errorf("days must be between 1 and 180, got %d", days)
+	}
+
+	if err := ValidateDimensions(dimensions); err != nil {
+		return err
+	}
+
+	if rowLimit < 1 || rowLimit > 25000 {
+		return fmt.Errorf("row limit must be between 1 and 25,000, got %d", rowLimit)
+	}
+
+	return nil
+}
+
 // ValidateFilterOperator checks if a filter operator is valid
 func ValidateFilterOperator(operator string) error {
 	if !ValidFilterOperators[operator] {

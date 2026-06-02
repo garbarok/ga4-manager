@@ -29,17 +29,17 @@ func (c *Client) CreateBigQueryLink(config BigQueryConfig) (*analyticsadmin.Goog
 func (c *Client) ListBigQueryLinks(propertyID string) ([]*analyticsadmin.GoogleAnalyticsAdminV1alphaBigQueryLink, error) {
 	propertyPath := fmt.Sprintf("properties/%s", propertyID)
 
-	resp, err := c.admin.Properties.BigQueryLinks.List(propertyPath).Context(c.ctx).Do()
+	links, err := c.admin.listBigQueryLinks(c.ctx, propertyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list BigQuery links: %w", err)
 	}
 
-	return resp.BigqueryLinks, nil
+	return links, nil
 }
 
 // GetBigQueryLink retrieves a specific BigQuery link
 func (c *Client) GetBigQueryLink(linkName string) (*analyticsadmin.GoogleAnalyticsAdminV1alphaBigQueryLink, error) {
-	link, err := c.admin.Properties.BigQueryLinks.Get(linkName).Context(c.ctx).Do()
+	link, err := c.admin.getBigQueryLink(c.ctx, linkName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get BigQuery link: %w", err)
 	}

@@ -10,7 +10,6 @@ import (
 )
 
 func (c *Client) CreateDimension(propertyID string, dim config.DimensionConfig) error {
-	// Validate inputs
 	if err := validation.ValidateDimensionParams(propertyID, dim.ParameterName, dim.DisplayName, dim.Scope); err != nil {
 		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
@@ -22,13 +21,6 @@ func (c *Client) CreateDimension(propertyID string, dim config.DimensionConfig) 
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "CreateDimension"); err != nil {
-		return err
-	}
-
-	parent := fmt.Sprintf("properties/%s", propertyID)
-
 	c.logger.Debug("creating custom dimension",
 		slog.String("property_id", propertyID),
 		slog.String("parameter_name", dim.ParameterName),
@@ -36,29 +28,9 @@ func (c *Client) CreateDimension(propertyID string, dim config.DimensionConfig) 
 		slog.String("scope", dim.Scope),
 	)
 
-	_, err := c.admin.Properties.CustomDimensions.Create(parent, dimToSDK(dim)).Context(c.ctx).Do()
-	if err != nil {
-		if isAlreadyExistsError(err) {
-			c.logger.Debug("dimension already exists",
-				slog.String("parameter_name", dim.ParameterName),
-			)
-			return nil
-		}
-		c.logger.Error("failed to create dimension",
-			slog.String("display_name", dim.DisplayName),
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("failed to create dimension '%s' for property %s: %w", dim.DisplayName, propertyID, err)
-	}
-
-	c.logger.Info("dimension created successfully",
-		slog.String("parameter_name", dim.ParameterName),
-		slog.String("display_name", dim.DisplayName),
-		slog.String("property_id", propertyID),
-	)
-
-	return nil
+	return c.createResource("dimension", propertyID, dim.DisplayName, func(parent string) error {
+		return c.admin.createCustomDimension(c.ctx, parent, dimToSDK(dim))
+	})
 }
 
 func dimToSDK(dim config.DimensionConfig) *admin.GoogleAnalyticsAdminV1alphaCustomDimension {
@@ -80,41 +52,9 @@ func (c *Client) SetupDimensions(propertyID string, dims []config.DimensionConfi
 }
 
 func (c *Client) ListDimensions(propertyID string) ([]*admin.GoogleAnalyticsAdminV1alphaCustomDimension, error) {
-	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "ListDimensions"); err != nil {
-		return nil, err
-	}
-
-	parent := fmt.Sprintf("properties/%s", propertyID)
-
-	c.logger.Debug("listing dimensions",
-		slog.String("property_id", propertyID),
-	)
-
-	resp, err := c.admin.Properties.CustomDimensions.List(parent).PageSize(200).Context(c.ctx).Do()
-	if err != nil {
-		c.logger.Error("failed to list dimensions",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("failed to list dimensions for property %s: %w", propertyID, err)
-	}
-
-	c.logger.Debug("dimensions listed successfully",
-		slog.String("property_id", propertyID),
-		slog.Int("count", len(resp.CustomDimensions)),
-	)
-
-	return resp.CustomDimensions, nil
+	return listResource(c, "dimension", propertyID, func(parent string) ([]*admin.GoogleAnalyticsAdminV1alphaCustomDimension, error) {
+		return c.admin.listCustomDimensions(c.ctx, parent)
+	})
 }
 
 // findDimensionByParameterName searches for dimension by parameter name.
@@ -122,25 +62,16 @@ func (c *Client) ListDimensions(propertyID string) ([]*admin.GoogleAnalyticsAdmi
 func (c *Client) findDimensionByParameterName(propertyID, parameterName string) (*admin.GoogleAnalyticsAdminV1alphaCustomDimension, error) {
 	dimensions, err := c.ListDimensions(propertyID)
 	if err != nil {
-		c.logger.Error("list failed",
-			slog.String("property_id", propertyID),
-			slog.String("parameter_name", parameterName),
-			slog.String("error", err.Error()),
-		)
 		return nil, fmt.Errorf("failed to list dimensions: %w", err)
 	}
 
-	for _, dim := range dimensions {
-		if dim.ParameterName == parameterName {
-			return dim, nil
-		}
-	}
-
-	return nil, nil
+	dim, _ := firstMatch(dimensions, func(d *admin.GoogleAnalyticsAdminV1alphaCustomDimension) string {
+		return d.ParameterName
+	}, parameterName)
+	return dim, nil
 }
 
 func (c *Client) DeleteDimension(propertyID, parameterName string) error {
-	// Validate inputs
 	if err := validation.ValidatePropertyID(propertyID); err != nil {
 		c.logger.Error("invalid property ID",
 			slog.String("property_id", propertyID),
@@ -178,8 +109,7 @@ func (c *Client) DeleteDimension(propertyID, parameterName string) error {
 		return err
 	}
 
-	_, err = c.admin.Properties.CustomDimensions.Archive(dim.Name, &admin.GoogleAnalyticsAdminV1alphaArchiveCustomDimensionRequest{}).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.archiveCustomDimension(c.ctx, dim.Name); err != nil {
 		c.logger.Error("failed to archive dimension",
 			slog.String("parameter_name", parameterName),
 			slog.String("property_id", propertyID),

@@ -10,7 +10,6 @@ import (
 )
 
 func (c *Client) CreateConversion(propertyID, eventName, countingMethod string) error {
-	// Validate inputs
 	if err := validation.ValidateConversionParams(propertyID, eventName, countingMethod); err != nil {
 		c.logger.Error("validation failed",
 			slog.String("property_id", propertyID),
@@ -21,46 +20,19 @@ func (c *Client) CreateConversion(propertyID, eventName, countingMethod string) 
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "CreateConversion"); err != nil {
-		return err
-	}
-
-	parent := fmt.Sprintf("properties/%s", propertyID)
-
 	c.logger.Debug("creating conversion event",
 		slog.String("property_id", propertyID),
 		slog.String("event_name", eventName),
 		slog.String("counting_method", countingMethod),
 	)
 
-	conversion := &admin.GoogleAnalyticsAdminV1alphaConversionEvent{
-		EventName:      eventName,
-		CountingMethod: countingMethod,
-	}
-
-	_, err := c.admin.Properties.ConversionEvents.Create(parent, conversion).Context(c.ctx).Do()
-	if err != nil {
-		if isAlreadyExistsError(err) {
-			c.logger.Debug("conversion already exists",
-				slog.String("event_name", eventName),
-			)
-			return nil // Already exists, not an error
+	return c.createResource("conversion", propertyID, eventName, func(parent string) error {
+		conversion := &admin.GoogleAnalyticsAdminV1alphaConversionEvent{
+			EventName:      eventName,
+			CountingMethod: countingMethod,
 		}
-		c.logger.Error("failed to create conversion",
-			slog.String("event_name", eventName),
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return fmt.Errorf("failed to create conversion '%s' for property %s: %w", eventName, propertyID, err)
-	}
-
-	c.logger.Info("conversion created successfully",
-		slog.String("event_name", eventName),
-		slog.String("property_id", propertyID),
-	)
-
-	return nil
+		return c.admin.createConversionEvent(c.ctx, parent, conversion)
+	})
 }
 
 func conversionToSDK(conv config.ConversionConfig) *admin.GoogleAnalyticsAdminV1alphaConversionEvent {
@@ -80,41 +52,9 @@ func (c *Client) SetupConversions(propertyID string, conversions []config.Conver
 }
 
 func (c *Client) ListConversions(propertyID string) ([]*admin.GoogleAnalyticsAdminV1alphaConversionEvent, error) {
-	// Validate inputs
-	if err := validation.ValidatePropertyID(propertyID); err != nil {
-		c.logger.Error("invalid property ID",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	// Wait for rate limit
-	if err := c.waitForRateLimit(c.ctx, "ListConversions"); err != nil {
-		return nil, err
-	}
-
-	parent := fmt.Sprintf("properties/%s", propertyID)
-
-	c.logger.Debug("listing conversions",
-		slog.String("property_id", propertyID),
-	)
-
-	resp, err := c.admin.Properties.ConversionEvents.List(parent).Context(c.ctx).Do()
-	if err != nil {
-		c.logger.Error("failed to list conversions",
-			slog.String("property_id", propertyID),
-			slog.String("error", err.Error()),
-		)
-		return nil, fmt.Errorf("failed to list conversions for property %s: %w", propertyID, err)
-	}
-
-	c.logger.Debug("conversions listed successfully",
-		slog.String("property_id", propertyID),
-		slog.Int("count", len(resp.ConversionEvents)),
-	)
-
-	return resp.ConversionEvents, nil
+	return listResource(c, "conversion", propertyID, func(parent string) ([]*admin.GoogleAnalyticsAdminV1alphaConversionEvent, error) {
+		return c.admin.listConversionEvents(c.ctx, parent)
+	})
 }
 
 // findConversionByEventName searches for conversion by event name.
@@ -122,25 +62,16 @@ func (c *Client) ListConversions(propertyID string) ([]*admin.GoogleAnalyticsAdm
 func (c *Client) findConversionByEventName(propertyID, eventName string) (*admin.GoogleAnalyticsAdminV1alphaConversionEvent, error) {
 	conversions, err := c.ListConversions(propertyID)
 	if err != nil {
-		c.logger.Error("list failed",
-			slog.String("property_id", propertyID),
-			slog.String("event_name", eventName),
-			slog.String("error", err.Error()),
-		)
 		return nil, fmt.Errorf("failed to list conversions: %w", err)
 	}
 
-	for _, conv := range conversions {
-		if conv.EventName == eventName {
-			return conv, nil
-		}
-	}
-
-	return nil, nil
+	conv, _ := firstMatch(conversions, func(e *admin.GoogleAnalyticsAdminV1alphaConversionEvent) string {
+		return e.EventName
+	}, eventName)
+	return conv, nil
 }
 
 func (c *Client) DeleteConversion(propertyID, eventName string) error {
-	// Validate inputs
 	if err := validation.ValidatePropertyID(propertyID); err != nil {
 		c.logger.Error("invalid property ID",
 			slog.String("property_id", propertyID),
@@ -177,8 +108,7 @@ func (c *Client) DeleteConversion(propertyID, eventName string) error {
 		return err
 	}
 
-	_, err = c.admin.Properties.ConversionEvents.Delete(conv.Name).Context(c.ctx).Do()
-	if err != nil {
+	if err := c.admin.deleteConversionEvent(c.ctx, conv.Name); err != nil {
 		c.logger.Error("failed to delete conversion",
 			slog.String("event_name", eventName),
 			slog.String("property_id", propertyID),
