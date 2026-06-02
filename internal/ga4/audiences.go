@@ -38,10 +38,10 @@ func GetAudienceSummary(_ *config.ProjectConfig) string {
 	}
 
 	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("Total Audiences: %d\n", len(audiences)))
+	fmt.Fprintf(&summary, "Total Audiences: %d\n", len(audiences))
 	summary.WriteString("By Category:\n")
 	for category, count := range categories {
-		summary.WriteString(fmt.Sprintf("  - %s: %d\n", category, count))
+		fmt.Fprintf(&summary, "  - %s: %d\n", category, count)
 	}
 
 	return summary.String()

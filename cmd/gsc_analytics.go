@@ -290,7 +290,7 @@ func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) error {
 	// Table styling
 	table.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
 	table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-	table.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+	table.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 	// Add rows
 	for _, row := range report.Rows {

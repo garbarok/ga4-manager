@@ -157,9 +157,9 @@ func (rm *RollbackManager) GenerateSummary() string {
 		typeCount[op.Type]++
 	}
 
-	sb.WriteString(fmt.Sprintf("Registered %d rollback operations:\n", len(rm.operations)))
+	fmt.Fprintf(&sb, "Registered %d rollback operations:\n", len(rm.operations))
 	for typ, count := range typeCount {
-		sb.WriteString(fmt.Sprintf("  - %d %s(s)\n", count, typ))
+		fmt.Fprintf(&sb, "  - %d %s(s)\n", count, typ)
 	}
 
 	return sb.String()

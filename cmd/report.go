@@ -299,7 +299,7 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 
 	convTable := tablewriter.NewWriter(os.Stdout)
 	convTable.Header([]string{"Event Name", "Counting Method"})
-	convTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+	convTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 	for _, conv := range conversions {
 		if err := convTable.Append([]string{conv.EventName, conv.CountingMethod}); err != nil {
@@ -321,7 +321,7 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 
 	dimTable := tablewriter.NewWriter(os.Stdout)
 	dimTable.Header([]string{"Display Name", "Parameter", "Scope"})
-	dimTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+	dimTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 	for _, dim := range dimensions {
 		if err := dimTable.Append([]string{dim.DisplayName, dim.ParameterName, dim.Scope}); err != nil {
@@ -342,7 +342,7 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	} else {
 		metricTable := tablewriter.NewWriter(os.Stdout)
 		metricTable.Header([]string{"Display Name", "Parameter", "Unit", "Scope"})
-		metricTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+		metricTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 		for _, metric := range metrics {
 			if err := metricTable.Append([]string{metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope}); err != nil {
@@ -364,7 +364,7 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	} else {
 		calcTable := tablewriter.NewWriter(os.Stdout)
 		calcTable.Header([]string{"Display Name", "Formula", "Unit"})
-		calcTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+		calcTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 		for _, calc := range calculatedMetrics {
 			if err := calcTable.Append([]string{calc.DisplayName, calc.Formula, calc.MetricUnit}); err != nil {
@@ -386,7 +386,7 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	audienceCategories := ga4.ListAudiencesByCategory(cfg)
 	audienceTable := tablewriter.NewWriter(os.Stdout)
 	audienceTable.Header([]string{"Name", "Category", "Duration (days)"})
-	audienceTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+	audienceTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 	for _, category := range []string{"SEO", "Conversion", "Content", "Behavioral"} {
 		if audiences, ok := audienceCategories[category]; ok {

@@ -250,11 +250,11 @@ func (pt *ProgressTracker) RenderProgress() string {
 			statusIcon = yellow("⊗")
 		}
 
-		sb.WriteString(fmt.Sprintf("\n%s %s %s\n", stepNum, statusIcon, step.Name))
+		fmt.Fprintf(&sb, "\n%s %s %s\n", stepNum, statusIcon, step.Name)
 
 		// Step details
 		if step.Details != "" {
-			sb.WriteString(fmt.Sprintf("  %s\n", gray(step.Details)))
+			fmt.Fprintf(&sb, "  %s\n", gray(step.Details))
 		}
 
 		// Sub-steps
@@ -271,16 +271,16 @@ func (pt *ProgressTracker) RenderProgress() string {
 				subIcon = gray("○")
 			}
 
-			sb.WriteString(fmt.Sprintf("  %s %s", subIcon, subStep.Name))
+			fmt.Fprintf(&sb, "  %s %s", subIcon, subStep.Name)
 			if subStep.Details != "" {
-				sb.WriteString(fmt.Sprintf(" %s", gray(fmt.Sprintf("(%s)", subStep.Details))))
+				fmt.Fprintf(&sb, " %s", gray(fmt.Sprintf("(%s)", subStep.Details)))
 			}
 			sb.WriteString("\n")
 		}
 
 		// Error message
 		if step.Error != nil {
-			sb.WriteString(fmt.Sprintf("  %s %s\n", red("Error:"), step.Error.Error()))
+			fmt.Fprintf(&sb, "  %s %s\n", red("Error:"), step.Error.Error())
 		}
 	}
 
@@ -319,11 +319,11 @@ func (pt *ProgressTracker) GenerateSummary() string {
 	sb.WriteString("═══════════════════════════════════════════════\n")
 
 	if failed > 0 {
-		sb.WriteString(fmt.Sprintf("%s Setup failed!\n", red("✗")))
+		fmt.Fprintf(&sb, "%s Setup failed!\n", red("✗"))
 	} else if completed == pt.totalSteps {
-		sb.WriteString(fmt.Sprintf("%s Setup complete!\n", green("✅")))
+		fmt.Fprintf(&sb, "%s Setup complete!\n", green("✅"))
 	} else {
-		sb.WriteString(fmt.Sprintf("%s Setup completed with warnings\n", yellow("⚠️")))
+		fmt.Fprintf(&sb, "%s Setup completed with warnings\n", yellow("⚠️"))
 	}
 
 	sb.WriteString("\n")
@@ -331,18 +331,18 @@ func (pt *ProgressTracker) GenerateSummary() string {
 	// Statistics
 	sb.WriteString("Setup Summary:\n")
 	if completed > 0 {
-		sb.WriteString(fmt.Sprintf("  %s %d steps completed\n", green("✓"), completed))
+		fmt.Fprintf(&sb, "  %s %d steps completed\n", green("✓"), completed)
 	}
 	if skipped > 0 {
-		sb.WriteString(fmt.Sprintf("  %s %d steps skipped\n", yellow("○"), skipped))
+		fmt.Fprintf(&sb, "  %s %d steps skipped\n", yellow("○"), skipped)
 	}
 	if failed > 0 {
-		sb.WriteString(fmt.Sprintf("  %s %d steps failed\n", red("✗"), failed))
+		fmt.Fprintf(&sb, "  %s %d steps failed\n", red("✗"), failed)
 	}
 
 	// Duration (use unlocked version since we already hold the lock)
 	duration := pt.durationUnlocked()
-	sb.WriteString(fmt.Sprintf("  Duration: %.1f seconds\n", duration.Seconds()))
+	fmt.Fprintf(&sb, "  Duration: %.1f seconds\n", duration.Seconds())
 
 	return sb.String()
 }

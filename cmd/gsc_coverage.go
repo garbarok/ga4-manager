@@ -240,7 +240,7 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 		// Table styling
 		issueTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
 		issueTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-		issueTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+		issueTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 		for _, issue := range report.TopIssues {
 			percentage := float64(issue.Count) / float64(report.TotalPages) * 100
@@ -268,7 +268,7 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 		// Table styling
 		pageTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
 		pageTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-		pageTable.Options(tablewriter.WithBorders(tw.Border{Left: tw.Off, Right: tw.Off, Top: tw.Off, Bottom: tw.Off}))
+		pageTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
 
 		displayLimit := len(report.PagesSample)
 		if displayLimit > 20 {

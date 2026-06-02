@@ -306,9 +306,9 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 
 	// Header
 	md.WriteString("# GA4 Configuration Report\n\n")
-	md.WriteString(fmt.Sprintf("**Project:** %s  \n", data.ProjectName))
-	md.WriteString(fmt.Sprintf("**Property ID:** %s  \n", data.PropertyID))
-	md.WriteString(fmt.Sprintf("**Generated:** %s  \n\n", data.Timestamp))
+	fmt.Fprintf(&md, "**Project:** %s  \n", data.ProjectName)
+	fmt.Fprintf(&md, "**Property ID:** %s  \n", data.PropertyID)
+	fmt.Fprintf(&md, "**Generated:** %s  \n\n", data.Timestamp)
 	md.WriteString("---\n\n")
 
 	// Conversions
@@ -317,7 +317,7 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 		md.WriteString("| Event Name | Counting Method |\n")
 		md.WriteString("|------------|----------------|\n")
 		for _, conv := range data.Conversions {
-			md.WriteString(fmt.Sprintf("| %s | %s |\n", conv.EventName, conv.CountingMethod))
+			fmt.Fprintf(&md, "| %s | %s |\n", conv.EventName, conv.CountingMethod)
 		}
 		md.WriteString("\n")
 	}
@@ -328,7 +328,7 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 		md.WriteString("| Display Name | Parameter | Scope |\n")
 		md.WriteString("|--------------|-----------|-------|\n")
 		for _, dim := range data.Dimensions {
-			md.WriteString(fmt.Sprintf("| %s | %s | %s |\n", dim.DisplayName, dim.ParameterName, dim.Scope))
+			fmt.Fprintf(&md, "| %s | %s | %s |\n", dim.DisplayName, dim.ParameterName, dim.Scope)
 		}
 		md.WriteString("\n")
 	}
@@ -339,8 +339,8 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 		md.WriteString("| Display Name | Parameter | Unit | Scope |\n")
 		md.WriteString("|--------------|-----------|------|-------|\n")
 		for _, metric := range data.Metrics {
-			md.WriteString(fmt.Sprintf("| %s | %s | %s | %s |\n",
-				metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope))
+			fmt.Fprintf(&md, "| %s | %s | %s | %s |\n",
+				metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope)
 		}
 		md.WriteString("\n")
 	}
@@ -351,7 +351,7 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 		md.WriteString("| Display Name | Formula | Unit |\n")
 		md.WriteString("|--------------|---------|------|\n")
 		for _, calc := range data.CalculatedMetrics {
-			md.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n", calc.DisplayName, calc.Formula, calc.MetricUnit))
+			fmt.Fprintf(&md, "| %s | `%s` | %s |\n", calc.DisplayName, calc.Formula, calc.MetricUnit)
 		}
 		md.WriteString("\n")
 	}
@@ -362,7 +362,7 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 		md.WriteString("| Name | Category | Duration (days) |\n")
 		md.WriteString("|------|----------|----------------|\n")
 		for _, aud := range data.Audiences {
-			md.WriteString(fmt.Sprintf("| %s | %s | %d |\n", aud.Name, aud.Category, aud.MembershipDuration))
+			fmt.Fprintf(&md, "| %s | %s | %d |\n", aud.Name, aud.Category, aud.MembershipDuration)
 		}
 		md.WriteString("\n")
 	}
@@ -370,8 +370,8 @@ func exportToMarkdown(data *ReportData, outputPath string) error {
 	// Data Retention
 	if data.DataRetention.EventDataRetention != "" {
 		md.WriteString("## 🗄️ Data Retention\n\n")
-		md.WriteString(fmt.Sprintf("- **Event Data Retention:** %s\n", data.DataRetention.EventDataRetention))
-		md.WriteString(fmt.Sprintf("- **Reset on New Activity:** %t\n\n", data.DataRetention.ResetUserDataOnNewActivity))
+		fmt.Fprintf(&md, "- **Event Data Retention:** %s\n", data.DataRetention.EventDataRetention)
+		fmt.Fprintf(&md, "- **Reset on New Activity:** %t\n\n", data.DataRetention.ResetUserDataOnNewActivity)
 	}
 
 	content := md.String()

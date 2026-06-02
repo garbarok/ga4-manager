@@ -145,7 +145,7 @@ func (c *Client) GetDataStreamSummary(propertyID string) (string, error) {
 	}
 
 	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("Data Streams for Property %s\n", propertyID))
+	fmt.Fprintf(&summary, "Data Streams for Property %s\n", propertyID)
 	summary.WriteString(strings.Repeat("=", 50) + "\n\n")
 
 	if len(streams) == 0 {
@@ -154,24 +154,24 @@ func (c *Client) GetDataStreamSummary(propertyID string) (string, error) {
 	}
 
 	for i, stream := range streams {
-		summary.WriteString(fmt.Sprintf("Stream %d:\n", i+1))
-		summary.WriteString(fmt.Sprintf("  Name: %s\n", stream.DisplayName))
-		summary.WriteString(fmt.Sprintf("  Type: %s\n", stream.Type))
+		fmt.Fprintf(&summary, "Stream %d:\n", i+1)
+		fmt.Fprintf(&summary, "  Name: %s\n", stream.DisplayName)
+		fmt.Fprintf(&summary, "  Type: %s\n", stream.Type)
 
 		if stream.WebStreamData != nil {
-			summary.WriteString(fmt.Sprintf("  Measurement ID: %s\n", stream.WebStreamData.MeasurementId))
-			summary.WriteString(fmt.Sprintf("  Default URI: %s\n", stream.WebStreamData.DefaultUri))
+			fmt.Fprintf(&summary, "  Measurement ID: %s\n", stream.WebStreamData.MeasurementId)
+			fmt.Fprintf(&summary, "  Default URI: %s\n", stream.WebStreamData.DefaultUri)
 		}
 
 		if stream.AndroidAppStreamData != nil {
-			summary.WriteString(fmt.Sprintf("  Package Name: %s\n", stream.AndroidAppStreamData.PackageName))
+			fmt.Fprintf(&summary, "  Package Name: %s\n", stream.AndroidAppStreamData.PackageName)
 		}
 
 		if stream.IosAppStreamData != nil {
-			summary.WriteString(fmt.Sprintf("  Bundle ID: %s\n", stream.IosAppStreamData.BundleId))
+			fmt.Fprintf(&summary, "  Bundle ID: %s\n", stream.IosAppStreamData.BundleId)
 		}
 
-		summary.WriteString(fmt.Sprintf("  Created: %s\n", stream.CreateTime))
+		fmt.Fprintf(&summary, "  Created: %s\n", stream.CreateTime)
 		summary.WriteString("\n")
 	}
 
@@ -194,21 +194,21 @@ func (c *Client) GetEnhancedMeasurementSummary(propertyID string) (string, error
 	summary.WriteString("Enhanced Measurement Settings\n")
 	summary.WriteString(strings.Repeat("=", 50) + "\n\n")
 
-	summary.WriteString(fmt.Sprintf("Stream: %s\n", stream.DisplayName))
-	summary.WriteString(fmt.Sprintf("Measurement ID: %s\n\n", stream.WebStreamData.MeasurementId))
+	fmt.Fprintf(&summary, "Stream: %s\n", stream.DisplayName)
+	fmt.Fprintf(&summary, "Measurement ID: %s\n\n", stream.WebStreamData.MeasurementId)
 
 	summary.WriteString("Features:\n")
 	summary.WriteString("  ✓ Page Views: Always enabled\n")
-	summary.WriteString(fmt.Sprintf("  %s Scrolls: %t\n", boolToCheckmark(settings.ScrollsEnabled), settings.ScrollsEnabled))
-	summary.WriteString(fmt.Sprintf("  %s Outbound Clicks: %t\n", boolToCheckmark(settings.OutboundClicksEnabled), settings.OutboundClicksEnabled))
-	summary.WriteString(fmt.Sprintf("  %s Site Search: %t\n", boolToCheckmark(settings.SiteSearchEnabled), settings.SiteSearchEnabled))
-	summary.WriteString(fmt.Sprintf("  %s Video Engagement: %t\n", boolToCheckmark(settings.VideoEngagementEnabled), settings.VideoEngagementEnabled))
-	summary.WriteString(fmt.Sprintf("  %s File Downloads: %t\n", boolToCheckmark(settings.FileDownloadsEnabled), settings.FileDownloadsEnabled))
-	summary.WriteString(fmt.Sprintf("  %s Page Changes (SPA): %t\n", boolToCheckmark(settings.PageChangesEnabled), settings.PageChangesEnabled))
-	summary.WriteString(fmt.Sprintf("  %s Form Interactions: %t\n", boolToCheckmark(settings.FormInteractionsEnabled), settings.FormInteractionsEnabled))
+	fmt.Fprintf(&summary, "  %s Scrolls: %t\n", boolToCheckmark(settings.ScrollsEnabled), settings.ScrollsEnabled)
+	fmt.Fprintf(&summary, "  %s Outbound Clicks: %t\n", boolToCheckmark(settings.OutboundClicksEnabled), settings.OutboundClicksEnabled)
+	fmt.Fprintf(&summary, "  %s Site Search: %t\n", boolToCheckmark(settings.SiteSearchEnabled), settings.SiteSearchEnabled)
+	fmt.Fprintf(&summary, "  %s Video Engagement: %t\n", boolToCheckmark(settings.VideoEngagementEnabled), settings.VideoEngagementEnabled)
+	fmt.Fprintf(&summary, "  %s File Downloads: %t\n", boolToCheckmark(settings.FileDownloadsEnabled), settings.FileDownloadsEnabled)
+	fmt.Fprintf(&summary, "  %s Page Changes (SPA): %t\n", boolToCheckmark(settings.PageChangesEnabled), settings.PageChangesEnabled)
+	fmt.Fprintf(&summary, "  %s Form Interactions: %t\n", boolToCheckmark(settings.FormInteractionsEnabled), settings.FormInteractionsEnabled)
 
 	if settings.SearchQueryParameter != "" {
-		summary.WriteString(fmt.Sprintf("\nSearch Parameters: %s\n", settings.SearchQueryParameter))
+		fmt.Fprintf(&summary, "\nSearch Parameters: %s\n", settings.SearchQueryParameter)
 	}
 
 	return summary.String(), nil
