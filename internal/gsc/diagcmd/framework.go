@@ -2,7 +2,7 @@
 //
 // Every command under `ga4 gsc <diagnostic>` follows the same framework shape:
 // a JSON envelope with {command, site, generated_at, results, quota_used};
-// --format text|json; exit codes 0 (clean) / 2 (issues detected) / 1 (failure);
+// --format table|json; exit codes 0 (clean) / 2 (issues detected) / 1 (failure);
 // "silent on all-green" stdout aside from the quota footer. This package owns
 // those concerns so per-command code is reduced to the predicate-specific
 // glue: build the query, apply the predicate, supply the text-row renderer.
@@ -16,18 +16,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/garbarok/ga4-manager/internal/config"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 // Output format names, exported so command files reference these instead of
-// duplicating string literals.
+// duplicating string literals. The diagnostic CLI accepts the table format
+// (human-readable, tab-aligned) and json (structured envelope for MCP /
+// scripts). Other rendering formats (csv, markdown) are available via the
+// underlying internal/render module but not exposed on diagnostic commands —
+// the JSON envelope is the canonical machine-readable shape here.
 const (
-	FormatText = "text"
-	FormatJSON = "json"
+	FormatTable = render.FormatTable
+	FormatJSON  = "json"
 )
 
 // Framework exit codes. The CLI convention is fixed: anything that crosses
@@ -68,11 +71,10 @@ func NewEnvelope[T any](command, site string, now time.Time, results []T, quotaU
 //
 // In JSON mode, the entire envelope is encoded with two-space indentation.
 //
-// In text mode, an empty Results slice prints only the framework's
+// In table mode, an empty Results slice prints only the framework's
 // `quota used: N` footer (the "silent on all-green" convention). When
-// Results is non-empty, columns is emitted as a tab-separated header and
-// rowFn is called for each result to produce the row cells; the final
-// footer line is `quota used: N`.
+// Results is non-empty, the table is rendered via internal/render and the
+// final footer line `quota used: N` is appended.
 func Render[T any](w io.Writer, env Envelope[T], format string, columns []string, rowFn func(T) []string) error {
 	if format == FormatJSON {
 		enc := json.NewEncoder(w)
@@ -81,16 +83,7 @@ func Render[T any](w io.Writer, env Envelope[T], format string, columns []string
 	}
 
 	if len(env.Results) > 0 {
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		if _, err := fmt.Fprintln(tw, strings.Join(columns, "\t")); err != nil {
-			return err
-		}
-		for _, r := range env.Results {
-			if _, err := fmt.Fprintln(tw, strings.Join(rowFn(r), "\t")); err != nil {
-				return err
-			}
-		}
-		if err := tw.Flush(); err != nil {
+		if err := render.Render(w, render.FormatTable, columns, env.Results, rowFn); err != nil {
 			return err
 		}
 	}
@@ -123,8 +116,8 @@ func FailWith(w io.Writer, format string, args ...any) int {
 // ValidateFormat returns an error if format is not one of the supported
 // output formats. Commands call this once on entry to fail fast.
 func ValidateFormat(format string) error {
-	if format != FormatText && format != FormatJSON {
-		return fmt.Errorf("invalid --format %q: must be %s or %s", format, FormatText, FormatJSON)
+	if format != FormatTable && format != FormatJSON {
+		return fmt.Errorf("invalid --format %q: must be %s or %s", format, FormatTable, FormatJSON)
 	}
 	return nil
 }

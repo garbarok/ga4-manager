@@ -70,7 +70,7 @@ func TestRunCannibalizationCommand_CleanExitOnEmpty(t *testing.T) {
 	fake := &fakeSearchAPI{rows: []gsc.SearchAnalyticsRow{
 		cannibalisationRow("widgets", "https://example.com/a", 100),
 	}}
-	params, stdout, _ := newParams(t, fake, diagcmd.FormatText)
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
 
 	status := runCannibalizationCommand(params)
 
@@ -87,7 +87,7 @@ func TestRunCannibalizationCommand_IssuesExitOnHit(t *testing.T) {
 		cannibalisationRow("widgets", "https://example.com/a", 50),
 		cannibalisationRow("widgets", "https://example.com/b", 30),
 	}}
-	params, stdout, _ := newParams(t, fake, diagcmd.FormatText)
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
 
 	status := runCannibalizationCommand(params)
 
@@ -177,7 +177,7 @@ func TestRunCannibalizationCommand_EmptyJSONStillIncludesEnvelope(t *testing.T) 
 
 func TestRunCannibalizationCommand_FailureOnAPIError(t *testing.T) {
 	fake := &fakeSearchAPI{err: errors.New("api down")}
-	params, _, stderr := newParams(t, fake, diagcmd.FormatText)
+	params, _, stderr := newParams(t, fake, diagcmd.FormatTable)
 
 	status := runCannibalizationCommand(params)
 
@@ -191,7 +191,7 @@ func TestRunCannibalizationCommand_FailureOnAPIError(t *testing.T) {
 
 func TestRunCannibalizationCommand_FailureOnMissingConfig(t *testing.T) {
 	params := cannibalizationParams{
-		Format:  diagcmd.FormatText,
+		Format:  diagcmd.FormatTable,
 		Stdout:  &bytes.Buffer{},
 		Stderr:  &bytes.Buffer{},
 		Factory: func() (gsc.SearchAPI, func(), error) { return &fakeSearchAPI{}, func() {}, nil },

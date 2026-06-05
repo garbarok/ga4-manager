@@ -55,7 +55,7 @@ func TestRenderJSONEncodesEnvelope(t *testing.T) {
 
 func TestRenderTextPrintsHeaderRowsAndFooter(t *testing.T) {
 	var buf bytes.Buffer
-	err := Render(&buf, sampleEnvelope(), FormatText,
+	err := Render(&buf, sampleEnvelope(), FormatTable,
 		[]string{"name", "score"},
 		func(r row) []string { return []string{r.Name, strconv.Itoa(r.Score)} },
 	)
@@ -77,7 +77,7 @@ func TestRenderTextPrintsHeaderRowsAndFooter(t *testing.T) {
 func TestRenderTextEmptyResultsPrintsOnlyFooter(t *testing.T) {
 	env := NewEnvelope[row]("gsc_sample", "sc-domain:example.com", time.Now(), nil, 7)
 	var buf bytes.Buffer
-	err := Render(&buf, env, FormatText,
+	err := Render(&buf, env, FormatTable,
 		[]string{"name", "score"},
 		func(r row) []string { return []string{r.Name, strconv.Itoa(r.Score)} },
 	)
@@ -109,7 +109,7 @@ func TestExitCodeMapping(t *testing.T) {
 }
 
 func TestValidateFormat(t *testing.T) {
-	if err := ValidateFormat(FormatText); err != nil {
+	if err := ValidateFormat(FormatTable); err != nil {
 		t.Errorf("text should be valid, got %v", err)
 	}
 	if err := ValidateFormat(FormatJSON); err != nil {
