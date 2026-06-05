@@ -1,18 +1,16 @@
 package cmd
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
-	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 var (
@@ -219,6 +217,84 @@ func displayCoverageDryRun(siteURL, startDate, endDate, state string, topIssues 
 	color.Blue("ℹ️  No API call made. Remove --dry-run to execute query.")
 }
 
+// issueRow pairs a coverage issue with the report's total page count so the
+// percentage column can be computed inside the projection function.
+type issueRow struct {
+	issue      gsc.IssueCount
+	totalPages int
+}
+
+// coverageIssuesColumns / coverageIssuesTableRow / coverageIssuesMarkdownRow
+// project a coverage issue. CSV isn't emitted for issues — only the page
+// sample table is exported to CSV, matching the previous behaviour.
+func coverageIssuesColumns() []string {
+	return []string{"Issue Type", "Count", "Percentage"}
+}
+
+func coverageIssuesTableRow(r issueRow) []string {
+	percentage := 0.0
+	if r.totalPages > 0 {
+		percentage = float64(r.issue.Count) / float64(r.totalPages) * 100
+	}
+	return []string{
+		r.issue.Issue,
+		fmt.Sprintf("%d", r.issue.Count),
+		fmt.Sprintf("%.1f%%", percentage),
+	}
+}
+
+func coverageIssuesMarkdownRow(r issueRow) []string {
+	return coverageIssuesTableRow(r)
+}
+
+// coveragePagesColumns / projection functions for the per-page sample table.
+func coveragePagesColumns() []string {
+	return []string{"URL", "Status", "Impressions", "Clicks", "CTR", "Position"}
+}
+
+// coveragePagesTableRow truncates the URL for terminal display and uses
+// one-decimal precision for CTR / position.
+func coveragePagesTableRow(p gsc.PageCoverage) []string {
+	url := p.URL
+	if len(url) > 50 {
+		url = url[:47] + "..."
+	}
+	return []string{
+		url,
+		p.Status,
+		fmt.Sprintf("%d", p.Impressions),
+		fmt.Sprintf("%d", p.Clicks),
+		fmt.Sprintf("%.1f%%", p.CTR*100),
+		fmt.Sprintf("%.1f", p.Position),
+	}
+}
+
+// coveragePagesCSVRow keeps full URLs and emits CTR / position at higher
+// precision so spreadsheet tools can reformat.
+func coveragePagesCSVRow(p gsc.PageCoverage) []string {
+	return []string{
+		p.URL,
+		p.Status,
+		fmt.Sprintf("%d", p.Impressions),
+		fmt.Sprintf("%d", p.Clicks),
+		fmt.Sprintf("%.6f", p.CTR),
+		fmt.Sprintf("%.2f", p.Position),
+	}
+}
+
+// coveragePagesMarkdownRow keeps full URLs and matches the table-mode
+// precision; pipe escaping is handled inside the render package.
+func coveragePagesMarkdownRow(p gsc.PageCoverage) []string {
+	return []string{
+		p.URL,
+		p.Status,
+		fmt.Sprintf("%d", p.Impressions),
+		fmt.Sprintf("%d", p.Clicks),
+		fmt.Sprintf("%.1f%%", p.CTR*100),
+		fmt.Sprintf("%.1f", p.Position),
+	}
+}
+
 func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 	// Display coverage summary
 	color.Cyan("═══ Index Coverage Summary ═══")
@@ -234,27 +310,12 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 	// Display top issues
 	if len(report.TopIssues) > 0 {
 		color.Cyan("═══ Coverage Issues ═══")
-		issueTable := tablewriter.NewWriter(os.Stdout)
-		issueTable.Header([]string{"Issue Type", "Count", "Percentage"})
-
-		// Table styling
-		issueTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
-		issueTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-		issueTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-		for _, issue := range report.TopIssues {
-			percentage := float64(issue.Count) / float64(report.TotalPages) * 100
-			if err := issueTable.Append([]string{
-				issue.Issue,
-				fmt.Sprintf("%d", issue.Count),
-				fmt.Sprintf("%.1f%%", percentage),
-			}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
+		issueRows := make([]issueRow, len(report.TopIssues))
+		for i, issue := range report.TopIssues {
+			issueRows[i] = issueRow{issue: issue, totalPages: report.TotalPages}
 		}
-
-		if err := issueTable.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, coverageIssuesColumns(), issueRows, coverageIssuesTableRow); err != nil {
+			return fmt.Errorf("failed to render issues table: %w", err)
 		}
 		fmt.Println()
 	}
@@ -262,42 +323,12 @@ func displayCoverageTable(report *gsc.IndexCoverageReport) error {
 	// Display page samples (limit to first 20 for table view)
 	if len(report.PagesSample) > 0 {
 		color.Cyan("═══ Page Samples (Top 20) ═══")
-		pageTable := tablewriter.NewWriter(os.Stdout)
-		pageTable.Header([]string{"URL", "Status", "Impressions", "Clicks", "CTR", "Position"})
-
-		// Table styling
-		pageTable.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
-		pageTable.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-		pageTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
 		displayLimit := len(report.PagesSample)
 		if displayLimit > 20 {
 			displayLimit = 20
 		}
-
-		for i := 0; i < displayLimit; i++ {
-			page := report.PagesSample[i]
-
-			// Truncate long URLs
-			url := page.URL
-			if len(url) > 50 {
-				url = url[:47] + "..."
-			}
-
-			if err := pageTable.Append([]string{
-				url,
-				page.Status,
-				fmt.Sprintf("%d", page.Impressions),
-				fmt.Sprintf("%d", page.Clicks),
-				fmt.Sprintf("%.1f%%", page.CTR*100),
-				fmt.Sprintf("%.1f", page.Position),
-			}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
-		}
-
-		if err := pageTable.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, coveragePagesColumns(), report.PagesSample[:displayLimit], coveragePagesTableRow); err != nil {
+			return fmt.Errorf("failed to render pages table: %w", err)
 		}
 
 		if len(report.PagesSample) > 20 {
@@ -316,23 +347,7 @@ func displayCoverageJSON(report *gsc.IndexCoverageReport) {
 }
 
 func displayCoverageCSV(report *gsc.IndexCoverageReport) {
-	writer := csv.NewWriter(os.Stdout)
-	defer writer.Flush()
-
-	// Write header
-	_ = writer.Write([]string{"URL", "Status", "Impressions", "Clicks", "CTR", "Position"})
-
-	// Write page samples
-	for _, page := range report.PagesSample {
-		_ = writer.Write([]string{
-			page.URL,
-			page.Status,
-			fmt.Sprintf("%d", page.Impressions),
-			fmt.Sprintf("%d", page.Clicks),
-			fmt.Sprintf("%.6f", page.CTR),
-			fmt.Sprintf("%.2f", page.Position),
-		})
-	}
+	_ = render.Render(os.Stdout, render.FormatCSV, coveragePagesColumns(), report.PagesSample, coveragePagesCSVRow)
 }
 
 func displayCoverageMarkdown(report *gsc.IndexCoverageReport) {
@@ -358,13 +373,11 @@ func displayCoverageMarkdown(report *gsc.IndexCoverageReport) {
 	if len(report.TopIssues) > 0 {
 		fmt.Println("## Coverage Issues")
 		fmt.Println()
-		fmt.Println("| Issue Type | Count | Percentage |")
-		fmt.Println("| --- | ---: | ---: |")
-
-		for _, issue := range report.TopIssues {
-			percentage := float64(issue.Count) / float64(report.TotalPages) * 100
-			fmt.Printf("| %s | %d | %.1f%% |\n", issue.Issue, issue.Count, percentage)
+		issueRows := make([]issueRow, len(report.TopIssues))
+		for i, issue := range report.TopIssues {
+			issueRows[i] = issueRow{issue: issue, totalPages: report.TotalPages}
 		}
+		_ = render.Render(os.Stdout, render.FormatMarkdown, coverageIssuesColumns(), issueRows, coverageIssuesMarkdownRow)
 		fmt.Println()
 	}
 
@@ -372,26 +385,13 @@ func displayCoverageMarkdown(report *gsc.IndexCoverageReport) {
 	if len(report.PagesSample) > 0 {
 		fmt.Println("## Page Samples")
 		fmt.Println()
-		fmt.Println("| URL | Status | Impressions | Clicks | CTR | Position |")
-		fmt.Println("| --- | --- | ---: | ---: | ---: | ---: |")
 
 		// Limit to top 50 for markdown
 		displayLimit := len(report.PagesSample)
 		if displayLimit > 50 {
 			displayLimit = 50
 		}
-
-		for i := 0; i < displayLimit; i++ {
-			page := report.PagesSample[i]
-			fmt.Printf("| %s | %s | %d | %d | %.1f%% | %.1f |\n",
-				page.URL,
-				page.Status,
-				page.Impressions,
-				page.Clicks,
-				page.CTR*100,
-				page.Position,
-			)
-		}
+		_ = render.Render(os.Stdout, render.FormatMarkdown, coveragePagesColumns(), report.PagesSample[:displayLimit], coveragePagesMarkdownRow)
 
 		if len(report.PagesSample) > 50 {
 			fmt.Println()

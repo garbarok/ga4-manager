@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 var (
@@ -209,31 +209,8 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 	// Indexing Issues Summary
 	if len(result.IndexingIssues) > 0 {
 		color.Cyan("Issues Found:")
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header([]string{"Severity", "Issue Type", "Message"})
-
-		for _, issue := range result.IndexingIssues {
-			var severity string
-			switch issue.Severity {
-			case "ERROR":
-				severity = color.RedString("ERROR")
-			case "WARNING":
-				severity = color.YellowString("WARNING")
-			default:
-				severity = issue.Severity
-			}
-
-			if err := table.Append([]string{
-				severity,
-				issue.IssueType,
-				issue.Message,
-			}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
-		}
-
-		if err := table.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, inspectIssuesColumns(), result.IndexingIssues, inspectIssuesTableRow); err != nil {
+			return fmt.Errorf("failed to render issues table: %w", err)
 		}
 		fmt.Println()
 	} else {
@@ -241,6 +218,27 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 		fmt.Println()
 	}
 	return nil
+}
+
+// inspectIssuesColumns / inspectIssuesTableRow project an indexing issue for
+// the URL-inspection results table. The severity cell keeps fatih/color
+// escape codes so terminal output retains its colour cues — matching the
+// previous hand-rolled tablewriter output.
+func inspectIssuesColumns() []string {
+	return []string{"Severity", "Issue Type", "Message"}
+}
+
+func inspectIssuesTableRow(issue gsc.IndexingIssue) []string {
+	var severity string
+	switch issue.Severity {
+	case "ERROR":
+		severity = color.RedString("ERROR")
+	case "WARNING":
+		severity = color.YellowString("WARNING")
+	default:
+		severity = issue.Severity
+	}
+	return []string{severity, issue.IssueType, issue.Message}
 }
 
 // displayRichResults shows rich results information including types and detected items
