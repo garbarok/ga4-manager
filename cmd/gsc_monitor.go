@@ -6,11 +6,11 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 var (
@@ -156,6 +156,15 @@ func runGSCMonitor(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// dryRunRow numbers a URL for the dry-run preview table.
+type dryRunRow struct {
+	index int
+	url   string
+}
+
+func dryRunColumns() []string             { return []string{"#", "URL"} }
+func dryRunTableRow(r dryRunRow) []string { return []string{fmt.Sprintf("%d", r.index), r.url} }
+
 func displayDryRunPreview(siteURL string, priorityURLs []string) error {
 	color.Cyan("═══ Dry-Run Mode ═══")
 	fmt.Println()
@@ -164,20 +173,12 @@ func displayDryRunPreview(siteURL string, priorityURLs []string) error {
 	color.Cyan("URLs to inspect: %d", len(priorityURLs))
 	fmt.Println()
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"#", "URL"})
-
+	rows := make([]dryRunRow, len(priorityURLs))
 	for i, url := range priorityURLs {
-		if err := table.Append([]string{
-			fmt.Sprintf("%d", i+1),
-			url,
-		}); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
+		rows[i] = dryRunRow{index: i + 1, url: url}
 	}
-
-	if err := table.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, dryRunColumns(), rows, dryRunTableRow); err != nil {
+		return fmt.Errorf("failed to render dry-run table: %w", err)
 	}
 	fmt.Println()
 
@@ -186,47 +187,37 @@ func displayDryRunPreview(siteURL string, priorityURLs []string) error {
 	return nil
 }
 
+// monitorColumns / monitorTableRow / monitorMarkdownRow project a URL
+// inspection result for the monitor command. The table-mode cells retain
+// fatih/color escape codes so the in-terminal output keeps its colour cues;
+// the markdown projection emits plain text for portable rendering.
+func monitorColumns() []string {
+	return []string{"URL", "Index Status", "Coverage", "Mobile", "Issues"}
+}
+
+func monitorTableRow(r gsc.URLInspectionResult) []string {
+	status := getColoredStatus(r.IndexStatus)
+	mobile := getMobileStatus(r.MobileUsable, r.MobileIssues)
+
+	var issues string
+	if len(r.IndexingIssues) > 0 {
+		issues = color.RedString("%d", len(r.IndexingIssues))
+	} else {
+		issues = color.GreenString("0")
+	}
+
+	url := r.URL
+	if len(url) > 60 {
+		url = url[:57] + "..."
+	}
+	return []string{url, status, r.CoverageState, mobile, issues}
+}
+
 func displayTableResults(results []gsc.URLInspectionResult) error {
 	color.Cyan("═══ Inspection Results ═══")
 	fmt.Println()
-
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"URL", "Index Status", "Coverage", "Mobile", "Issues"})
-
-	for _, r := range results {
-		// Color-coded index status
-		status := getColoredStatus(r.IndexStatus)
-
-		// Mobile status
-		mobile := getMobileStatus(r.MobileUsable, r.MobileIssues)
-
-		// Issues count
-		var issues string
-		if len(r.IndexingIssues) > 0 {
-			issues = color.RedString("%d", len(r.IndexingIssues))
-		} else {
-			issues = color.GreenString("0")
-		}
-
-		// Truncate URL for display
-		url := r.URL
-		if len(url) > 60 {
-			url = url[:57] + "..."
-		}
-
-		if err := table.Append([]string{
-			url,
-			status,
-			r.CoverageState,
-			mobile,
-			issues,
-		}); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
-	}
-
-	if err := table.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, monitorColumns(), results, monitorTableRow); err != nil {
+		return fmt.Errorf("failed to render results table: %w", err)
 	}
 	fmt.Println()
 	return nil

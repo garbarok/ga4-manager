@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 var (
@@ -115,54 +115,56 @@ func runGSCSitemapsList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Display sitemaps in a table
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header([]string{"Sitemap URL", "URLs", "Errors", "Warnings", "Last Submitted", "Status"})
-
-	for _, sm := range sitemaps {
-		var status string
-		if sm.Errors > 0 {
-			status = color.RedString("Errors: %d", sm.Errors)
-		} else if sm.Warnings > 0 {
-			status = color.YellowString("Warnings: %d", sm.Warnings)
-		} else if sm.IsPending {
-			status = color.YellowString("Pending")
-		} else {
-			status = color.GreenString("OK")
-		}
-
-		lastSubmitted := "Never"
-		if sm.LastSubmitted != "" {
-			t, err := time.Parse(time.RFC3339, sm.LastSubmitted)
-			if err == nil {
-				lastSubmitted = t.Format("2006-01-02 15:04")
-			} else {
-				lastSubmitted = sm.LastSubmitted
-			}
-		}
-
-		sitemapType := sm.Path
-		if sm.IsSitemapsIndex {
-			sitemapType += " (Index)"
-		}
-
-		if err := table.Append([]string{
-			sitemapType,
-			fmt.Sprintf("%d", sm.ContentsCount),
-			fmt.Sprintf("%d", sm.Errors),
-			fmt.Sprintf("%d", sm.Warnings),
-			lastSubmitted,
-			status,
-		}); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
-	}
-
-	if err := table.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, sitemapsListColumns(), sitemaps, sitemapsListTableRow); err != nil {
+		return fmt.Errorf("failed to render sitemaps table: %w", err)
 	}
 	color.Green("\n✓ Found %d sitemap(s)", len(sitemaps))
 	return nil
+}
+
+// sitemapsListColumns / sitemapsListTableRow project a sitemap row for the
+// list command. Status and last-submitted are pre-formatted in the
+// projection — they include fatih/color escape codes so the in-terminal
+// output keeps its colour cues.
+func sitemapsListColumns() []string {
+	return []string{"Sitemap URL", "URLs", "Errors", "Warnings", "Last Submitted", "Status"}
+}
+
+func sitemapsListTableRow(sm gsc.SitemapInfo) []string {
+	var status string
+	if sm.Errors > 0 {
+		status = color.RedString("Errors: %d", sm.Errors)
+	} else if sm.Warnings > 0 {
+		status = color.YellowString("Warnings: %d", sm.Warnings)
+	} else if sm.IsPending {
+		status = color.YellowString("Pending")
+	} else {
+		status = color.GreenString("OK")
+	}
+
+	lastSubmitted := "Never"
+	if sm.LastSubmitted != "" {
+		t, err := time.Parse(time.RFC3339, sm.LastSubmitted)
+		if err == nil {
+			lastSubmitted = t.Format("2006-01-02 15:04")
+		} else {
+			lastSubmitted = sm.LastSubmitted
+		}
+	}
+
+	sitemapType := sm.Path
+	if sm.IsSitemapsIndex {
+		sitemapType += " (Index)"
+	}
+
+	return []string{
+		sitemapType,
+		fmt.Sprintf("%d", sm.ContentsCount),
+		fmt.Sprintf("%d", sm.Errors),
+		fmt.Sprintf("%d", sm.Warnings),
+		lastSubmitted,
+		status,
+	}
 }
 
 func runGSCSitemapsSubmit(cmd *cobra.Command, args []string) error {
@@ -284,28 +286,29 @@ func runGSCSitemapsGet(cmd *cobra.Command, args []string) error {
 	if len(sm.Contents) > 0 {
 		fmt.Println()
 		color.Cyan("═══ Content Breakdown ═══")
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header([]string{"Type", "Submitted", "Indexed"})
-
-		for _, content := range sm.Contents {
-			indexedPct := 0.0
-			if content.Submitted > 0 {
-				indexedPct = (float64(content.Indexed) / float64(content.Submitted)) * 100
-			}
-
-			if err := table.Append([]string{
-				content.Type,
-				fmt.Sprintf("%d", content.Submitted),
-				fmt.Sprintf("%d (%.1f%%)", content.Indexed, indexedPct),
-			}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
-		}
-
-		if err := table.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, sitemapsContentsColumns(), sm.Contents, sitemapsContentsTableRow); err != nil {
+			return fmt.Errorf("failed to render contents table: %w", err)
 		}
 	}
 
 	return nil
+}
+
+// sitemapsContentsColumns / sitemapsContentsTableRow project a sitemap-
+// contents entry for the get command. The indexed cell embeds the indexed
+// percentage exactly as the previous hand-rolled output did.
+func sitemapsContentsColumns() []string {
+	return []string{"Type", "Submitted", "Indexed"}
+}
+
+func sitemapsContentsTableRow(content gsc.SitemapContentInfo) []string {
+	indexedPct := 0.0
+	if content.Submitted > 0 {
+		indexedPct = (float64(content.Indexed) / float64(content.Submitted)) * 100
+	}
+	return []string{
+		content.Type,
+		fmt.Sprintf("%d", content.Submitted),
+		fmt.Sprintf("%d (%.1f%%)", content.Indexed, indexedPct),
+	}
 }

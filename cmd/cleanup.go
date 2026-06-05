@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/garbarok/ga4-manager/internal/render"
 	"github.com/garbarok/ga4-manager/internal/tui"
-	"github.com/olekukonko/tablewriter"
-	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 )
 
@@ -114,49 +113,34 @@ func executeCleanup(cfgPath, projName string, all, dryRun bool, cType string, ye
 		// Show what will be removed
 		if hasConversions {
 			fmt.Printf("\n%s Conversion Events to Remove:\n", red("🗑"))
-			table := tablewriter.NewWriter(os.Stdout)
-			table.Header([]string{"Event Name", "Status"})
-			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-
-			for _, eventName := range cfg.Cleanup.ConversionsToRemove {
-				if err := table.Append([]string{eventName, "Will be deleted"}); err != nil {
-					return fmt.Errorf("failed to append table row: %w", err)
-				}
-			}
-			if err := table.Render(); err != nil {
-				return fmt.Errorf("failed to render table: %w", err)
+			if err := render.Render(os.Stdout, render.FormatTable,
+				cleanupConversionsColumns(),
+				cfg.Cleanup.ConversionsToRemove,
+				cleanupConversionsTableRow,
+			); err != nil {
+				return fmt.Errorf("failed to render conversions table: %w", err)
 			}
 		}
 
 		if hasDimensions {
 			fmt.Printf("\n%s Custom Dimensions to Remove:\n", red("🗑"))
-			table := tablewriter.NewWriter(os.Stdout)
-			table.Header([]string{"Parameter Name", "Status"})
-			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-
-			for _, paramName := range cfg.Cleanup.DimensionsToRemove {
-				if err := table.Append([]string{paramName, "Will be archived"}); err != nil {
-					return fmt.Errorf("failed to append table row: %w", err)
-				}
-			}
-			if err := table.Render(); err != nil {
-				return fmt.Errorf("failed to render table: %w", err)
+			if err := render.Render(os.Stdout, render.FormatTable,
+				cleanupDimensionsColumns(),
+				cfg.Cleanup.DimensionsToRemove,
+				cleanupDimensionsTableRow,
+			); err != nil {
+				return fmt.Errorf("failed to render dimensions table: %w", err)
 			}
 		}
 
 		if hasMetrics {
 			fmt.Printf("\n%s Custom Metrics to Remove:\n", red("🗑"))
-			table := tablewriter.NewWriter(os.Stdout)
-			table.Header([]string{"Parameter Name", "Status"})
-			table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-
-			for _, paramName := range cfg.Cleanup.MetricsToRemove {
-				if err := table.Append([]string{paramName, "Will be archived"}); err != nil {
-					return fmt.Errorf("failed to append table row: %w", err)
-				}
-			}
-			if err := table.Render(); err != nil {
-				return fmt.Errorf("failed to render table: %w", err)
+			if err := render.Render(os.Stdout, render.FormatTable,
+				cleanupMetricsColumns(),
+				cfg.Cleanup.MetricsToRemove,
+				cleanupMetricsTableRow,
+			); err != nil {
+				return fmt.Errorf("failed to render metrics table: %w", err)
 			}
 		}
 
@@ -305,3 +289,20 @@ func shouldProceedWithCleanup(hasItems, skipConfirmation bool, yellow func(a ...
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
+
+// cleanupConversionsColumns / cleanupConversionsTableRow project the
+// conversion-events preview table. Each row is a single event name plus a
+// fixed status string — matching the previous hand-rolled tablewriter
+// output.
+func cleanupConversionsColumns() []string         { return []string{"Event Name", "Status"} }
+func cleanupConversionsTableRow(s string) []string { return []string{s, "Will be deleted"} }
+
+// cleanupDimensionsColumns / cleanupDimensionsTableRow project the
+// custom-dimensions preview table.
+func cleanupDimensionsColumns() []string         { return []string{"Parameter Name", "Status"} }
+func cleanupDimensionsTableRow(s string) []string { return []string{s, "Will be archived"} }
+
+// cleanupMetricsColumns / cleanupMetricsTableRow project the custom-metrics
+// preview table.
+func cleanupMetricsColumns() []string         { return []string{"Parameter Name", "Status"} }
+func cleanupMetricsTableRow(s string) []string { return []string{s, "Will be archived"} }

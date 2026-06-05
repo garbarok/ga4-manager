@@ -9,10 +9,10 @@ import (
 	"github.com/fatih/color"
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/ga4"
+	"github.com/garbarok/ga4-manager/internal/render"
 	"github.com/garbarok/ga4-manager/internal/tui"
-	"github.com/olekukonko/tablewriter"
-	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
+	admin "google.golang.org/api/analyticsadmin/v1alpha"
 )
 
 var reportCmd = &cobra.Command{
@@ -34,7 +34,7 @@ func init() {
 	reportCmd.Flags().StringVarP(&projectName, "project", "p", "", "Config file name (e.g., basic-ecommerce, content-site)")
 	reportCmd.Flags().BoolVarP(&reportAll, "all", "a", false, "Report on all projects")
 	reportCmd.Flags().StringVarP(&reportConfigPath, "config", "c", "", "Path to configuration file")
-	reportCmd.Flags().StringVarP(&reportExport, "export", "e", "", "Export format: csv, json, or markdown")
+	reportCmd.Flags().StringVarP(&reportExport, "export", "e", "", "Export format: csv, json, or markdown (no aliases)")
 	reportCmd.Flags().StringVarP(&reportOutput, "output", "o", "", "Output file path (default: stdout or auto-generated filename)")
 }
 
@@ -228,14 +228,11 @@ func executeExport(projectPath string, all bool, format string) {
 func exportReports(client *ga4.Client, projects []*config.ProjectConfig, format, outputPath string) error {
 	format = strings.ToLower(format)
 
-	// Validate format
-	if format != "csv" && format != "json" && format != "markdown" && format != "md" {
+	// Validate format. The canonical vocabulary is csv | json | markdown; no
+	// aliases (the previous "md" synonym was removed alongside the slice-2
+	// renderer migration).
+	if format != "csv" && format != "json" && format != "markdown" {
 		return fmt.Errorf("invalid export format: %s (supported: csv, json, markdown)", format)
-	}
-
-	// Normalize markdown format
-	if format == "md" {
-		format = "markdown"
 	}
 
 	fmt.Printf("📤 Exporting reports in %s format...\n\n", strings.ToUpper(format))
@@ -297,17 +294,8 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 		return fmt.Errorf("failed to list conversions: %w", err)
 	}
 
-	convTable := tablewriter.NewWriter(os.Stdout)
-	convTable.Header([]string{"Event Name", "Counting Method"})
-	convTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-	for _, conv := range conversions {
-		if err := convTable.Append([]string{conv.EventName, conv.CountingMethod}); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
-	}
-	if err := convTable.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, reportConversionsColumns(), conversions, reportConversionsTableRow); err != nil {
+		return fmt.Errorf("failed to render conversions table: %w", err)
 	}
 
 	// List dimensions
@@ -319,17 +307,8 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 		return fmt.Errorf("failed to list dimensions: %w", err)
 	}
 
-	dimTable := tablewriter.NewWriter(os.Stdout)
-	dimTable.Header([]string{"Display Name", "Parameter", "Scope"})
-	dimTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-	for _, dim := range dimensions {
-		if err := dimTable.Append([]string{dim.DisplayName, dim.ParameterName, dim.Scope}); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
-	}
-	if err := dimTable.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, reportDimensionsColumns(), dimensions, reportDimensionsTableRow); err != nil {
+		return fmt.Errorf("failed to render dimensions table: %w", err)
 	}
 
 	// List custom metrics
@@ -340,17 +319,8 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	if err != nil {
 		fmt.Printf("Warning: failed to list custom metrics: %v\n", err)
 	} else {
-		metricTable := tablewriter.NewWriter(os.Stdout)
-		metricTable.Header([]string{"Display Name", "Parameter", "Unit", "Scope"})
-		metricTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-		for _, metric := range metrics {
-			if err := metricTable.Append([]string{metric.DisplayName, metric.ParameterName, metric.MeasurementUnit, metric.Scope}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
-		}
-		if err := metricTable.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, reportMetricsColumns(), metrics, reportMetricsTableRow); err != nil {
+			return fmt.Errorf("failed to render metrics table: %w", err)
 		}
 	}
 
@@ -362,17 +332,8 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	if err != nil {
 		fmt.Printf("Warning: failed to list calculated metrics: %v\n", err)
 	} else {
-		calcTable := tablewriter.NewWriter(os.Stdout)
-		calcTable.Header([]string{"Display Name", "Formula", "Unit"})
-		calcTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-		for _, calc := range calculatedMetrics {
-			if err := calcTable.Append([]string{calc.DisplayName, calc.Formula, calc.MetricUnit}); err != nil {
-				return fmt.Errorf("failed to append table row: %w", err)
-			}
-		}
-		if err := calcTable.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
+		if err := render.Render(os.Stdout, render.FormatTable, reportCalculatedColumns(), calculatedMetrics, reportCalculatedTableRow); err != nil {
+			return fmt.Errorf("failed to render calculated metrics table: %w", err)
 		}
 	}
 
@@ -384,21 +345,14 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	fmt.Println(audienceSummary)
 
 	audienceCategories := ga4.ListAudiencesByCategory(cfg)
-	audienceTable := tablewriter.NewWriter(os.Stdout)
-	audienceTable.Header([]string{"Name", "Category", "Duration (days)"})
-	audienceTable.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
+	audienceRows := make([]config.EnhancedAudience, 0)
 	for _, category := range []string{"SEO", "Conversion", "Content", "Behavioral"} {
 		if audiences, ok := audienceCategories[category]; ok {
-			for _, aud := range audiences {
-				if err := audienceTable.Append([]string{aud.Name, aud.Category, fmt.Sprintf("%d", aud.MembershipDuration)}); err != nil {
-					return fmt.Errorf("failed to append table row: %w", err)
-				}
-			}
+			audienceRows = append(audienceRows, audiences...)
 		}
 	}
-	if err := audienceTable.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
+	if err := render.Render(os.Stdout, render.FormatTable, reportAudiencesColumns(), audienceRows, reportAudiencesTableRow); err != nil {
+		return fmt.Errorf("failed to render audiences table: %w", err)
 	}
 
 	fmt.Println()
@@ -429,4 +383,57 @@ func reportProject(client *ga4.Client, cfg *config.ProjectConfig) error {
 	}
 
 	return nil
+}
+
+// reportConversionsColumns / reportConversionsTableRow project a conversion
+// event for the report's conversions section. The previous tablewriter
+// output had borderless styling; the new render.Render output uses plain
+// tabwriter alignment which keeps the same column order and contents.
+func reportConversionsColumns() []string {
+	return []string{"Event Name", "Counting Method"}
+}
+
+func reportConversionsTableRow(c *admin.GoogleAnalyticsAdminV1alphaConversionEvent) []string {
+	return []string{c.EventName, c.CountingMethod}
+}
+
+// reportDimensionsColumns / reportDimensionsTableRow project a custom
+// dimension for the report's dimensions section.
+func reportDimensionsColumns() []string {
+	return []string{"Display Name", "Parameter", "Scope"}
+}
+
+func reportDimensionsTableRow(d *admin.GoogleAnalyticsAdminV1alphaCustomDimension) []string {
+	return []string{d.DisplayName, d.ParameterName, d.Scope}
+}
+
+// reportMetricsColumns / reportMetricsTableRow project a custom metric for
+// the report's metrics section.
+func reportMetricsColumns() []string {
+	return []string{"Display Name", "Parameter", "Unit", "Scope"}
+}
+
+func reportMetricsTableRow(m *admin.GoogleAnalyticsAdminV1alphaCustomMetric) []string {
+	return []string{m.DisplayName, m.ParameterName, m.MeasurementUnit, m.Scope}
+}
+
+// reportCalculatedColumns / reportCalculatedTableRow project a
+// recommended-calculated-metric entry for the report's calculated metrics
+// section.
+func reportCalculatedColumns() []string {
+	return []string{"Display Name", "Formula", "Unit"}
+}
+
+func reportCalculatedTableRow(c ga4.CalculatedMetric) []string {
+	return []string{c.DisplayName, c.Formula, c.MetricUnit}
+}
+
+// reportAudiencesColumns / reportAudiencesTableRow project a configured
+// audience for the report's audiences section.
+func reportAudiencesColumns() []string {
+	return []string{"Name", "Category", "Duration (days)"}
+}
+
+func reportAudiencesTableRow(a config.EnhancedAudience) []string {
+	return []string{a.Name, a.Category, fmt.Sprintf("%d", a.MembershipDuration)}
 }
