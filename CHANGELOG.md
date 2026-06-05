@@ -12,6 +12,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority filtering (`--priority high/medium/low`)
 - Incremental updates for partial updates
 
+## [2.3.0] - 2026-06-05
+
+### GSC Diagnostics framework: four production-grade SEO commands + shared substrate
+
+#### Added
+
+**Four new diagnostic commands (CLI + MCP at parity)**
+- `ga4 gsc cannibalization` / `gsc_cannibalization` — detect queries where ≥2 pages on the same site each clear an impression threshold, splitting authority. Supports `--with-coverage-state` (per-page URL Inspection with severity tiering: `actionable` vs `consolidating`), `--only-actionable` (cron-friendly filter that drops in-flight migrations), `--days N` lookback, and the redirect-aware `canonical_candidate` heuristic that auto-corrects to the impression leader among non-redirect pages.
+- `ga4 gsc opportunities` / `gsc_opportunities` — surface queries ranking position 5–20 whose CTR is below the peer median (position-bucket curve), ranked by `potential_clicks` — the absolute monthly clicks the page would gain at median CTR. Falls back to a published industry-baseline CTR curve when the site has too few peers in a bucket to compute its own median, so small-site Operators get useful output before they have enough traffic for per-site medians.
+- `ga4 gsc ctr-anomaly` / `gsc_ctr_anomaly` — compare two consecutive windows of search analytics, surface (query, page) pairs whose position barely moved but whose CTR collapsed ≥30%. Signals snippet rot — title/meta no longer converting against the SERP. Sorted by `clicks_lost` descending.
+- `ga4 gsc health` / `gsc_health` — first state-bearing command. Inspects priority URLs from config, diffs against a JSON snapshot per ADR-0005, surfaces regressions / recoveries / baselines. Silent on all-green so a weekly cron only fires when something regresses (noindex bugs, coverage-state changes, canonical mismatches, mobile-usability or rich-result failures).
+
+**Shared framework (`internal/gsc/diagcmd`)**
+- `Envelope[T]` generic for JSON output, `Render` dispatcher, `ExitCode` / `ValidateFormat` / `LoadSite` / `FailWith` helpers. The four conventions every diagnostic command honours (exit 0/1/2 semantics, `--format table|json`, silent-on-all-green, quota footer) are defined in one module rather than reimplemented per command.
+
+**Shared renderer (`internal/render`)**
+- One generic `Render[T]` function with three format adapters (table / csv / markdown). Replaces seven cmd files' worth of hand-rolled `tablewriter` + format-switch logic; the `olekukonko/tablewriter` dependency was removed from the project as a result. JSON output stays per-command because envelope shapes are command-specific (analytics has aggregates, diagnostics have results, etc.).
+
+**State storage (`internal/gsc/state`, ADR-0005)**
+- Schema-versioned JSON snapshots per `(command, gsc_site)` pair, atomic temp-file-plus-rename, typed errors (`ErrSnapshotMissing`, `ErrSchemaVersionMismatch`, `ErrInvalidKey`), `ResolveStateDir` helper, injectable `renameFn` test seam. First consumer is `gsc_health`; future state-bearing diagnostics plug in here.
+
+**GSC client interfaces (`internal/gsc.SearchAPI`, `internal/gsc.InspectAPI`)**
+- Narrow consumer-facing interfaces over `*Client`. Mirrors the `internal/ga4` adminAPI/fakeAdminAPI seam. Quota usage now travels alongside the data it cost (`SearchAnalyticsReport.QuotaUsed`) rather than via a separate state read.
+
+**CONTEXT.md and ADRs**
+- "Operator" defined as the central actor (the person running this CLI against their own properties).
+- "SEO Diagnostics" section codifies the four canonical signals as strict, mutually-exclusive predicates (Decay, CTR anomaly, Opportunity, Cannibalisation).
+- ADR-0005 captures the state-storage architecture decision.
+
+#### Fixed
+
+- **MCP swallowed stdout on exit 2.** The dispatch layer treated any non-zero exit as `CLI_EXECUTION_FAILED`, so success-with-findings (the entire point of diagnostic commands) returned only stderr. `SUCCESS_EXIT_CODES = {0, 2}` now treats exit 2 as success at the MCP layer; exit 1 and unexpected codes still route to `mapCLIError`.
+- **Opaque `spawn .../ga4 ENOENT` on first MCP call after a fresh clone.** `CLIExecutor` now validates the binary at construction and throws a clear remediation hint pointing at `make build` / `go build -o ga4 .` and the `GA4_BINARY_PATH` override.
+- **Cannibalisation `canonical_candidate` could point at a redirect target** for sites mid-migration (GSC still attributes impressions to the legacy URL inside its 28-day window). The field now auto-corrects to the impression leader among non-redirect pages when `--with-coverage-state` is set.
+
+#### Changed
+
+- Format vocabulary unified across the codebase: `table | csv | markdown`. The previously-shipped diagnostic flag value `text` is now `table`; `cmd/report.go`'s `md` alias is removed (use `markdown`).
+- `gsc_cannibalization` always passes `--min-impressions` so the MCP and Go defaults can never silently diverge.
+- Stale `internal/seo/webvitals.go` (190 LOC, zero consumers) deleted. BO-09 CWV monitoring remains deferred until CrUX coverage is available, and will be designed fresh when picked up.
+- Removed automatic PR review (Claude + CodeRabbit). Code review responsibility moves to the maintainer plus the local `/code-review` and `/thermo-nuclear-code-quality-review` skills.
+
+#### Tests
+
+- Go: full suite green, including new packages `internal/gsc/diagcmd`, `internal/gsc/state`, `internal/gsc/diagnostics`, `internal/render`, plus per-command CLI test files for all four new diagnostics.
+- MCP: 1432 tests pass (up from 1341 at the start of the cycle).
+- `go vet ./...` clean, `make lint` clean (only pre-existing vendored `node_modules/flatted` govet warnings).
+
 ## [2.2.0] - 2026-04-25
 
 ### Diagnostic & SEO MCP tools + onboarding overhaul
