@@ -13,5 +13,19 @@ type SearchAPI interface {
 	QuerySearchAnalytics(query *SearchAnalyticsQuery) (*SearchAnalyticsReport, error)
 }
 
-// Compile-time guarantee that *Client satisfies SearchAPI.
-var _ SearchAPI = (*Client)(nil)
+// InspectAPI is the consumer interface for URL Inspection. Diagnostic
+// commands that need per-URL coverage data (e.g. cannibalisation severity
+// tiering, hreflang validation, schema audits) depend on this seam in
+// addition to SearchAPI. Each call charges one inspection against the daily
+// quota; callers are expected to deduplicate URLs they care about before
+// invoking InspectURL.
+type InspectAPI interface {
+	InspectURL(siteURL, inspectURL string) (*URLInspectionResult, error)
+}
+
+// Compile-time guarantee that *Client satisfies both diagnostic-side
+// interfaces.
+var (
+	_ SearchAPI  = (*Client)(nil)
+	_ InspectAPI = (*Client)(nil)
+)

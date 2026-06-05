@@ -110,6 +110,11 @@ Two or more pages on the same site ranking for the same query, splitting authori
 cannibalisation ≔ ≥2 pages on the same query with impressions ≥ 10
 ```
 
+The `canonical_candidate` field on a cannibalisation result is a heuristic: it is the page with the highest current impressions on the query, **not** Google's chosen canonical. For migrating sites GSC may still attribute impressions to a legacy URL inside its 28-day window, so the impression leader can be the page the Operator intends to redirect away from. When precision matters, callers can request a per-page coverage_state lookup which annotates each finding with a severity tier:
+
+- `actionable` — every page in the result is in a non-redirect coverage state.
+- `consolidating` — at least one page is `Page with redirect`; the migration is mid-flight and the finding will decay out of the GSC attribution window on its own.
+
 Avoid: "duplicate ranking", "query overlap".
 
 ---

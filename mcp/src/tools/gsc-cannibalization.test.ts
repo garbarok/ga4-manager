@@ -8,14 +8,25 @@ import {
 } from './gsc-cannibalization.js'
 
 describe('gscCannibalizationInputSchema', () => {
-  it('accepts a config path with default min_impressions', () => {
+  it('accepts a config path with default min_impressions, days, and with_coverage_state', () => {
     const parsed = gscCannibalizationInputSchema.safeParse({
       config: 'configs/mysite.yaml',
     })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.data.min_impressions).toBe(10)
+      expect(parsed.data.days).toBe(28)
+      expect(parsed.data.with_coverage_state).toBe(false)
     }
+  })
+
+  it('rejects days below 1 or above 485', () => {
+    expect(
+      gscCannibalizationInputSchema.safeParse({ config: 'x', days: 0 }).success,
+    ).toBe(false)
+    expect(
+      gscCannibalizationInputSchema.safeParse({ config: 'x', days: 486 }).success,
+    ).toBe(false)
   })
 
   it('accepts a custom min_impressions', () => {
@@ -57,10 +68,12 @@ describe('gscCannibalizationInputSchema', () => {
 })
 
 describe('buildCannibalizationArgs', () => {
-  it('always passes config, json format, and min-impressions', () => {
+  it('always passes config, json format, min-impressions, and days', () => {
     const args = buildCannibalizationArgs({
       config: 'configs/mysite.yaml',
       min_impressions: 10,
+      days: 28,
+      with_coverage_state: false,
     } as GscCannibalizationInput)
     expect(args).toEqual([
       'cannibalization',
@@ -70,6 +83,8 @@ describe('buildCannibalizationArgs', () => {
       'json',
       '--min-impressions',
       '10',
+      '--days',
+      '28',
     ])
   })
 
@@ -77,9 +92,40 @@ describe('buildCannibalizationArgs', () => {
     const args = buildCannibalizationArgs({
       config: 'configs/mysite.yaml',
       min_impressions: 25,
+      days: 28,
+      with_coverage_state: false,
     } as GscCannibalizationInput)
     expect(args).toContain('--min-impressions')
     expect(args).toContain('25')
+  })
+
+  it('passes a non-default days verbatim', () => {
+    const args = buildCannibalizationArgs({
+      config: 'configs/mysite.yaml',
+      min_impressions: 10,
+      days: 90,
+      with_coverage_state: false,
+    } as GscCannibalizationInput)
+    expect(args).toContain('--days')
+    expect(args).toContain('90')
+  })
+
+  it('appends --with-coverage-state when true; omits when false', () => {
+    const on = buildCannibalizationArgs({
+      config: 'configs/mysite.yaml',
+      min_impressions: 10,
+      days: 28,
+      with_coverage_state: true,
+    } as GscCannibalizationInput)
+    expect(on).toContain('--with-coverage-state')
+
+    const off = buildCannibalizationArgs({
+      config: 'configs/mysite.yaml',
+      min_impressions: 10,
+      days: 28,
+      with_coverage_state: false,
+    } as GscCannibalizationInput)
+    expect(off).not.toContain('--with-coverage-state')
   })
 })
 
