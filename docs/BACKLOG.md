@@ -1,157 +1,155 @@
 # GA4 Manager — SEO Automation Backlog
 
-> Context: wealthsim.app (Next.js, sc-domain:wealthsim.app, GA4 property 514673271).
-> Priorities derived from a GSC/GA4 audit session on 2026-06-05.
-> Each item includes API feasibility confirmation before implementation is considered.
+> Forward-looking feature backlog for the GSC analysis surface of the CLI.
+> Each item names a generic SEO diagnostic any Operator with a GSC site can run.
+> API feasibility is confirmed against existing Search Analytics + URL Inspection APIs.
+>
+> **Cross-cutting decisions** (resolved 2026-06-05 grilling session):
+> - CLI + MCP at parity from day one. Every command emits structured output consumed by an MCP tool registered per ADR-0003.
+> - Canonical signal vocabulary lives in `CONTEXT.md` (Decay, CTR anomaly, Opportunity, Cannibalisation). BACKLOG predicates below are aligned to those definitions.
+> - State storage per ADR-0005: `.ga4-state/<command>.<gsc-site>.json`, gitignored, schema-versioned, `--state-dir` override.
+> - "Silent on all-green" = stdout-only convention. Exit `0` all-green, `2` issues detected, `1` command failed. No notification channels in the tool itself — that lives in whatever runs the cron.
 
 ---
 
-## Priority 1 — High value, confirmed doable
+## P1 — High value, confirmed doable
 
 ### BO-01 · Keyword Opportunity Finder
-**Problem:** wealthsim.app has 9,172 impressions/month but only 50 clicks (0.63% CTR). Many queries are ranking at position 5–20 but not converting to clicks — a title/meta optimisation problem that's invisible without analysis.
+**Problem:** Sites often rank on pages 1–2 for queries they never tuned for. The pages exist, the impressions exist, but the CTR is low because the title/meta was never optimised. Invisible without cross-referencing query × page × position data.
 
 **What it does:**
 - Queries `gsc_analytics_run` with `dimensions: query,page`
-- Filters to position 5–20, impressions ≥ 20, CTR below category median
-- Outputs a ranked table of "easy wins": query → page → current position → CTR gap
-- Optional: compares to prior period to show trending opportunities
+- Applies the **opportunity** predicate (see CONTEXT.md): `position ∈ [5, 20] AND ctr < category_median_ctr`, where `category_median_ctr` is computed per integer position bucket (industry-standard position-CTR curve)
+- Outputs a ranked table of opportunities: query → page → current position → CTR gap vs. position-bucket median
+- Opt-in `--compare-to-prior` flag adds a second window for trending mode
 
-**API feasibility:** ✅ Fully supported via Search Analytics API. 1 request per run.
+**API feasibility:** Fully supported via Search Analytics API. 1 request per run (2 with `--compare-to-prior`).
 
-**Output example:**
-```
-Query                          Page                        Pos   Impr  CTR    Gap
-"s&p 500 investment calc"      /calculator/sp500-investment  8    920   0.3%  -2.1%
-"compound interest monthly"    /calculator/compound-interest 12   540   0.4%  -1.8%
-```
-
-**Suggested command:** `ga4 gsc opportunities --config configs/wealthsim.yaml`
+**Suggested command:** `ga4 gsc opportunities --config <config>.yaml`
 
 ---
 
 ### BO-02 · Content Decay Monitor
-**Problem:** Top-performing pages (especially Spanish posts) can lose ranking gradually. Currently there is no automated way to catch this before it becomes a significant traffic loss.
+**Problem:** Pages that previously ranked well can slip in position gradually. Without automated comparison against a prior window, the slip becomes a significant traffic loss before anyone notices.
 
 **What it does:**
 - Wraps `gsc_traffic_compare` comparing last 28 days vs prior 28 days
-- Filters to pages with clicks_delta < -20% AND impressions_delta < -15% (both dropping = decay, not just CTR shift)
-- Outputs a "pages losing ground" list with decay severity score
-- Separates seasonal drops (position stable, impressions drop) from ranking drops (position worsens)
+- Applies the **decay** predicate (see CONTEXT.md): `position_delta ≥ +1.0 AND clicks_delta ≤ -20%`
+- Outputs the matching pages ordered by absolute clicks lost
+- Decay is strictly position-driven; pages that lost clicks via CTR collapse without position movement are caught by BO-05 (CTR anomaly)
 
-**API feasibility:** ✅ `gsc_traffic_compare` already exists. Needs a wrapper with decay-specific thresholds.
+**API feasibility:** `gsc_traffic_compare` already exists. Needs a wrapper applying the decay predicate.
 
-**Suggested command:** `ga4 gsc decay --config configs/wealthsim.yaml --threshold 20`
+**Suggested command:** `ga4 gsc decay --config <config>.yaml`
 
 ---
 
-### BO-03 · Weekly Index Health Cron
-**Problem:** The noindex bug on `tfsa-calculator` / `rrsp-calculator` was only discovered during a manual GSC audit. Automated weekly monitoring of priority URLs would catch de-index events within days.
+### BO-03 · Weekly Index Health Report
+**Problem:** A page can be silently de-indexed, develop a canonical mismatch, or fail mobile-usability checks without anyone noticing for weeks. Manual GSC audits catch these only after the traffic loss is measurable. Automated weekly inspection of declared priority URLs surfaces regressions within days.
 
 **What it does:**
 - Runs `gsc_monitor_urls` on all `search_console.url_inspection.priority_urls` from config
-- Diffs results against previous run (stored in a local state file)
-- Alerts on: newly de-indexed pages, coverage state regressions, canonical mismatches, mobile usability failures
-- Outputs a clean pass/fail summary; only prints issues, silent on all-green
+- Diffs results against previous run (state file per ADR-0005: `.ga4-state/health.<gsc-site>.json`)
+- Reports on: newly de-indexed pages, coverage state regressions, canonical mismatches, mobile usability failures
+- Silent on all-green (exit 0); prints issues and exits 2 when regressions are detected. Notification routing is the cron wrapper's responsibility — the command itself does not emit webhooks/emails.
 
-**API feasibility:** ✅ `gsc_monitor_urls` supports up to 50 URLs. 29 priority URLs = 29 quota/run (well within 2000/day). State file is local — no external dependency.
+**API feasibility:** `gsc_monitor_urls` supports up to 50 URLs per call. URL Inspection quota: 2000/day, so 50 URLs/week ≈ 7/day, well within budget. State file is local — no external dependency.
 
-**Quota cost:** 29 requests/week ≈ 4/day average.
-
-**Suggested command:** `ga4 gsc health --config configs/wealthsim.yaml` (run via cron weekly)
+**Suggested command:** `ga4 gsc health --config <config>.yaml` (driven by cron, launchd, GitHub Actions, etc.)
 
 ---
 
 ### BO-04 · Query Cannibalization Detector
-**Problem:** When two pages rank for the same query, Google splits authority between them. Neither ranks as well as one consolidated page would. Impossible to spot without cross-referencing query × page data.
+**Problem:** When two pages on the same site rank for the same query, Google splits authority between them. Neither ranks as well as a consolidated page would. Impossible to spot without cross-referencing query × page data.
 
 **What it does:**
 - Pulls `gsc_analytics_run` with `dimensions: query,page`, large limit (5000+ rows)
-- Groups by query; finds queries where ≥ 2 pages each have impressions ≥ 10
-- Ranks by total impression waste (sum of impressions across cannibalising pages)
+- Applies the **cannibalisation** predicate (see CONTEXT.md): `≥2 pages on the same query with impressions ≥ 10`
+- Ranks queries by total impressions across the cannibalising pages, descending
 - Suggests which page to keep as canonical and which to consolidate or redirect
 
-**API feasibility:** ✅ One API call, existing tool. Pure post-processing logic.
+**API feasibility:** One API call, existing tool. Pure post-processing logic.
 
-**Suggested command:** `ga4 gsc cannibalization --config configs/wealthsim.yaml --min-impressions 10`
+**Suggested command:** `ga4 gsc cannibalization --config <config>.yaml --min-impressions 10`
 
 ---
 
 ### BO-05 · CTR Anomaly Detection
-**Problem:** A page can hold its ranking position while CTR drops — always caused by a competitor improving their snippet, a SERP feature stealing clicks, or a title no longer matching search intent. Invisible in standard traffic reports.
+**Problem:** A page can hold its ranking position while CTR drops — typically caused by a competitor improving their snippet, a SERP feature stealing clicks, or a title/meta that no longer matches search intent. Invisible in standard traffic reports.
 
 **What it does:**
 - Runs `gsc_traffic_compare` with `dimensions: query,page`
-- Filters to rows where `position_delta` is < 2 (position held) but `ctr_delta` < -30%
-- These are "title rot" candidates — ranking fine, but snippet has become uncompetitive
+- Applies the **CTR anomaly** predicate (see CONTEXT.md): `|position_delta| < 1.0 AND ctr_delta ≤ -30%`
+- These are snippet-driven regressions — ranking held, but title/meta stopped converting
 - Output: page → affected queries → CTR before/after → recommended action (rewrite title/meta)
 
-**API feasibility:** ✅ `gsc_traffic_compare` already supports query+page dimensions.
+**API feasibility:** `gsc_traffic_compare` already supports query+page dimensions.
 
-**Suggested command:** `ga4 gsc ctr-anomaly --config configs/wealthsim.yaml`
+**Suggested command:** `ga4 gsc ctr-anomaly --config <config>.yaml`
 
 ---
 
-## Priority 2 — Medium value, confirmed doable
+## P2 — Medium value, confirmed doable
 
 ### BO-06 · Schema / Rich Results Audit
-**Problem:** BlogPosting, BreadcrumbList, and FAQPage schema is deployed across the site but never systematically validated. A single broken template can silently invalidate rich results for all articles.
+**Problem:** Structured data (BlogPosting, BreadcrumbList, FAQPage, Product, etc.) is typically deployed via templates and then never re-validated. A single broken template can silently invalidate rich results for an entire content type.
 
 **What it does:**
 - Runs `gsc_inspect_url` on all priority URLs in config
 - Reports `rich_results_status` and `rich_result_types` per page
-- Flags pages where expected schema type is missing or invalid
-- Quota cost: 1 request per URL (29 URLs = 29/2000 daily limit)
+- Flags pages where an expected schema type is missing or invalid
+- Quota cost: 1 request per URL
 
-**API feasibility:** ✅ URL Inspection API returns rich results data. Rate limit: 2000/day, 600/min.
+**API feasibility:** URL Inspection API returns rich results data. Rate limit: 2000/day, 600/min.
 
-**Suggested command:** `ga4 gsc schema-audit --config configs/wealthsim.yaml`
+**Suggested command:** `ga4 gsc schema-audit --config <config>.yaml`
 
 ---
 
 ### BO-07 · Hreflang Cross-Validation
-**Problem:** wealthsim.app has hreflang pairs (e.g. `sp500-investment` ↔ `sp500-simulador`). If one side is de-indexed or returns the wrong canonical, Google ignores the entire hreflang signal — breaking Spanish/English geo-targeting silently.
+**Problem:** Multi-language sites declare hreflang pairs between equivalent pages. If one side is de-indexed, returns the wrong canonical, or is robots-blocked, Google silently ignores the entire hreflang signal — breaking geo-targeting without any error surfacing.
 
 **What it does:**
-- Reads hreflang pairs from `CALCULATOR_VARIANTS` config or a dedicated config section
+- Reads hreflang pairs from a dedicated config section
 - Inspects both sides of each pair via `gsc_inspect_url`
-- Validates: both indexed, google_canonical matches user_canonical on each side, no robots block
+- Validates: both indexed, `google_canonical` matches `user_canonical` on each side, no robots block
 - Reports any asymmetry as a hreflang integrity failure
 
-**API feasibility:** ✅ URL Inspection API. Needs hreflang pair mapping in config YAML.
+**API feasibility:** URL Inspection API. Needs hreflang pair mapping in config YAML.
 
-**Config addition needed:**
+**Config addition needed (open question — see below):**
 ```yaml
-hreflang_pairs:
-  - en: "https://www.wealthsim.app/calculator/sp500-investment"
-    es: "https://www.wealthsim.app/calculator/sp500-simulador"
+search_console:
+  hreflang_pairs:
+    - en: "https://example.com/page-en"
+      es: "https://example.com/pagina-es"
 ```
 
-**Suggested command:** `ga4 gsc hreflang --config configs/wealthsim.yaml`
+**Suggested command:** `ga4 gsc hreflang --config <config>.yaml`
 
 ---
 
 ### BO-08 · Redirect Chain Validator
-**Problem:** The redirect table in `next.config.ts` has grown to 30+ rules. Chains (A→B→C) waste crawl budget and dilute link equity. Currently validated manually.
+**Problem:** Redirect tables in framework configs (`next.config.ts`, nginx, `_redirects`, etc.) accumulate over time. Chains (A→B→C) waste crawl budget and dilute link equity. Currently validated only by hand, if at all.
 
 **What it does:**
 - Takes the redirect source URLs from config
 - Inspects each via `gsc_inspect_url` to confirm Google sees them as redirects (not 404s or live pages)
-- Flags any source URL that is still indexed (redirect not processed by Google yet)
+- Flags any source URL that is still indexed (redirect not yet processed by Google)
 - Flags chains where the destination also redirects
 
-**API feasibility:** ✅ URL Inspection API + local HTTP HEAD requests to check chains.
+**API feasibility:** URL Inspection API + local HTTP HEAD requests to check chains.
 
-**Suggested command:** `ga4 gsc redirects --config configs/wealthsim.yaml`
+**Suggested command:** `ga4 gsc redirects --config <config>.yaml`
 
 ---
 
-## Priority 3 — Needs new API client (not in scope yet)
+## P3 — Needs new API client (not in scope yet)
 
 ### BO-09 · Core Web Vitals Monitoring
 **Why deferred:** CWV data is in the CrUX API (Chrome User Experience Report), separate from the Search Analytics API. Would require a new API client and auth scope.
 
-**When to revisit:** Once the site reaches enough real-user traffic for CrUX to have field data (typically 1000+ users/month per page).
+**When to revisit:** Once the Operator's site reaches enough real-user traffic for CrUX to have field data (typically 1000+ users/month per page).
 
 ---
 
@@ -170,8 +168,22 @@ hreflang_pairs:
 
 ## Implementation notes
 
-- All new commands should follow the existing `ga4 gsc <subcommand> --config` pattern
-- State files for diff-based features (BO-03) go in `~/.ga4-manager/state/` or project-local `.ga4-state/`
+- All new commands follow the existing `ga4 gsc <subcommand> --config` pattern (flat, no `analyze` subgroup)
+- State files per ADR-0005: `.ga4-state/<command>.<gsc-site>.json`, with `--state-dir` override
+- Every command supports `--format text|json`; JSON is the source of truth, text is presentational
+- Every JSON output includes a `quota_used` integer; text mode prints it as a footer
 - Quota tracking already exists — new commands must log quota used per run
 - Dry-run flag (`--dry-run`) required on any command that writes state
-- Output should be silent on all-green; only print when action is needed
+- Output silent on all-green; exit 0 success, exit 2 issues detected, exit 1 command failed
+
+---
+
+## Open questions (for next grilling round)
+
+These were surfaced during the 2026-06-05 grilling session but not yet resolved. Recommended answers in parentheses.
+
+1. **BO-08 outbound HTTP probing scope.** The redirect chain validator wants to follow redirects via local HTTP. Does the tool probe only URLs declared in config, or follow chains into arbitrary destinations? What user-agent? Robots.txt respected? (*Recommendation:* probe only config-declared own-site URLs; identify as `ga4-manager/<version>`; do not honour robots.txt for own-site probes; `--max-concurrent` flag with default 4.)
+2. **BO-01 prior-period comparison.** The opportunity finder is currently single-window. Should `--compare-to-prior` be a separate flag, or always-on? (*Recommendation:* opt-in flag — single-window is the common case and avoids doubling the quota cost.)
+3. **BO-04 "impression waste" definition.** The metric used to rank cannibalisation severity needs a precise formula. (*Recommendation:* `sum(impressions across cannibalising pages) − max(impressions on single page)` — the impressions that would theoretically consolidate onto the canonical page.)
+4. **`internal/seo/webvitals.go` stub.** Constants for CWV thresholds exist but BO-09 defers CWV until CrUX traffic is available. Delete the stub, or keep it as a placeholder? (*Recommendation:* delete — per "no half-finished implementations" project guideline. Re-add when BO-09 is picked up.)
+5. **BO-07 hreflang config location.** The proposed `hreflang_pairs:` block lives under `search_console:` to keep all GSC-driven config nested together. Confirm? (*Recommendation:* yes.)

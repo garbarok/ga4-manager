@@ -434,10 +434,10 @@ function parseTableOutput(output: string): AnalyticsRunOutput {
   }
 
   // Extract site from output. The CLI emits a progress line like
-  //   "Querying search analytics for sc-domain:wealthsim.app..."
+  //   "Querying search analytics for sc-domain:example.com..."
   // where the trailing "..." is purely cosmetic loading-indicator text, not
   // part of the actual site identifier. Strip trailing dots so callers don't
-  // see "sc-domain:wealthsim.app..." in structured output (which would then
+  // see "sc-domain:example.com..." in structured output (which would then
   // 404 if used as input to a follow-up call). See issue #49.
   const siteMatch = output.match(/Querying search analytics for\s+(\S+)/);
   if (siteMatch) {
