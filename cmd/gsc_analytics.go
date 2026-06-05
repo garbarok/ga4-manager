@@ -1,21 +1,19 @@
 package cmd
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
-	tw "github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
 	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/render"
 )
 
 var (
@@ -271,58 +269,68 @@ func displayAnalyticsDryRun(query *gsc.SearchAnalyticsQuery) {
 	color.Blue("ℹ️  No API call made. Remove --dry-run to execute query.")
 }
 
+// analyticsColumns builds the column list from the report's dimensions plus
+// the four fixed metric columns. Title-casing the dimension names matches the
+// previous hand-rolled headers.
+func analyticsColumns(report *gsc.SearchAnalyticsReport) []string {
+	columns := make([]string, 0, len(report.Metadata.Dimensions)+4)
+	for _, dim := range report.Metadata.Dimensions {
+		columns = append(columns, cases.Title(language.English).String(dim))
+	}
+	return append(columns, "Clicks", "Impressions", "CTR", "Position")
+}
+
+// analyticsTableRow truncates long dimension values for terminal display and
+// uses one-decimal precision on CTR and position.
+func analyticsTableRow(row gsc.SearchAnalyticsRow) []string {
+	cells := make([]string, 0, len(row.Keys)+4)
+	for _, k := range row.Keys {
+		if len(k) > 60 {
+			cells = append(cells, k[:57]+"...")
+		} else {
+			cells = append(cells, k)
+		}
+	}
+	return append(cells,
+		fmt.Sprintf("%d", row.Clicks),
+		fmt.Sprintf("%d", row.Impressions),
+		fmt.Sprintf("%.1f%%", row.CTR*100),
+		fmt.Sprintf("%.1f", row.Position),
+	)
+}
+
+// analyticsCSVRow keeps dimension values verbatim and emits CTR / position at
+// full precision so downstream spreadsheet/BI tools can reformat.
+func analyticsCSVRow(row gsc.SearchAnalyticsRow) []string {
+	cells := make([]string, 0, len(row.Keys)+4)
+	cells = append(cells, row.Keys...)
+	return append(cells,
+		fmt.Sprintf("%d", row.Clicks),
+		fmt.Sprintf("%d", row.Impressions),
+		fmt.Sprintf("%.6f", row.CTR),
+		fmt.Sprintf("%.2f", row.Position),
+	)
+}
+
+// analyticsMarkdownRow matches the table-mode precision; pipe escaping is
+// handled inside the render package.
+func analyticsMarkdownRow(row gsc.SearchAnalyticsRow) []string {
+	cells := make([]string, 0, len(row.Keys)+4)
+	cells = append(cells, row.Keys...)
+	return append(cells,
+		fmt.Sprintf("%d", row.Clicks),
+		fmt.Sprintf("%d", row.Impressions),
+		fmt.Sprintf("%.1f%%", row.CTR*100),
+		fmt.Sprintf("%.1f", row.Position),
+	)
+}
+
 func displayAnalyticsTable(report *gsc.SearchAnalyticsReport) error {
 	if report.TotalRows == 0 {
 		color.Yellow("⚠ No data found for this query")
 		return nil
 	}
-
-	table := tablewriter.NewWriter(os.Stdout)
-
-	// Build header based on dimensions
-	header := make([]string, 0, len(report.Metadata.Dimensions)+4)
-	for _, dim := range report.Metadata.Dimensions {
-		header = append(header, cases.Title(language.English).String(dim))
-	}
-	header = append(header, "Clicks", "Impressions", "CTR", "Position")
-	table.Header(header)
-
-	// Table styling
-	table.Options(tablewriter.WithHeaderAlignment(tw.AlignLeft))
-	table.Options(tablewriter.WithRowAlignment(tw.AlignLeft))
-	table.Options(tablewriter.WithRendition(tw.Rendition{Borders: tw.BorderNone}))
-
-	// Add rows
-	for _, row := range report.Rows {
-		rowData := make([]string, 0, len(row.Keys)+4)
-
-		// Add dimension values
-		for _, key := range row.Keys {
-			// Truncate long URLs/queries for table display
-			if len(key) > 60 {
-				rowData = append(rowData, key[:57]+"...")
-			} else {
-				rowData = append(rowData, key)
-			}
-		}
-
-		// Add metrics
-		rowData = append(rowData,
-			fmt.Sprintf("%d", row.Clicks),
-			fmt.Sprintf("%d", row.Impressions),
-			fmt.Sprintf("%.1f%%", row.CTR*100),
-			fmt.Sprintf("%.1f", row.Position),
-		)
-
-		if err := table.Append(rowData); err != nil {
-			return fmt.Errorf("failed to append table row: %w", err)
-		}
-	}
-
-	if err := table.Render(); err != nil {
-		return fmt.Errorf("failed to render table: %w", err)
-	}
-	return nil
+	return render.Render(os.Stdout, render.FormatTable, analyticsColumns(report), report.Rows, analyticsTableRow)
 }
 
 func displayAnalyticsJSON(report *gsc.SearchAnalyticsReport) {
@@ -332,34 +340,7 @@ func displayAnalyticsJSON(report *gsc.SearchAnalyticsReport) {
 }
 
 func displayAnalyticsCSV(report *gsc.SearchAnalyticsReport) {
-	writer := csv.NewWriter(os.Stdout)
-	defer writer.Flush()
-
-	// Write header
-	header := make([]string, 0, len(report.Metadata.Dimensions)+4)
-	for _, dim := range report.Metadata.Dimensions {
-		header = append(header, cases.Title(language.English).String(dim))
-	}
-	header = append(header, "Clicks", "Impressions", "CTR", "Position")
-	_ = writer.Write(header)
-
-	// Write rows
-	for _, row := range report.Rows {
-		record := make([]string, 0, len(row.Keys)+4)
-
-		// Add dimension values
-		record = append(record, row.Keys...)
-
-		// Add metrics
-		record = append(record,
-			fmt.Sprintf("%d", row.Clicks),
-			fmt.Sprintf("%d", row.Impressions),
-			fmt.Sprintf("%.6f", row.CTR), // Full precision for CSV
-			fmt.Sprintf("%.2f", row.Position),
-		)
-
-		_ = writer.Write(record)
-	}
+	_ = render.Render(os.Stdout, render.FormatCSV, analyticsColumns(report), report.Rows, analyticsCSVRow)
 }
 
 func displayAnalyticsMarkdown(report *gsc.SearchAnalyticsReport) {
@@ -376,7 +357,6 @@ func displayAnalyticsMarkdown(report *gsc.SearchAnalyticsReport) {
 		return
 	}
 
-	// Summary section
 	fmt.Println("## Summary")
 	fmt.Println()
 	fmt.Printf("- **Total Rows:** %d\n", report.TotalRows)
@@ -386,48 +366,15 @@ func displayAnalyticsMarkdown(report *gsc.SearchAnalyticsReport) {
 	fmt.Printf("- **Average Position:** %.1f\n", report.Aggregates.AveragePosition)
 	fmt.Println()
 
-	// Data table
 	fmt.Println("## Results")
 	fmt.Println()
 
-	// Table header
-	headerRow := "|"
-	separatorRow := "|"
-	for _, dim := range report.Metadata.Dimensions {
-		headerRow += fmt.Sprintf(" %s |", cases.Title(language.English).String(dim))
-		separatorRow += " --- |"
+	// Limit to top 50 rows for markdown readability.
+	rows := report.Rows
+	if len(rows) > 50 {
+		rows = rows[:50]
 	}
-	headerRow += " Clicks | Impressions | CTR | Position |"
-	separatorRow += " ---: | ---: | ---: | ---: |"
-
-	fmt.Println(headerRow)
-	fmt.Println(separatorRow)
-
-	// Data rows (limit to top 50 for markdown readability)
-	displayLimit := report.TotalRows
-	if displayLimit > 50 {
-		displayLimit = 50
-	}
-
-	for i := 0; i < displayLimit; i++ {
-		row := report.Rows[i]
-		dataRow := "|"
-
-		for _, key := range row.Keys {
-			// Escape pipes in values
-			escapedKey := strings.ReplaceAll(key, "|", "\\|")
-			dataRow += fmt.Sprintf(" %s |", escapedKey)
-		}
-
-		dataRow += fmt.Sprintf(" %d | %d | %.1f%% | %.1f |",
-			row.Clicks,
-			row.Impressions,
-			row.CTR*100,
-			row.Position,
-		)
-
-		fmt.Println(dataRow)
-	}
+	_ = render.Render(os.Stdout, render.FormatMarkdown, analyticsColumns(report), rows, analyticsMarkdownRow)
 
 	if report.TotalRows > 50 {
 		fmt.Println()
