@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority filtering (`--priority high/medium/low`)
 - Incremental updates for partial updates
 
+## [2.3.1] - 2026-06-05
+
+### Polish — small-site usability for the diagnostic family
+
+#### Changed
+
+- **`gsc opportunities` default `--min-potential-clicks` 0 → 1.** Suppresses 0-click rounding-error findings on small sites. Pass `--min-potential-clicks 0` to restore the previous "surface everything" behaviour. Same default change mirrored in the matching MCP arg.
+- **`gsc analytics run` default `--days` 30 → 28.** Aligns with the diagnostic-command default and with GSC's standard reporting window. Pass `--days 30` explicitly to keep the old value.
+
+#### Added
+
+- **`gsc ctr-anomaly` sparse-data warning.** When the joined sample falls below the threshold (currently 5 pairs after the `--min-clicks-prior` filter) and zero anomalies came back, the command emits a stderr warning explaining that `0 anomalies` reflects insufficient data, with a remediation hint to widen `--days` or lower `--min-clicks-prior`. JSON output on stdout is unchanged; the warning is stderr-only so structured consumers never see it.
+
 ## [2.3.0] - 2026-06-05
 
 ### GSC Diagnostics framework: four production-grade SEO commands + shared substrate

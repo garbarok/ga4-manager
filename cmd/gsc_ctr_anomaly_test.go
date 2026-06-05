@@ -221,6 +221,48 @@ func TestRunCTRAnomalyCommand_Windows(t *testing.T) {
 	}
 }
 
+func TestRunCTRAnomalyCommand_SparseDataEmitsWarning(t *testing.T) {
+	// Only 2 paired rows after the min-clicks-prior filter — below the
+	// sparse threshold. No CTR collapse, so 0 results. Stderr should
+	// carry the "too few pairs to detect anomalies reliably" warning.
+	current := []gsc.SearchAnalyticsRow{
+		ctrAnomalyRow("q1", "https://example.com/a", 5, 100, 0.05, 7.0),
+		ctrAnomalyRow("q2", "https://example.com/b", 6, 100, 0.06, 7.0),
+	}
+	prior := []gsc.SearchAnalyticsRow{
+		ctrAnomalyRow("q1", "https://example.com/a", 5, 100, 0.05, 7.0),
+		ctrAnomalyRow("q2", "https://example.com/b", 6, 100, 0.06, 7.0),
+	}
+	fake := &fakeCTRAnomalyClient{currentRows: current, priorRows: prior}
+	params, _, stderr := newCTRAnomalyParams(t, fake, diagcmd.FormatJSON)
+	if status := runCTRAnomalyCommand(params); status != diagcmd.ExitClean {
+		t.Fatalf("status = %d, want clean", status)
+	}
+	if !strings.Contains(stderr.String(), "too few to detect anomalies") {
+		t.Errorf("expected sparse-data warning on stderr, got %q", stderr.String())
+	}
+}
+
+func TestRunCTRAnomalyCommand_NoWarningWhenSamplesAdequate(t *testing.T) {
+	// Enough pairs that the warning shouldn't fire even though the
+	// result set is empty.
+	current := make([]gsc.SearchAnalyticsRow, 0, 10)
+	prior := make([]gsc.SearchAnalyticsRow, 0, 10)
+	for i := 0; i < 10; i++ {
+		q := "q" + string(rune('0'+i))
+		current = append(current, ctrAnomalyRow(q, "https://example.com/"+q, 8, 100, 0.08, 7.0))
+		prior = append(prior, ctrAnomalyRow(q, "https://example.com/"+q, 8, 100, 0.08, 7.0))
+	}
+	fake := &fakeCTRAnomalyClient{currentRows: current, priorRows: prior}
+	params, _, stderr := newCTRAnomalyParams(t, fake, diagcmd.FormatJSON)
+	if status := runCTRAnomalyCommand(params); status != diagcmd.ExitClean {
+		t.Fatalf("status = %d, want clean", status)
+	}
+	if strings.Contains(stderr.String(), "too few") {
+		t.Errorf("sparse warning should NOT fire on adequate samples, got %q", stderr.String())
+	}
+}
+
 func TestRunCTRAnomalyCommand_FailureModes(t *testing.T) {
 	t.Run("invalid format", func(t *testing.T) {
 		fake := &fakeCTRAnomalyClient{}

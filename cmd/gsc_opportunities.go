@@ -78,7 +78,7 @@ func init() {
 	gscOpportunitiesCmd.Flags().StringVar(&gscOpportunitiesFormat, "format", diagcmd.FormatTable, "Output format: table or json")
 	gscOpportunitiesCmd.Flags().IntVar(&gscOpportunitiesDays, "days", opportunitiesDaysDefault, "Lookback window in days (1–485)")
 	gscOpportunitiesCmd.Flags().Int64Var(&gscOpportunitiesMinImpressions, "min-impressions", 5, "Minimum impressions for a query to be considered (drops noise; default 5 — small sites need a low floor)")
-	gscOpportunitiesCmd.Flags().Int64Var(&gscOpportunitiesMinPotentialClick, "min-potential-clicks", 0, "Drop opportunities below this projected click gain")
+	gscOpportunitiesCmd.Flags().Int64Var(&gscOpportunitiesMinPotentialClick, "min-potential-clicks", 1, "Drop opportunities below this projected click gain (default 1 — suppresses 0-click rounding-error findings)")
 }
 
 // gscOpportunitiesClientFactory returns a live GSC client. Tests substitute.

@@ -101,7 +101,7 @@ func init() {
 	gscAnalyticsRunCmd.Flags().StringVarP(&gscAnalyticsConfig, "config", "c", "", "Path to configuration file")
 
 	// Days flag (default: 30 days)
-	gscAnalyticsRunCmd.Flags().IntVarP(&gscAnalyticsDays, "days", "d", 30, "Number of days to query (1-180)")
+	gscAnalyticsRunCmd.Flags().IntVarP(&gscAnalyticsDays, "days", "d", 28, "Number of days to query (1-180); 28 aligns with the diagnostic-command default")
 
 	// Dimensions flag (default: query,page)
 	gscAnalyticsRunCmd.Flags().StringVar(&gscAnalyticsDimensions, "dimensions", "query,page", "Dimensions to include (comma-separated, max 3)")
