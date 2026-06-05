@@ -5,6 +5,10 @@
 *.env
 !.env.example
 
+# Operator-private notes and per-machine state (never committed to public repo)
+.local/
+.ga4-state/
+
 # Google Cloud credentials
 *credentials*.json
 *service-account*.json
