@@ -132,6 +132,17 @@ const __dirname = dirname(__filename)
 const binaryPath = process.env.GA4_BINARY_PATH || join(__dirname, '../../ga4')
 const executor = new CLIExecutor(binaryPath)
 
+// Framework convention (see CONTEXT.md, docs/BACKLOG.md "Implementation notes"):
+//   exit 0 — clean run, no findings
+//   exit 1 — command failed (API error, malformed config, etc.)
+//   exit 2 — success with findings (e.g. cannibalising queries detected)
+//
+// Both 0 and 2 are success at the MCP dispatch layer; the parsed JSON
+// envelope tells the caller whether findings exist. Treating 2 as failure
+// would swallow stdout — the very report the tool exists to surface.
+const SUCCESS_EXIT_CODES = new Set([0, 2])
+const isSuccessExit = (code: number): boolean => SUCCESS_EXIT_CODES.has(code)
+
 // ============================================================================
 // Tool registry
 // ============================================================================
@@ -304,7 +315,7 @@ const SPECS: ToolSpec[] = [
         command: 'gsc',
         args: buildMonitorUrlsArgs(input),
       })
-      if (result.exitCode !== 0) {
+      if (!isSuccessExit(result.exitCode)) {
         return { output: mapCLIError(result, 'gsc_monitor_urls'), isError: true }
       }
       return { output: parseMonitorUrlsOutput(result.stdout, input), isError: false }
@@ -383,7 +394,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       command: spec.command,
       args: spec.buildArgs(input),
     })
-    if (result.exitCode !== 0) {
+    if (!isSuccessExit(result.exitCode)) {
       return jsonContent(mapCLIError(result, name), true)
     }
     return jsonContent(spec.parse(result.stdout, input))
