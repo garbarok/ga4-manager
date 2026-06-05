@@ -14,25 +14,38 @@ import (
 	"github.com/garbarok/ga4-manager/internal/gsc/diagcmd"
 )
 
-// fakeSearchAPI is a local SearchAPI for the cannibalisation tests. It
-// satisfies the slimmed interface (QuerySearchAnalytics only) and reports
-// quota by counting calls. Lives in this _test.go file to mirror
-// internal/ga4's fakeAdminAPI pattern.
-type fakeSearchAPI struct {
-	rows  []gsc.SearchAnalyticsRow
-	err   error
-	calls int
+// fakeCannibalizationClient implements cannibalizationClient (the union of
+// gsc.SearchAPI and gsc.InspectAPI) for the cannibalisation tests. Lives in
+// this _test.go file to mirror internal/ga4's fakeAdminAPI pattern.
+type fakeCannibalizationClient struct {
+	rows           []gsc.SearchAnalyticsRow
+	searchErr      error
+	searchCalls    int
+	coverageByPage map[string]string
+	inspectErr     error
+	inspectCalls   int
 }
 
-func (f *fakeSearchAPI) QuerySearchAnalytics(_ *gsc.SearchAnalyticsQuery) (*gsc.SearchAnalyticsReport, error) {
-	f.calls++
-	if f.err != nil {
-		return nil, f.err
+func (f *fakeCannibalizationClient) QuerySearchAnalytics(_ *gsc.SearchAnalyticsQuery) (*gsc.SearchAnalyticsReport, error) {
+	f.searchCalls++
+	if f.searchErr != nil {
+		return nil, f.searchErr
 	}
 	return &gsc.SearchAnalyticsReport{
 		Rows:      f.rows,
 		TotalRows: len(f.rows),
-		QuotaUsed: f.calls,
+		QuotaUsed: f.searchCalls,
+	}, nil
+}
+
+func (f *fakeCannibalizationClient) InspectURL(_, page string) (*gsc.URLInspectionResult, error) {
+	f.inspectCalls++
+	if f.inspectErr != nil {
+		return nil, f.inspectErr
+	}
+	return &gsc.URLInspectionResult{
+		URL:           page,
+		CoverageState: f.coverageByPage[page],
 	}, nil
 }
 
@@ -51,7 +64,7 @@ func cannibalisationRow(query, page string, impressions int64) gsc.SearchAnalyti
 	return gsc.SearchAnalyticsRow{Keys: []string{query, page}, Impressions: impressions}
 }
 
-func newParams(t *testing.T, fake *fakeSearchAPI, format string) (cannibalizationParams, *bytes.Buffer, *bytes.Buffer) {
+func newParams(t *testing.T, fake *fakeCannibalizationClient, format string) (cannibalizationParams, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -59,7 +72,8 @@ func newParams(t *testing.T, fake *fakeSearchAPI, format string) (cannibalizatio
 		ConfigPath:     writeConfig(t, "sc-domain:example.com"),
 		MinImpressions: 10,
 		Format:         format,
-		Factory:        func() (gsc.SearchAPI, func(), error) { return fake, func() {}, nil },
+		Days:           cannibalizationDaysDefault,
+		Factory:        func() (cannibalizationClient, func(), error) { return fake, func() {}, nil },
 		Stdout:         stdout,
 		Stderr:         stderr,
 		Now:            time.Date(2026, 6, 5, 12, 0, 0, 0, time.UTC),
@@ -67,7 +81,7 @@ func newParams(t *testing.T, fake *fakeSearchAPI, format string) (cannibalizatio
 }
 
 func TestRunCannibalizationCommand_CleanExitOnEmpty(t *testing.T) {
-	fake := &fakeSearchAPI{rows: []gsc.SearchAnalyticsRow{
+	fake := &fakeCannibalizationClient{rows: []gsc.SearchAnalyticsRow{
 		cannibalisationRow("widgets", "https://example.com/a", 100),
 	}}
 	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
@@ -83,7 +97,7 @@ func TestRunCannibalizationCommand_CleanExitOnEmpty(t *testing.T) {
 }
 
 func TestRunCannibalizationCommand_IssuesExitOnHit(t *testing.T) {
-	fake := &fakeSearchAPI{rows: []gsc.SearchAnalyticsRow{
+	fake := &fakeCannibalizationClient{rows: []gsc.SearchAnalyticsRow{
 		cannibalisationRow("widgets", "https://example.com/a", 50),
 		cannibalisationRow("widgets", "https://example.com/b", 30),
 	}}
@@ -106,7 +120,7 @@ func TestRunCannibalizationCommand_IssuesExitOnHit(t *testing.T) {
 }
 
 func TestRunCannibalizationCommand_JSONShape(t *testing.T) {
-	fake := &fakeSearchAPI{rows: []gsc.SearchAnalyticsRow{
+	fake := &fakeCannibalizationClient{rows: []gsc.SearchAnalyticsRow{
 		cannibalisationRow("widgets", "https://example.com/a", 50),
 		cannibalisationRow("widgets", "https://example.com/b", 30),
 		cannibalisationRow("gadgets", "https://example.com/c", 200),
@@ -148,13 +162,16 @@ func TestRunCannibalizationCommand_JSONShape(t *testing.T) {
 	if got.Results[0].CanonicalCandidate != "https://example.com/c" {
 		t.Errorf("results[0].canonical_candidate = %q", got.Results[0].CanonicalCandidate)
 	}
-	if len(got.Results[0].Pages) != 2 {
-		t.Errorf("results[0].pages len = %d, want 2", len(got.Results[0].Pages))
+	if got.Results[0].Severity != "" {
+		t.Errorf("severity should be empty when --with-coverage-state is off, got %q", got.Results[0].Severity)
+	}
+	if got.Results[0].Pages[0].CoverageState != "" {
+		t.Errorf("coverage_state should be empty when --with-coverage-state is off, got %q", got.Results[0].Pages[0].CoverageState)
 	}
 }
 
 func TestRunCannibalizationCommand_EmptyJSONStillIncludesEnvelope(t *testing.T) {
-	fake := &fakeSearchAPI{rows: nil}
+	fake := &fakeCannibalizationClient{rows: nil}
 	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
 
 	status := runCannibalizationCommand(params)
@@ -176,7 +193,7 @@ func TestRunCannibalizationCommand_EmptyJSONStillIncludesEnvelope(t *testing.T) 
 }
 
 func TestRunCannibalizationCommand_FailureOnAPIError(t *testing.T) {
-	fake := &fakeSearchAPI{err: errors.New("api down")}
+	fake := &fakeCannibalizationClient{searchErr: errors.New("api down")}
 	params, _, stderr := newParams(t, fake, diagcmd.FormatTable)
 
 	status := runCannibalizationCommand(params)
@@ -192,9 +209,10 @@ func TestRunCannibalizationCommand_FailureOnAPIError(t *testing.T) {
 func TestRunCannibalizationCommand_FailureOnMissingConfig(t *testing.T) {
 	params := cannibalizationParams{
 		Format:  diagcmd.FormatTable,
+		Days:    cannibalizationDaysDefault,
 		Stdout:  &bytes.Buffer{},
 		Stderr:  &bytes.Buffer{},
-		Factory: func() (gsc.SearchAPI, func(), error) { return &fakeSearchAPI{}, func() {}, nil },
+		Factory: func() (cannibalizationClient, func(), error) { return &fakeCannibalizationClient{}, func() {}, nil },
 		Now:     time.Now(),
 	}
 	if status := runCannibalizationCommand(params); status != diagcmd.ExitFailure {
@@ -203,12 +221,140 @@ func TestRunCannibalizationCommand_FailureOnMissingConfig(t *testing.T) {
 }
 
 func TestRunCannibalizationCommand_FailureOnInvalidFormat(t *testing.T) {
-	fake := &fakeSearchAPI{rows: nil}
+	fake := &fakeCannibalizationClient{rows: nil}
 	params, _, stderr := newParams(t, fake, "xml")
 	if status := runCannibalizationCommand(params); status != diagcmd.ExitFailure {
 		t.Fatalf("status = %d, want %d", status, diagcmd.ExitFailure)
 	}
 	if !strings.Contains(stderr.String(), "invalid --format") {
 		t.Errorf("stderr does not explain invalid format: %q", stderr.String())
+	}
+}
+
+func TestRunCannibalizationCommand_FailureOnInvalidDays(t *testing.T) {
+	fake := &fakeCannibalizationClient{}
+	params, _, stderr := newParams(t, fake, diagcmd.FormatTable)
+	params.Days = 0
+	if status := runCannibalizationCommand(params); status != diagcmd.ExitFailure {
+		t.Fatalf("status = %d, want %d", status, diagcmd.ExitFailure)
+	}
+	if !strings.Contains(stderr.String(), "invalid --days") {
+		t.Errorf("stderr does not explain invalid days: %q", stderr.String())
+	}
+
+	params.Days = cannibalizationDaysMax + 1
+	stderr.Reset()
+	if status := runCannibalizationCommand(params); status != diagcmd.ExitFailure {
+		t.Fatalf("status above max = %d, want %d", status, diagcmd.ExitFailure)
+	}
+}
+
+func TestRunCannibalizationCommand_WithCoverageStateAddsSeverityAndDedupesInspect(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("widgets", "https://example.com/a", 50),
+			cannibalisationRow("widgets", "https://example.com/b", 30),
+			cannibalisationRow("gadgets", "https://example.com/a", 40), // page A reused across queries
+			cannibalisationRow("gadgets", "https://example.com/c", 25),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/a": "Page with redirect", // legacy, redirected
+			"https://example.com/b": "Submitted and indexed",
+			"https://example.com/c": "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.WithCoverageState = true
+
+	status := runCannibalizationCommand(params)
+	if status != diagcmd.ExitIssues {
+		t.Fatalf("status = %d, want %d", status, diagcmd.ExitIssues)
+	}
+
+	var got CannibalizationOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+
+	// Deduplication: pages {a, b, c} → 3 unique → 3 Inspect calls, NOT 4.
+	if fake.inspectCalls != 3 {
+		t.Errorf("inspect calls = %d, want 3 (dedup across queries)", fake.inspectCalls)
+	}
+	// Quota footer: 1 search + 3 inspect = 4.
+	if got.QuotaUsed != 4 {
+		t.Errorf("quota_used = %d, want 4", got.QuotaUsed)
+	}
+
+	// Every result has severity populated, every page has coverage_state.
+	for i, r := range got.Results {
+		if r.Severity == "" {
+			t.Errorf("results[%d].severity is empty", i)
+		}
+		for j, p := range r.Pages {
+			if p.CoverageState == "" {
+				t.Errorf("results[%d].pages[%d].coverage_state is empty", i, j)
+			}
+		}
+	}
+
+	// Both queries should be "consolidating" because both share page A (redirect).
+	for i, r := range got.Results {
+		if r.Severity != SeverityConsolidating {
+			t.Errorf("results[%d].severity = %q, want %q (page A redirects in both)", i, r.Severity, SeverityConsolidating)
+		}
+	}
+}
+
+func TestRunCannibalizationCommand_WithCoverageStateActionableWhenNoRedirect(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("widgets", "https://example.com/x", 50),
+			cannibalisationRow("widgets", "https://example.com/y", 30),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/x": "Submitted and indexed",
+			"https://example.com/y": "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.WithCoverageState = true
+
+	if status := runCannibalizationCommand(params); status != diagcmd.ExitIssues {
+		t.Fatalf("status = %d, want %d", status, diagcmd.ExitIssues)
+	}
+
+	var got CannibalizationOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(got.Results))
+	}
+	if got.Results[0].Severity != SeverityActionable {
+		t.Errorf("severity = %q, want %q", got.Results[0].Severity, SeverityActionable)
+	}
+}
+
+func TestRunCannibalizationCommand_WithCoverageStateAddsTableColumn(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("widgets", "https://example.com/x", 50),
+			cannibalisationRow("widgets", "https://example.com/y", 30),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/x": "Submitted and indexed",
+			"https://example.com/y": "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
+	params.WithCoverageState = true
+
+	runCannibalizationCommand(params)
+	out := stdout.String()
+	if !strings.Contains(out, "severity") {
+		t.Errorf("table header missing severity column: %q", out)
+	}
+	if !strings.Contains(out, SeverityActionable) {
+		t.Errorf("table missing actionable severity: %q", out)
 	}
 }
