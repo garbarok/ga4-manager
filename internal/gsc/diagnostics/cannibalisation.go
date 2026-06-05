@@ -53,13 +53,7 @@ func Cannibalisation(rows []gsc.SearchAnalyticsRow, minImpressions int64) []Cann
 
 	// Aggregate impressions per (query, page). The same query+page can appear
 	// in more than one row if upstream callers concatenate ranges, so we sum.
-	type qpKey struct {
-		query string
-		page  string
-	}
-	agg := make(map[qpKey]int64)
-	queryPages := make(map[string]map[string]struct{})
-
+	agg := make(map[string]map[string]int64)
 	for _, row := range rows {
 		if len(row.Keys) != 2 {
 			continue
@@ -68,19 +62,16 @@ func Cannibalisation(rows []gsc.SearchAnalyticsRow, minImpressions int64) []Cann
 		if query == "" || page == "" {
 			continue
 		}
-		key := qpKey{query: query, page: page}
-		agg[key] += row.Impressions
-		if _, ok := queryPages[query]; !ok {
-			queryPages[query] = make(map[string]struct{})
+		if agg[query] == nil {
+			agg[query] = make(map[string]int64)
 		}
-		queryPages[query][page] = struct{}{}
+		agg[query][page] += row.Impressions
 	}
 
 	results := make([]CannibalisationResult, 0)
-	for query, pages := range queryPages {
+	for query, pages := range agg {
 		qualifying := make([]PageImpressions, 0, len(pages))
-		for page := range pages {
-			impressions := agg[qpKey{query: query, page: page}]
+		for page, impressions := range pages {
 			if impressions >= minImpressions {
 				qualifying = append(qualifying, PageImpressions{Page: page, Impressions: impressions})
 			}

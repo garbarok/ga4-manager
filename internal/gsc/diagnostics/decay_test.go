@@ -2,7 +2,6 @@ package diagnostics
 
 import (
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/garbarok/ga4-manager/internal/gsc"
@@ -21,9 +20,6 @@ func decayResultsApproxEqual(got, want []DecayResult) bool {
 		}
 		if math.Abs(got[i].PositionDelta-want[i].PositionDelta) > 1e-9 ||
 			math.Abs(got[i].ClicksDelta-want[i].ClicksDelta) > 1e-9 {
-			return false
-		}
-		if !reflect.DeepEqual(got[i].Pair, want[i].Pair) {
 			return false
 		}
 	}
@@ -86,10 +82,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 1.0,
 					ClicksDelta:   -0.20,
 					ClicksLost:    20,
-					Pair: RowPair{
-						Current: pairRow("widgets", "https://example.com/a", 80, 1000, 0.080, 6.0),
-						Prior:   pairRow("widgets", "https://example.com/a", 100, 1000, 0.100, 5.0),
-					},
 				},
 			},
 		},
@@ -126,10 +118,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 2.0,
 					ClicksDelta:   -0.20,
 					ClicksLost:    100,
-					Pair: RowPair{
-						Current: pairRow("big", "https://example.com/b", 400, 5000, 0.08, 7.0),
-						Prior:   pairRow("big", "https://example.com/b", 500, 5000, 0.10, 5.0),
-					},
 				},
 				{
 					Query:         "mid",
@@ -137,10 +125,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 2.0,
 					ClicksDelta:   -0.20,
 					ClicksLost:    10,
-					Pair: RowPair{
-						Current: pairRow("mid", "https://example.com/m", 40, 500, 0.08, 7.0),
-						Prior:   pairRow("mid", "https://example.com/m", 50, 500, 0.10, 5.0),
-					},
 				},
 				{
 					Query:         "small",
@@ -148,10 +132,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 2.0,
 					ClicksDelta:   -0.20,
 					ClicksLost:    2,
-					Pair: RowPair{
-						Current: pairRow("small", "https://example.com/s", 8, 100, 0.08, 7.0),
-						Prior:   pairRow("small", "https://example.com/s", 10, 100, 0.10, 5.0),
-					},
 				},
 			},
 		},
@@ -178,10 +158,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 3.0,
 					ClicksDelta:   -1.0,
 					ClicksLost:    10,
-					Pair: RowPair{
-						Current: pairRow("a", "https://example.com/p1", 0, 1000, 0.0, 8.0),
-						Prior:   pairRow("a", "https://example.com/p1", 10, 1000, 0.01, 5.0),
-					},
 				},
 				{
 					Query:         "a",
@@ -189,10 +165,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 3.0,
 					ClicksDelta:   -1.0,
 					ClicksLost:    10,
-					Pair: RowPair{
-						Current: pairRow("a", "https://example.com/p2", 0, 1000, 0.0, 8.0),
-						Prior:   pairRow("a", "https://example.com/p2", 10, 1000, 0.01, 5.0),
-					},
 				},
 				{
 					Query:         "b",
@@ -200,10 +172,6 @@ func TestDecay(t *testing.T) {
 					PositionDelta: 3.0,
 					ClicksDelta:   -1.0,
 					ClicksLost:    10,
-					Pair: RowPair{
-						Current: pairRow("b", "https://example.com/p2", 0, 1000, 0.0, 8.0),
-						Prior:   pairRow("b", "https://example.com/p2", 10, 1000, 0.01, 5.0),
-					},
 				},
 			},
 		},

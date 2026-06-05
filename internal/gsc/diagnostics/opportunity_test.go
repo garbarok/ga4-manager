@@ -2,7 +2,6 @@ package diagnostics
 
 import (
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/garbarok/ga4-manager/internal/gsc"
@@ -23,9 +22,6 @@ func opportunityResultsApproxEqual(got, want []OpportunityResult) bool {
 			math.Abs(got[i].CTR-want[i].CTR) > 1e-9 ||
 			math.Abs(got[i].CategoryMedianCTR-want[i].CategoryMedianCTR) > 1e-9 ||
 			math.Abs(got[i].CTRGap-want[i].CTRGap) > 1e-9 {
-			return false
-		}
-		if !reflect.DeepEqual(got[i].Row, want[i].Row) {
 			return false
 		}
 	}
@@ -93,7 +89,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            5,
 					CategoryMedianCTR: 0.055,
 					CTRGap:            0.045,
-					Row:               oppRow("q1", "https://example.com/low", 4.5, 0.01, 1000),
 				},
 			},
 		},
@@ -121,7 +116,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            10,
 					CategoryMedianCTR: 0.05,
 					CTRGap:            0.05 - 0.02,
-					Row:               oppRow("q", "https://example.com/a", 10.0, 0.02, 1000),
 				},
 			},
 		},
@@ -142,7 +136,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            8,
 					CategoryMedianCTR: 0.04,
 					CTRGap:            0.03,
-					Row:               oppRow("q", "https://example.com/a", 8.0, 0.01, 1000),
 				},
 				{
 					Query:             "q",
@@ -152,7 +145,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            8,
 					CategoryMedianCTR: 0.04,
 					CTRGap:            0.01,
-					Row:               oppRow("q", "https://example.com/b", 8.0, 0.03, 1000),
 				},
 			},
 		},
@@ -173,7 +165,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            10,
 					CategoryMedianCTR: 0.025,
 					CTRGap:            0.015,
-					Row:               oppRow("q-x", "https://example.com/p1", 10.0, 0.01, 1000),
 				},
 				{
 					Query:             "q-y",
@@ -183,7 +174,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            10,
 					CategoryMedianCTR: 0.025,
 					CTRGap:            0.005,
-					Row:               oppRow("q-y", "https://example.com/p1", 10.0, 0.02, 1000),
 				},
 			},
 		},
@@ -202,7 +192,6 @@ func TestOpportunity(t *testing.T) {
 					Bucket:            10,
 					CategoryMedianCTR: 0.055,
 					CTRGap:            0.045,
-					Row:               gsc.SearchAnalyticsRow{Keys: []string{"https://example.com/a"}, CTR: 0.01, Position: 10.0, Impressions: 1000},
 				},
 			},
 		},

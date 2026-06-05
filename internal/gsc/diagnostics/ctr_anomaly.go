@@ -15,7 +15,6 @@ type CTRAnomalyResult struct {
 	Page          string
 	PositionDelta float64
 	CTRDelta      float64
-	Pair          RowPair
 }
 
 // CTRAnomaly classifies row pairs under the CTR-anomaly predicate.
@@ -60,7 +59,6 @@ func CTRAnomaly(pairs []RowPair) []CTRAnomalyResult {
 			Page:          page,
 			PositionDelta: positionDelta,
 			CTRDelta:      ctrDelta,
-			Pair:          pair,
 		})
 	}
 

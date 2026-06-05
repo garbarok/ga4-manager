@@ -22,7 +22,6 @@ type OpportunityResult struct {
 	Bucket            int
 	CategoryMedianCTR float64
 	CTRGap            float64
-	Row               gsc.SearchAnalyticsRow
 }
 
 // Opportunity classifies rows under the opportunity predicate.
@@ -112,7 +111,6 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 			Bucket:            e.bucket,
 			CategoryMedianCTR: median,
 			CTRGap:            median - e.row.CTR,
-			Row:               e.row,
 		})
 	}
 

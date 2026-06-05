@@ -2,7 +2,6 @@ package diagnostics
 
 import (
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/garbarok/ga4-manager/internal/gsc"
@@ -20,9 +19,6 @@ func ctrResultsApproxEqual(got, want []CTRAnomalyResult) bool {
 			return false
 		}
 		if math.Abs(got[i].CTRDelta-want[i].CTRDelta) > 1e-9 {
-			return false
-		}
-		if !reflect.DeepEqual(got[i].Pair, want[i].Pair) {
 			return false
 		}
 	}
@@ -74,10 +70,6 @@ func TestCTRAnomaly(t *testing.T) {
 					Page:          "https://example.com/a",
 					PositionDelta: 0.5,
 					CTRDelta:      -0.30,
-					Pair: RowPair{
-						Current: pairRow("widgets", "https://example.com/a", 70, 1000, 0.070, 5.5),
-						Prior:   pairRow("widgets", "https://example.com/a", 100, 1000, 0.100, 5.0),
-					},
 				},
 			},
 		},
@@ -95,10 +87,6 @@ func TestCTRAnomaly(t *testing.T) {
 					Page:          "https://example.com/a",
 					PositionDelta: -0.5,
 					CTRDelta:      -0.70,
-					Pair: RowPair{
-						Current: pairRow("widgets", "https://example.com/a", 30, 1000, 0.030, 4.5),
-						Prior:   pairRow("widgets", "https://example.com/a", 100, 1000, 0.100, 5.0),
-					},
 				},
 			},
 		},
@@ -138,40 +126,24 @@ func TestCTRAnomaly(t *testing.T) {
 					Page:          "https://example.com/p",
 					PositionDelta: 0.5,
 					CTRDelta:      -0.80,
-					Pair: RowPair{
-						Current: pairRow("a-severe", "https://example.com/p", 20, 1000, 0.020, 5.5),
-						Prior:   pairRow("a-severe", "https://example.com/p", 100, 1000, 0.100, 5.0),
-					},
 				},
 				{
 					Query:         "b-mild",
 					Page:          "https://example.com/p",
 					PositionDelta: 0.5,
 					CTRDelta:      -0.35,
-					Pair: RowPair{
-						Current: pairRow("b-mild", "https://example.com/p", 65, 1000, 0.065, 5.5),
-						Prior:   pairRow("b-mild", "https://example.com/p", 100, 1000, 0.100, 5.0),
-					},
 				},
 				{
 					Query:         "a-tied",
 					Page:          "https://example.com/p",
 					PositionDelta: 0.5,
 					CTRDelta:      -0.30,
-					Pair: RowPair{
-						Current: pairRow("a-tied", "https://example.com/p", 70, 1000, 0.070, 5.5),
-						Prior:   pairRow("a-tied", "https://example.com/p", 100, 1000, 0.100, 5.0),
-					},
 				},
 				{
 					Query:         "a-tied",
 					Page:          "https://example.com/q",
 					PositionDelta: 0.5,
 					CTRDelta:      -0.30,
-					Pair: RowPair{
-						Current: pairRow("a-tied", "https://example.com/q", 70, 1000, 0.070, 5.5),
-						Prior:   pairRow("a-tied", "https://example.com/q", 100, 1000, 0.100, 5.0),
-					},
 				},
 			},
 		},

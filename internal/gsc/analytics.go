@@ -27,6 +27,7 @@ type SearchAnalyticsReport struct {
 	TotalRows  int                      // Total number of rows returned
 	Aggregates SearchAnalyticsAggregate // Aggregated totals
 	Metadata   ReportMetadata           // Query metadata
+	QuotaUsed  int                      // GSC API quota used by the client after this call
 }
 
 // SearchAnalyticsRow represents a single row in the search analytics results
@@ -195,6 +196,7 @@ func (c *Client) transformSearchAnalyticsResponse(query *SearchAnalyticsQuery, r
 		}
 	}
 
+	report.QuotaUsed, _, _ = c.GetQuotaStatus()
 	return report
 }
 

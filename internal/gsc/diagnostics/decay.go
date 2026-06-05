@@ -14,7 +14,6 @@ type DecayResult struct {
 	PositionDelta float64
 	ClicksDelta   float64
 	ClicksLost    int64
-	Pair          RowPair
 }
 
 // Decay classifies row pairs under the decay predicate.
@@ -62,7 +61,6 @@ func Decay(pairs []RowPair) []DecayResult {
 			PositionDelta: positionDelta,
 			ClicksDelta:   clicksDelta,
 			ClicksLost:    clicksLost,
-			Pair:          pair,
 		})
 	}
 

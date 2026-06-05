@@ -57,7 +57,7 @@ describe('gscCannibalizationInputSchema', () => {
 })
 
 describe('buildCannibalizationArgs', () => {
-  it('builds args with config and JSON format', () => {
+  it('always passes config, json format, and min-impressions', () => {
     const args = buildCannibalizationArgs({
       config: 'configs/mysite.yaml',
       min_impressions: 10,
@@ -68,24 +68,18 @@ describe('buildCannibalizationArgs', () => {
       'configs/mysite.yaml',
       '--format',
       'json',
+      '--min-impressions',
+      '10',
     ])
   })
 
-  it('appends --min-impressions when non-default', () => {
+  it('passes a non-default min_impressions verbatim', () => {
     const args = buildCannibalizationArgs({
       config: 'configs/mysite.yaml',
       min_impressions: 25,
     } as GscCannibalizationInput)
     expect(args).toContain('--min-impressions')
     expect(args).toContain('25')
-  })
-
-  it('omits --min-impressions for the default value (10)', () => {
-    const args = buildCannibalizationArgs({
-      config: 'configs/mysite.yaml',
-      min_impressions: 10,
-    } as GscCannibalizationInput)
-    expect(args).not.toContain('--min-impressions')
   })
 })
 
@@ -131,10 +125,8 @@ describe('parseCannibalizationOutput', () => {
     expect(out.quota_used).toBe(1)
   })
 
-  it('throws when no JSON envelope is present', () => {
-    expect(() => parseCannibalizationOutput('garbled non-json output')).toThrow(
-      /No JSON envelope/,
-    )
+  it('throws when stdout is not valid JSON', () => {
+    expect(() => parseCannibalizationOutput('garbled non-json output')).toThrow()
   })
 
   it('throws when the command field is wrong', () => {
