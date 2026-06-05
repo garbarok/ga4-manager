@@ -6,15 +6,27 @@ import (
 )
 
 // CTRAnomalyResult is one (query, page) pair that satisfies the CTR-anomaly
-// predicate.
+// predicate — its position held but its CTR collapsed.
 //
 // PositionDelta is current.Position − prior.Position. CTRDelta is the relative
 // change in CTR as a ratio: (current.CTR − prior.CTR) / prior.CTR.
+// ClicksLost is prior.Clicks − current.Clicks, clamped to ≥0 — the
+// absolute revenue impact of the anomaly, useful for ranking results by
+// how much the Operator can recover by fixing the snippet.
 type CTRAnomalyResult struct {
-	Query         string
-	Page          string
-	PositionDelta float64
-	CTRDelta      float64
+	Query              string
+	Page               string
+	PositionCurrent    float64
+	PositionPrior      float64
+	PositionDelta      float64
+	CTRCurrent         float64
+	CTRPrior           float64
+	CTRDelta           float64
+	ClicksCurrent      int64
+	ClicksPrior        int64
+	ClicksLost         int64
+	ImpressionsCurrent int64
+	ImpressionsPrior   int64
 }
 
 // CTRAnomaly classifies row pairs under the CTR-anomaly predicate.
@@ -54,15 +66,34 @@ func CTRAnomaly(pairs []RowPair) []CTRAnomalyResult {
 			continue
 		}
 
+		clicksLost := pair.Prior.Clicks - pair.Current.Clicks
+		if clicksLost < 0 {
+			clicksLost = 0
+		}
 		results = append(results, CTRAnomalyResult{
-			Query:         query,
-			Page:          page,
-			PositionDelta: positionDelta,
-			CTRDelta:      ctrDelta,
+			Query:              query,
+			Page:               page,
+			PositionCurrent:    pair.Current.Position,
+			PositionPrior:      pair.Prior.Position,
+			PositionDelta:      positionDelta,
+			CTRCurrent:         pair.Current.CTR,
+			CTRPrior:           pair.Prior.CTR,
+			CTRDelta:           ctrDelta,
+			ClicksCurrent:      pair.Current.Clicks,
+			ClicksPrior:        pair.Prior.Clicks,
+			ClicksLost:         clicksLost,
+			ImpressionsCurrent: pair.Current.Impressions,
+			ImpressionsPrior:   pair.Prior.Impressions,
 		})
 	}
 
+	// Sort by absolute clicks lost descending — the actionable signal an
+	// Operator (or an LLM rewriter) wants to act on first. CTRDelta is a
+	// useful secondary tie-break for results at equal clicks lost.
 	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].ClicksLost != results[j].ClicksLost {
+			return results[i].ClicksLost > results[j].ClicksLost
+		}
 		if results[i].CTRDelta != results[j].CTRDelta {
 			return results[i].CTRDelta < results[j].CTRDelta
 		}

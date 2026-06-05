@@ -92,6 +92,12 @@ import {
   buildOpportunitiesArgs,
   parseOpportunitiesOutput,
 } from './tools/gsc-opportunities.js'
+import {
+  gscCTRAnomalyTool,
+  gscCTRAnomalyInputSchema,
+  buildCTRAnomalyArgs,
+  parseCTRAnomalyOutput,
+} from './tools/gsc-ctr-anomaly.js'
 
 // gsc_monitor_urls is dual-mode (native URL loop OR CLI), handled below.
 import {
@@ -308,6 +314,13 @@ const SPECS: ToolSpec[] = [
     command: 'gsc',
     buildArgs: buildOpportunitiesArgs,
     parse: (out) => parseOpportunitiesOutput(out),
+  }),
+  cli({
+    tool: gscCTRAnomalyTool,
+    schema: gscCTRAnomalyInputSchema,
+    command: 'gsc',
+    buildArgs: buildCTRAnomalyArgs,
+    parse: (out) => parseCTRAnomalyOutput(out),
   }),
 
   // ── gsc_monitor_urls: dual-mode (native URL loop OR CLI config run) ─────────
