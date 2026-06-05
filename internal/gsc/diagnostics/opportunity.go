@@ -18,10 +18,60 @@ type OpportunityResult struct {
 	Query             string
 	Page              string
 	Position          float64
+	Clicks            int64
+	Impressions       int64
 	CTR               float64
 	Bucket            int
 	CategoryMedianCTR float64
-	CTRGap            float64
+	// MedianSource reports where CategoryMedianCTR came from: "site" when at
+	// least two same-site rows shared the bucket, or "baseline" when the
+	// industry baseline curve was used as a fallback. Small sites often
+	// have single-row buckets, so the baseline keeps the predicate useful
+	// before the site has enough peers to compute its own medians.
+	MedianSource string
+	// CTRGap is CategoryMedianCTR − CTR — how far below the bucket median the
+	// row sits as a ratio. Always > 0 for a qualifying row.
+	CTRGap float64
+	// PotentialClicks is the additional clicks the page would receive over
+	// the same impression window if it converted at the bucket median CTR
+	// instead of its current CTR. Computed as max(0, round(impressions *
+	// (median - ctr))). This is the headline number for prioritising
+	// optimisation work: "how many monthly clicks are we leaving on the
+	// table for this query".
+	PotentialClicks int64
+}
+
+// Median-source labels surfaced in OpportunityResult.MedianSource.
+const (
+	MedianSourceSite     = "site"
+	MedianSourceBaseline = "baseline"
+)
+
+// baselineCTRByBucket is a published industry-average position-CTR curve,
+// rounded to four decimal places. Used when the site itself has too few
+// rows in a position bucket to compute its own median. The values are the
+// rough centre of multiple public datasets (Advanced Web Ranking,
+// Backlinko, Sistrix 2023-2024 averages) — they are NOT vertical-specific,
+// but they buy a defensible "expected CTR for this position" floor that
+// lets the opportunity predicate work on small sites where peer data is
+// sparse. Operators with enough traffic get the site median instead.
+var baselineCTRByBucket = map[int]float64{
+	5:  0.065,
+	6:  0.054,
+	7:  0.045,
+	8:  0.040,
+	9:  0.035,
+	10: 0.030,
+	11: 0.025,
+	12: 0.020,
+	13: 0.018,
+	14: 0.015,
+	15: 0.013,
+	16: 0.010,
+	17: 0.010,
+	18: 0.010,
+	19: 0.010,
+	20: 0.010,
 }
 
 // Opportunity classifies rows under the opportunity predicate.
@@ -45,8 +95,12 @@ type OpportunityResult struct {
 // is left empty when only a page is present. Rows whose bucket is outside
 // [5, 20] are excluded up front and do not influence other buckets' medians.
 //
-// Results are ordered by CTRGap descending (largest under-performance first),
-// with a deterministic tie-break by Page ascending then Query ascending.
+// Results are ordered by PotentialClicks descending — the absolute number
+// of monthly clicks the page would gain if it converted at the bucket
+// median CTR — with CTRGap descending, Page ascending, and Query ascending
+// as successive tie-breaks. The ordering is deliberate: the Operator
+// (or an LLM consumer) acts on the biggest revenue win first, not on the
+// largest relative gap.
 func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 	type entry struct {
 		row    gsc.SearchAnalyticsRow
@@ -65,18 +119,31 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 		buckets[bucket] = append(buckets[bucket], row.CTR)
 	}
 
-	medians := make(map[int]float64, len(buckets))
+	// Compute per-site bucket medians where we have enough peers, and label
+	// each bucket with the median source. Single-row buckets fall back to
+	// the published baseline curve so the predicate still finds opportunities
+	// on small sites.
+	type bucketMedian struct {
+		ctr    float64
+		source string
+	}
+	medians := make(map[int]bucketMedian, len(buckets))
 	for bucket, ctrs := range buckets {
-		if len(ctrs) < 2 {
+		if len(ctrs) >= 2 {
+			sorted := append([]float64(nil), ctrs...)
+			sort.Float64s(sorted)
+			n := len(sorted)
+			var m float64
+			if n%2 == 1 {
+				m = sorted[n/2]
+			} else {
+				m = (sorted[n/2-1] + sorted[n/2]) / 2.0
+			}
+			medians[bucket] = bucketMedian{ctr: m, source: MedianSourceSite}
 			continue
 		}
-		sorted := append([]float64(nil), ctrs...)
-		sort.Float64s(sorted)
-		n := len(sorted)
-		if n%2 == 1 {
-			medians[bucket] = sorted[n/2]
-		} else {
-			medians[bucket] = (sorted[n/2-1] + sorted[n/2]) / 2.0
+		if baseline, ok := baselineCTRByBucket[bucket]; ok {
+			medians[bucket] = bucketMedian{ctr: baseline, source: MedianSourceBaseline}
 		}
 	}
 
@@ -86,7 +153,7 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 		if !ok {
 			continue
 		}
-		if e.row.CTR >= median {
+		if e.row.CTR >= median.ctr {
 			continue
 		}
 
@@ -103,18 +170,35 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 			continue
 		}
 
+		ctrGap := median.ctr - e.row.CTR
+		potential := int64(math.Round(float64(e.row.Impressions) * ctrGap))
+		if potential < 0 {
+			potential = 0
+		}
 		results = append(results, OpportunityResult{
 			Query:             query,
 			Page:              page,
 			Position:          e.row.Position,
+			Clicks:            e.row.Clicks,
+			Impressions:       e.row.Impressions,
 			CTR:               e.row.CTR,
 			Bucket:            e.bucket,
-			CategoryMedianCTR: median,
-			CTRGap:            median - e.row.CTR,
+			CategoryMedianCTR: median.ctr,
+			MedianSource:      median.source,
+			CTRGap:            ctrGap,
+			PotentialClicks:   potential,
 		})
 	}
 
+	// Sort by absolute clicks left on the table descending — that is the
+	// metric an Operator can act on directly ("rewriting this title would
+	// recover ~N clicks/month"). CTRGap is the relative measure and is kept
+	// as a secondary tie-break for deterministic ordering at equal
+	// PotentialClicks.
 	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].PotentialClicks != results[j].PotentialClicks {
+			return results[i].PotentialClicks > results[j].PotentialClicks
+		}
 		if results[i].CTRGap != results[j].CTRGap {
 			return results[i].CTRGap > results[j].CTRGap
 		}

@@ -86,6 +86,12 @@ import {
   buildCannibalizationArgs,
   parseCannibalizationOutput,
 } from './tools/gsc-cannibalization.js'
+import {
+  gscOpportunitiesTool,
+  gscOpportunitiesInputSchema,
+  buildOpportunitiesArgs,
+  parseOpportunitiesOutput,
+} from './tools/gsc-opportunities.js'
 
 // gsc_monitor_urls is dual-mode (native URL loop OR CLI), handled below.
 import {
@@ -295,6 +301,13 @@ const SPECS: ToolSpec[] = [
     command: 'gsc',
     buildArgs: buildCannibalizationArgs,
     parse: (out) => parseCannibalizationOutput(out),
+  }),
+  cli({
+    tool: gscOpportunitiesTool,
+    schema: gscOpportunitiesInputSchema,
+    command: 'gsc',
+    buildArgs: buildOpportunitiesArgs,
+    parse: (out) => parseOpportunitiesOutput(out),
   }),
 
   // ── gsc_monitor_urls: dual-mode (native URL loop OR CLI config run) ─────────

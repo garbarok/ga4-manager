@@ -59,11 +59,26 @@ func TestOpportunity(t *testing.T) {
 			want: []OpportunityResult{},
 		},
 		{
-			name: "single-row bucket excluded",
+			name: "single-row bucket falls back to baseline curve",
 			rows: []gsc.SearchAnalyticsRow{
 				oppRow("q1", "https://example.com/a", 10.0, 0.01, 1000),
 			},
-			want: []OpportunityResult{},
+			// Bucket 10 has baseline CTR 3% — way above the row's 1% — so
+			// this IS an opportunity, attributed to the baseline source.
+			want: []OpportunityResult{
+				{
+					Query:             "q1",
+					Page:              "https://example.com/a",
+					Position:          10.0,
+					Impressions:       1000,
+					CTR:               0.01,
+					Bucket:            10,
+					CategoryMedianCTR: 0.03,
+					MedianSource:      MedianSourceBaseline,
+					CTRGap:            0.02,
+					PotentialClicks:   20,
+				},
+			},
 		},
 		{
 			name: "all-equal-ctr bucket yields no opportunities",
