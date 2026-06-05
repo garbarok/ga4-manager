@@ -33,6 +33,13 @@ export const gscCannibalizationInputSchema = z.object({
     .describe(
       'When true, inspect each unique candidate page via URL Inspection and emit a severity tier (actionable | consolidating) per result. Costs one inspection request per unique page; off by default because URL Inspection has a 2000/day budget.',
     ),
+  only_actionable: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'When true, drop consolidating findings from the result set. Implies with_coverage_state. Useful for cron wrappers that want "silent on all-green" semantics when every finding is an in-flight migration.',
+    ),
 })
 
 export type GscCannibalizationInput = z.infer<typeof gscCannibalizationInputSchema>
@@ -92,6 +99,9 @@ export function buildCannibalizationArgs(input: GscCannibalizationInput): string
   if (input.with_coverage_state) {
     args.push('--with-coverage-state')
   }
+  if (input.only_actionable) {
+    args.push('--only-actionable')
+  }
   return args
 }
 
@@ -150,6 +160,12 @@ export const gscCannibalizationTool = {
         type: 'boolean',
         description:
           'When true, inspect each unique candidate page via URL Inspection and emit a severity tier per result (actionable | consolidating). Costs one inspection request per unique page; off by default because URL Inspection has a 2000/day budget.',
+        default: false,
+      },
+      only_actionable: {
+        type: 'boolean',
+        description:
+          'When true, drop consolidating findings from the result set. Implies with_coverage_state.',
         default: false,
       },
     },

@@ -47,6 +47,7 @@ var (
 	gscCannibalizationFormat            string
 	gscCannibalizationDays              int
 	gscCannibalizationWithCoverageState bool
+	gscCannibalizationOnlyActionable    bool
 )
 
 var gscCannibalizationCmd = &cobra.Command{
@@ -74,9 +75,19 @@ page via the URL Inspection API. Each result then carries a severity:
 Quota cost: one URL Inspection request per unique candidate page; off
 by default because URL Inspection has a 2000/day budget.
 
+With --with-coverage-state set, canonical_candidate is sharpened: for
+consolidating findings the impression leader among NON-redirect pages
+is returned instead of the raw impression leader (which can itself be
+a redirected page during in-flight migrations).
+
+Pass --only-actionable to drop consolidating findings from the result
+set after coverage-state annotation. Useful for cron wrappers that want
+"silent on all-green" semantics when every finding is an in-flight
+migration. Implies --with-coverage-state.
+
 Exit codes:
-  0  no cannibalising queries detected
-  2  at least one cannibalising query detected
+  0  no actionable cannibalising queries (after --only-actionable filter)
+  2  at least one cannibalising query in the result set
   1  command failed (API error, malformed config, etc.)
 
 Examples:
@@ -84,7 +95,8 @@ Examples:
   ga4 gsc cannibalization --config configs/mysite.yaml --format json
   ga4 gsc cannibalization --config configs/mysite.yaml --min-impressions 25
   ga4 gsc cannibalization --config configs/mysite.yaml --days 90
-  ga4 gsc cannibalization --config configs/mysite.yaml --with-coverage-state`,
+  ga4 gsc cannibalization --config configs/mysite.yaml --with-coverage-state
+  ga4 gsc cannibalization --config configs/mysite.yaml --only-actionable`,
 	RunE: cannibalizationRunE,
 }
 
@@ -96,6 +108,7 @@ func init() {
 	gscCannibalizationCmd.Flags().StringVar(&gscCannibalizationFormat, "format", diagcmd.FormatTable, "Output format: table or json")
 	gscCannibalizationCmd.Flags().IntVar(&gscCannibalizationDays, "days", cannibalizationDaysDefault, "Lookback window in days (1–485)")
 	gscCannibalizationCmd.Flags().BoolVar(&gscCannibalizationWithCoverageState, "with-coverage-state", false, "Inspect each candidate page via URL Inspection and emit a severity tier per finding")
+	gscCannibalizationCmd.Flags().BoolVar(&gscCannibalizationOnlyActionable, "only-actionable", false, "Drop consolidating findings from the result set (implies --with-coverage-state)")
 }
 
 // cannibalizationClient is the union of GSC capabilities this command can
@@ -140,15 +153,16 @@ type CannibalizationOutput = diagcmd.Envelope[CannibalizationResultRow]
 
 func cannibalizationRunE(_ *cobra.Command, _ []string) error {
 	status := runCannibalizationCommand(cannibalizationParams{
-		ConfigPath:         gscCannibalizationConfig,
-		MinImpressions:     gscCannibalizationMinImpressions,
-		Format:             gscCannibalizationFormat,
-		Days:               gscCannibalizationDays,
-		WithCoverageState:  gscCannibalizationWithCoverageState,
-		Factory:            gscClientFactory,
-		Stdout:             os.Stdout,
-		Stderr:             os.Stderr,
-		Now:                time.Now().UTC(),
+		ConfigPath:        gscCannibalizationConfig,
+		MinImpressions:    gscCannibalizationMinImpressions,
+		Format:            gscCannibalizationFormat,
+		Days:              gscCannibalizationDays,
+		WithCoverageState: gscCannibalizationWithCoverageState,
+		OnlyActionable:    gscCannibalizationOnlyActionable,
+		Factory:           gscClientFactory,
+		Stdout:            os.Stdout,
+		Stderr:            os.Stderr,
+		Now:               time.Now().UTC(),
 	})
 	os.Exit(status)
 	return nil
@@ -160,6 +174,7 @@ type cannibalizationParams struct {
 	Format            string
 	Days              int
 	WithCoverageState bool
+	OnlyActionable    bool
 	Factory           func() (cannibalizationClient, func(), error)
 	Stdout            io.Writer
 	Stderr            io.Writer
@@ -173,6 +188,12 @@ func runCannibalizationCommand(p cannibalizationParams) int {
 	if err := validateCannibalizationDays(p.Days); err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
+
+	// --only-actionable implies --with-coverage-state because severity is the
+	// field the filter operates on. Auto-enabling avoids a confusing "you set
+	// --only-actionable but never asked for severity, so nothing was dropped".
+	withCoverageState := p.WithCoverageState || p.OnlyActionable
+
 	site, _, err := diagcmd.LoadSite(p.ConfigPath)
 	if err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
@@ -184,13 +205,20 @@ func runCannibalizationCommand(p cannibalizationParams) int {
 	}
 	defer cleanup()
 
-	env, err := buildCannibalizationEnvelope(client, site, p.MinImpressions, p.Days, p.WithCoverageState, p.Now)
+	env, severityCounts, err := buildCannibalizationEnvelope(client, site, p.MinImpressions, p.Days, withCoverageState, p.OnlyActionable, p.Now)
 	if err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
-	if err := diagcmd.Render(p.Stdout, env, p.Format, cannibalizationColumnsFor(p.WithCoverageState), cannibalizationTextRowFor(p.WithCoverageState)); err != nil {
+	if err := diagcmd.Render(p.Stdout, env, p.Format, cannibalizationColumnsFor(withCoverageState), cannibalizationTextRowFor(withCoverageState)); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
+	}
+
+	// Text-mode summary footer: appended only when coverage-state annotation
+	// happened (otherwise there is no severity to summarise). JSON output is
+	// unchanged — consumers compute their own breakdown from results[].severity.
+	if p.Format == diagcmd.FormatTable && withCoverageState {
+		writeCannibalizationSummary(p.Stdout, len(env.Results), severityCounts, p.OnlyActionable)
 	}
 
 	return diagcmd.ExitCode(nil, len(env.Results) > 0)
@@ -203,7 +231,21 @@ func validateCannibalizationDays(days int) error {
 	return nil
 }
 
-func buildCannibalizationEnvelope(client cannibalizationClient, site string, minImpressions int64, days int, withCoverageState bool, now time.Time) (CannibalizationOutput, error) {
+// cannibalizationSeverityCounts captures the breakdown computed during a
+// --with-coverage-state run. The pre-filter values are surfaced to the
+// text-mode summary footer so the Operator can see "10 findings: 0
+// actionable, 10 consolidating; --only-actionable dropped 10" even when
+// the filter empties the result set.
+type cannibalizationSeverityCounts struct {
+	Actionable    int
+	Consolidating int
+	HadFilter     bool
+	DroppedByOnly int
+}
+
+func buildCannibalizationEnvelope(client cannibalizationClient, site string, minImpressions int64, days int, withCoverageState, onlyActionable bool, now time.Time) (CannibalizationOutput, cannibalizationSeverityCounts, error) {
+	var counts cannibalizationSeverityCounts
+
 	startDate, endDate := gsc.BuildDateRange(days)
 	report, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
 		SiteURL:    site,
@@ -214,7 +256,7 @@ func buildCannibalizationEnvelope(client cannibalizationClient, site string, min
 		DataState:  "final",
 	})
 	if err != nil {
-		return CannibalizationOutput{}, fmt.Errorf("search analytics query failed: %w", err)
+		return CannibalizationOutput{}, counts, fmt.Errorf("search analytics query failed: %w", err)
 	}
 
 	diag := diagnostics.Cannibalisation(report.Rows, minImpressions)
@@ -236,12 +278,33 @@ func buildCannibalizationEnvelope(client cannibalizationClient, site string, min
 	if withCoverageState {
 		inspections, err := annotateWithCoverageState(client, site, rows)
 		if err != nil {
-			return CannibalizationOutput{}, fmt.Errorf("coverage-state inspection failed: %w", err)
+			return CannibalizationOutput{}, counts, fmt.Errorf("coverage-state inspection failed: %w", err)
 		}
 		quota = report.QuotaUsed + inspections
+
+		for _, r := range rows {
+			switch r.Severity {
+			case SeverityActionable:
+				counts.Actionable++
+			case SeverityConsolidating:
+				counts.Consolidating++
+			}
+		}
+
+		if onlyActionable {
+			counts.HadFilter = true
+			counts.DroppedByOnly = counts.Consolidating
+			filtered := make([]CannibalizationResultRow, 0, counts.Actionable)
+			for _, r := range rows {
+				if r.Severity == SeverityActionable {
+					filtered = append(filtered, r)
+				}
+			}
+			rows = filtered
+		}
 	}
 
-	return diagcmd.NewEnvelope(cannibalizationCommandName, site, now, rows, quota), nil
+	return diagcmd.NewEnvelope(cannibalizationCommandName, site, now, rows, quota), counts, nil
 }
 
 // annotateWithCoverageState inspects each unique candidate page once and
@@ -282,12 +345,43 @@ func annotateWithCoverageState(client gsc.InspectAPI, site string, rows []Cannib
 		}
 		if hasRedirect {
 			rows[i].Severity = SeverityConsolidating
+			// Replace canonical_candidate with the impression leader among
+			// non-redirect pages. Pages are already sorted impressions
+			// descending by the diagnostics package, so the first
+			// non-redirect entry IS the highest-impression non-redirect
+			// page. Falls back to the original heuristic value when every
+			// page redirects — that case yields no sensible recommendation,
+			// so the impression-leader heuristic is the least-wrong choice.
+			for _, p := range rows[i].Pages {
+				if p.CoverageState != CoverageStatePageWithRedirect {
+					rows[i].CanonicalCandidate = p.Page
+					break
+				}
+			}
 		} else {
 			rows[i].Severity = SeverityActionable
 		}
 	}
 
 	return len(pageList), nil
+}
+
+// writeCannibalizationSummary appends a one-line summary footer to text-mode
+// output, so cron tails read "→ 10 findings: 0 actionable, 10 consolidating"
+// without needing to scan the severity column.
+func writeCannibalizationSummary(w io.Writer, shownCount int, counts cannibalizationSeverityCounts, onlyActionable bool) {
+	switch {
+	case counts.HadFilter && counts.Actionable == 0:
+		fmt.Fprintf(w, "→ 0 actionable findings (filtered out %d consolidating). No action required.\n", counts.DroppedByOnly)
+	case onlyActionable:
+		fmt.Fprintf(w, "→ %d actionable findings (filtered out %d consolidating).\n", shownCount, counts.DroppedByOnly)
+	case counts.Actionable == 0 && counts.Consolidating > 0:
+		fmt.Fprintf(w, "→ %d findings: 0 actionable, %d consolidating. No action required.\n",
+			shownCount, counts.Consolidating)
+	default:
+		fmt.Fprintf(w, "→ %d findings: %d actionable, %d consolidating.\n",
+			shownCount, counts.Actionable, counts.Consolidating)
+	}
 }
 
 func cannibalizationColumnsFor(withCoverageState bool) []string {
