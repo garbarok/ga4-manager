@@ -51,23 +51,23 @@ export interface CannibalizationOutput {
 // ============================================================================
 
 export function buildCannibalizationArgs(input: GscCannibalizationInput): string[] {
-  const args: string[] = ['cannibalization', '--config', input.config, '--format', 'json']
-  if (input.min_impressions !== undefined && input.min_impressions !== 10) {
-    args.push('--min-impressions', input.min_impressions.toString())
-  }
-  return args
+  return [
+    'cannibalization',
+    '--config',
+    input.config,
+    '--format',
+    'json',
+    '--min-impressions',
+    String(input.min_impressions),
+  ]
 }
 
-// parseCannibalizationOutput extracts the JSON envelope from CLI stdout. The
-// CLI emits a single JSON object under --format json; if the envelope is
-// missing or malformed, an Error is thrown so the dispatch layer can wrap it
-// as a tool failure.
+// parseCannibalizationOutput parses the CLI's JSON envelope. The framework
+// convention (see docs/BACKLOG.md "Implementation notes") is that --format
+// json writes exactly one JSON object to stdout; we parse it directly and
+// validate the required fields.
 export function parseCannibalizationOutput(stdout: string): CannibalizationOutput {
-  const match = stdout.match(/\{[\s\S]*\}/)
-  if (!match) {
-    throw new Error('No JSON envelope found in CLI output')
-  }
-  const parsed = JSON.parse(match[0]) as Partial<CannibalizationOutput>
+  const parsed = JSON.parse(stdout) as Partial<CannibalizationOutput>
   if (parsed.command !== 'gsc_cannibalization') {
     throw new Error(
       `Unexpected command in CLI output: ${String(parsed.command)} (want gsc_cannibalization)`,

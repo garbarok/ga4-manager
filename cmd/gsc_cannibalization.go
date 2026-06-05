@@ -1,32 +1,23 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"text/tabwriter"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/garbarok/ga4-manager/internal/config"
 	"github.com/garbarok/ga4-manager/internal/gsc"
+	"github.com/garbarok/ga4-manager/internal/gsc/diagcmd"
 	"github.com/garbarok/ga4-manager/internal/gsc/diagnostics"
 )
 
 const (
-	cannibalizationDays          = 30
-	cannibalizationRowLimit      = 5000
-	cannibalizationDataState     = "final"
-	cannibalizationCommandName   = "gsc_cannibalization"
-	cannibalizationFormatText    = "text"
-	cannibalizationFormatJSON    = "json"
-	cannibalizationExitClean     = 0
-	cannibalizationExitFailure   = 1
-	cannibalizationExitIssues    = 2
-	cannibalizationDimensionsCSV = "query,page"
+	cannibalizationDays        = 30
+	cannibalizationRowLimit    = 5000
+	cannibalizationCommandName = "gsc_cannibalization"
 )
 
 var (
@@ -61,11 +52,11 @@ func init() {
 
 	gscCannibalizationCmd.Flags().StringVarP(&gscCannibalizationConfig, "config", "c", "", "Path to configuration file (required)")
 	gscCannibalizationCmd.Flags().Int64Var(&gscCannibalizationMinImpressions, "min-impressions", diagnostics.DefaultMinImpressions, "Per-page impression threshold for the cannibalisation predicate")
-	gscCannibalizationCmd.Flags().StringVar(&gscCannibalizationFormat, "format", cannibalizationFormatText, "Output format: text or json")
+	gscCannibalizationCmd.Flags().StringVar(&gscCannibalizationFormat, "format", diagcmd.FormatText, "Output format: text or json")
 }
 
-// gscClientFactory is the default factory that returns a live GSC client
-// wrapped behind the SearchAPI interface. Tests substitute a fake here.
+// gscClientFactory returns a live GSC client wrapped behind the SearchAPI
+// interface. Tests substitute a fake.
 var gscClientFactory = func() (gsc.SearchAPI, func(), error) {
 	client, err := gsc.NewClient()
 	if err != nil {
@@ -74,36 +65,23 @@ var gscClientFactory = func() (gsc.SearchAPI, func(), error) {
 	return client, func() { _ = client.Close() }, nil
 }
 
-// CannibalizationPageOutput mirrors a qualifying page in the JSON output.
-type CannibalizationPageOutput struct {
+// CannibalizationPage mirrors one qualifying page in the JSON envelope.
+type CannibalizationPage struct {
 	Page        string `json:"page"`
 	Impressions int64  `json:"impressions"`
 }
 
-// CannibalizationResultOutput is one row of the JSON results array.
-type CannibalizationResultOutput struct {
-	Query              string                      `json:"query"`
-	Pages              []CannibalizationPageOutput `json:"pages"`
-	TotalImpressions   int64                       `json:"total_impressions"`
-	CanonicalCandidate string                      `json:"canonical_candidate"`
+// CannibalizationResultRow is one row of the JSON results array.
+type CannibalizationResultRow struct {
+	Query              string                `json:"query"`
+	Pages              []CannibalizationPage `json:"pages"`
+	TotalImpressions   int64                 `json:"total_impressions"`
+	CanonicalCandidate string                `json:"canonical_candidate"`
 }
 
-// CannibalizationOutput is the JSON envelope emitted under --format json and
-// returned by the matching MCP tool. Field names follow the framework
-// convention (see docs/BACKLOG.md "Implementation notes").
-type CannibalizationOutput struct {
-	Command     string                        `json:"command"`
-	Site        string                        `json:"site"`
-	GeneratedAt string                        `json:"generated_at"`
-	Results     []CannibalizationResultOutput `json:"results"`
-	QuotaUsed   int                           `json:"quota_used"`
-}
+// CannibalizationOutput is the JSON envelope emitted under --format json.
+type CannibalizationOutput = diagcmd.Envelope[CannibalizationResultRow]
 
-// cannibalizationRunE is the cobra entry point. It delegates to
-// runCannibalizationCommand, which is testable, then calls os.Exit with the
-// status code the runner returned. Exit codes are 0 (clean), 2 (issues
-// detected), or 1 (failure). Returning a cobra error would always map to
-// exit 1, so the distinct exit-2 path requires an explicit os.Exit here.
 func cannibalizationRunE(_ *cobra.Command, _ []string) error {
 	status := runCannibalizationCommand(cannibalizationParams{
 		ConfigPath:     gscCannibalizationConfig,
@@ -118,8 +96,6 @@ func cannibalizationRunE(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-// cannibalizationParams bundles every input runCannibalizationCommand depends
-// on so the tests can drive it without touching globals or the process.
 type cannibalizationParams struct {
 	ConfigPath     string
 	MinImpressions int64
@@ -130,131 +106,72 @@ type cannibalizationParams struct {
 	Now            time.Time
 }
 
-// runCannibalizationCommand is the pure runner: it loads the config, applies
-// the diagnostics predicate, renders output, and returns the framework exit
-// code. Side effects are confined to the writers in params.
 func runCannibalizationCommand(p cannibalizationParams) int {
-	if p.ConfigPath == "" {
-		writeLine(p.Stderr, "--config is required")
-		return cannibalizationExitFailure
+	if err := diagcmd.ValidateFormat(p.Format); err != nil {
+		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
-	if p.Format != cannibalizationFormatText && p.Format != cannibalizationFormatJSON {
-		writeLine(p.Stderr, fmt.Sprintf("invalid --format %q: must be text or json", p.Format))
-		return cannibalizationExitFailure
-	}
-
-	cfg, err := config.LoadConfig(p.ConfigPath)
+	site, _, err := diagcmd.LoadSite(p.ConfigPath)
 	if err != nil {
-		writeLine(p.Stderr, fmt.Sprintf("failed to load config: %v", err))
-		return cannibalizationExitFailure
-	}
-	if cfg.SearchConsole == nil || cfg.SearchConsole.SiteURL == "" {
-		writeLine(p.Stderr, fmt.Sprintf("no search_console.site_url in %s", p.ConfigPath))
-		return cannibalizationExitFailure
+		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
 	client, cleanup, err := p.Factory()
 	if err != nil {
-		writeLine(p.Stderr, fmt.Sprintf("failed to create GSC client: %v", err))
-		return cannibalizationExitFailure
+		return diagcmd.FailWith(p.Stderr, "failed to create GSC client: %v", err)
 	}
 	defer cleanup()
 
-	output, err := executeCannibalization(client, cfg.SearchConsole.SiteURL, p.MinImpressions, p.Now)
+	env, err := buildCannibalizationEnvelope(client, site, p.MinImpressions, p.Now)
 	if err != nil {
-		writeLine(p.Stderr, err.Error())
-		return cannibalizationExitFailure
+		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
-	if err := renderCannibalization(p.Stdout, output, p.Format); err != nil {
-		writeLine(p.Stderr, fmt.Sprintf("failed to render output: %v", err))
-		return cannibalizationExitFailure
+	if err := diagcmd.Render(p.Stdout, env, p.Format, cannibalizationColumns, cannibalizationTextRow); err != nil {
+		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}
 
-	if len(output.Results) > 0 {
-		return cannibalizationExitIssues
-	}
-	return cannibalizationExitClean
+	return diagcmd.ExitCode(nil, len(env.Results) > 0)
 }
 
-// writeLine writes msg followed by a newline, ignoring any I/O error. Used
-// only for stderr diagnostics where there is no meaningful recovery path.
-func writeLine(w io.Writer, msg string) {
-	_, _ = w.Write([]byte(msg + "\n"))
-}
-
-// executeCannibalization performs the single API call, applies the predicate,
-// and assembles the output envelope.
-func executeCannibalization(client gsc.SearchAPI, site string, minImpressions int64, now time.Time) (CannibalizationOutput, error) {
+func buildCannibalizationEnvelope(client gsc.SearchAPI, site string, minImpressions int64, now time.Time) (CannibalizationOutput, error) {
 	startDate, endDate := gsc.BuildDateRange(cannibalizationDays)
-	query := &gsc.SearchAnalyticsQuery{
+	report, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
 		SiteURL:    site,
 		StartDate:  startDate,
 		EndDate:    endDate,
-		Dimensions: strings.Split(cannibalizationDimensionsCSV, ","),
+		Dimensions: []string{"query", "page"},
 		RowLimit:   cannibalizationRowLimit,
-		DataState:  cannibalizationDataState,
-	}
-
-	report, err := client.QuerySearchAnalytics(query)
+		DataState:  "final",
+	})
 	if err != nil {
 		return CannibalizationOutput{}, fmt.Errorf("search analytics query failed: %w", err)
 	}
 
-	results := diagnostics.Cannibalisation(report.Rows, minImpressions)
-
-	output := CannibalizationOutput{
-		Command:     cannibalizationCommandName,
-		Site:        site,
-		GeneratedAt: now.Format(time.RFC3339),
-		Results:     make([]CannibalizationResultOutput, 0, len(results)),
-		QuotaUsed:   client.QuotaUsed(),
-	}
-	for _, r := range results {
-		pages := make([]CannibalizationPageOutput, 0, len(r.Pages))
+	diag := diagnostics.Cannibalisation(report.Rows, minImpressions)
+	rows := make([]CannibalizationResultRow, 0, len(diag))
+	for _, r := range diag {
+		pages := make([]CannibalizationPage, 0, len(r.Pages))
 		for _, p := range r.Pages {
-			pages = append(pages, CannibalizationPageOutput{Page: p.Page, Impressions: p.Impressions})
+			pages = append(pages, CannibalizationPage{Page: p.Page, Impressions: p.Impressions})
 		}
-		output.Results = append(output.Results, CannibalizationResultOutput{
+		rows = append(rows, CannibalizationResultRow{
 			Query:              r.Query,
 			Pages:              pages,
 			TotalImpressions:   r.TotalImpressions,
 			CanonicalCandidate: r.CanonicalCandidate,
 		})
 	}
-	return output, nil
+
+	return diagcmd.NewEnvelope(cannibalizationCommandName, site, now, rows, report.QuotaUsed), nil
 }
 
-// renderCannibalization writes either the text table + footer or the JSON
-// envelope. Text mode prints only the quota footer when no results,
-// satisfying the framework's silent-on-all-green rule while still surfacing
-// the quota cost.
-func renderCannibalization(w io.Writer, output CannibalizationOutput, format string) error {
-	if format == cannibalizationFormatJSON {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(output)
-	}
+var cannibalizationColumns = []string{"query", "pages", "total_impressions", "canonical_candidate"}
 
-	if len(output.Results) == 0 {
-		_, err := fmt.Fprintf(w, "quota used: %d\n", output.QuotaUsed)
-		return err
+func cannibalizationTextRow(r CannibalizationResultRow) []string {
+	return []string{
+		r.Query,
+		strconv.Itoa(len(r.Pages)),
+		strconv.FormatInt(r.TotalImpressions, 10),
+		r.CanonicalCandidate,
 	}
-
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "query\tpages\ttotal_impressions\tcanonical_candidate"); err != nil {
-		return err
-	}
-	for _, r := range output.Results {
-		if _, err := fmt.Fprintf(tw, "%s\t%d\t%d\t%s\n", r.Query, len(r.Pages), r.TotalImpressions, r.CanonicalCandidate); err != nil {
-			return err
-		}
-	}
-	if err := tw.Flush(); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(w, "quota used: %d\n", output.QuotaUsed); err != nil {
-		return err
-	}
-	return nil
 }
