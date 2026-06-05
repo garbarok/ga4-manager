@@ -2,9 +2,18 @@
 
 This file defines the canonical vocabulary for this project. When naming things in issues, ADRs, refactor proposals, test names, or commit messages, use these terms exactly. Don't drift to synonyms listed under "avoid".
 
+## Framing
+
+GA4 Manager is a generic, open-source CLI. It has one type of consumer — the **Operator** — and no first-class downstream projects. The configs under `configs/examples/` are illustrative templates; any config that happens to be checked in elsewhere in the repo (e.g. `configs/<name>.yaml`) is a sample, not a stakeholder. Feature requests should describe what the Operator can do with the tool against *their* GA4 properties and GSC sites, not against any specific site the maintainers happen to run.
+
 ---
 
 ## Core Concepts
+
+### Operator
+The person running the GA4 Manager CLI (or driving the MCP server) against one or more of their own GA4 properties and GSC sites. The Operator owns the YAML config(s), supplies the credentials via ADC, and decides where state and credentials live. Whenever this document or an ADR says "the Operator does X" it means the human in front of the tool, not the tool's maintainers.
+
+Avoid: "user", "customer", "client" (those carry product connotations this tool doesn't have).
 
 ### Property
 A Google Analytics 4 property identified by a numeric **property ID** (e.g. `123456789`). Distinct from a GCP project. All GA4 Admin API calls use the resource path `properties/{propertyID}`.
@@ -58,6 +67,50 @@ Google's credential discovery chain. Supports both user credentials (via `gcloud
 
 ### MCP tool
 One of the 16 structured operations exposed by the MCP server in `mcp/` to AI assistants. Each tool maps to either a CLI command (spawned as a subprocess) or a native TypeScript implementation.
+
+---
+
+## SEO Diagnostics
+
+The four canonical signals the GSC analysis commands report. Each is a strict, mutually-exclusive predicate over a query×page row, defined so that a given comparison window classifies a page into at most one of decay/CTR anomaly. Opportunity and cannibalisation are orthogonal — a page may simultaneously be an opportunity and a cannibalisation participant.
+
+### Decay
+A page slipping in ranking, with downstream traffic loss. Position-driven.
+
+```
+decay ≔ position_delta ≥ +1.0 AND clicks_delta ≤ -20%
+```
+
+Avoid: "traffic drop", "ranking loss" (decay is the specific predicate above).
+
+### CTR anomaly
+A page holding its position but converting fewer clicks per impression. Snippet-driven — usually a SERP feature stealing clicks, a competitor's better title, or stale meta description.
+
+```
+ctr_anomaly ≔ |position_delta| < 1.0 AND ctr_delta ≤ -30%
+```
+
+Avoid: "title rot" (use CTR anomaly).
+
+### Opportunity
+A page ranking on page 1–2 but under-converting relative to its peer group. Tuning candidate — usually title/meta optimisation.
+
+```
+opportunity ≔ position ∈ [5, 20] AND ctr < category_median_ctr
+```
+
+**Category (v1):** the position bucket. For a row at position *p*, `category_median_ctr` is the median CTR of all rows in the same site/window at `round(p)`. This is the industry-standard position-CTR-curve approach and requires zero config. The term *category* is intentionally left abstract so it can later graduate to a page-template clustering (e.g. `/calculator/*` vs `/blog/*`) without renaming the concept.
+
+Avoid: "easy win", "low-hanging fruit".
+
+### Cannibalisation
+Two or more pages on the same site ranking for the same query, splitting authority.
+
+```
+cannibalisation ≔ ≥2 pages on the same query with impressions ≥ 10
+```
+
+Avoid: "duplicate ranking", "query overlap".
 
 ---
 
