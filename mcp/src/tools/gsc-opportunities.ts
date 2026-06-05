@@ -31,9 +31,9 @@ export const gscOpportunitiesInputSchema = z.object({
     .int()
     .min(0)
     .optional()
-    .default(0)
+    .default(1)
     .describe(
-      'Filter out opportunities below this projected monthly click gain. Default: 0 (no filter).',
+      'Filter out opportunities below this projected monthly click gain. Default: 1 — suppresses 0-click rounding-error findings on small sites; set to 0 to surface everything.',
     ),
 })
 
@@ -138,8 +138,8 @@ export const gscOpportunitiesTool = {
       min_potential_clicks: {
         type: 'number',
         description:
-          'Drop opportunities below this projected monthly click gain. Default: 0.',
-        default: 0,
+          'Drop opportunities below this projected monthly click gain. Default: 1 (suppresses 0-click rounding-error findings on small sites).',
+        default: 1,
         minimum: 0,
       },
     },

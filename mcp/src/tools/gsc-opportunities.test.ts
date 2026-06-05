@@ -14,7 +14,7 @@ describe('gscOpportunitiesInputSchema', () => {
     if (parsed.success) {
       expect(parsed.data.days).toBe(28)
       expect(parsed.data.min_impressions).toBe(20)
-      expect(parsed.data.min_potential_clicks).toBe(0)
+      expect(parsed.data.min_potential_clicks).toBe(1)
     }
   })
 

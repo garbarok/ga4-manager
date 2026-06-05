@@ -138,6 +138,12 @@ type ctrAnomalyParams struct {
 	Now            time.Time
 }
 
+// ctrAnomalySparsePairsThreshold is the minimum number of (query, page)
+// pairs that survive --min-clicks-prior below which the result set cannot
+// be trusted. With fewer pairs than this, a "zero anomalies" result tells
+// the Operator nothing — there's just not enough data to detect them.
+const ctrAnomalySparsePairsThreshold = 5
+
 func runCTRAnomalyCommand(p ctrAnomalyParams) int {
 	if err := diagcmd.ValidateFormat(p.Format); err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
@@ -156,13 +162,23 @@ func runCTRAnomalyCommand(p ctrAnomalyParams) int {
 	}
 	defer cleanup()
 
-	env, err := buildCTRAnomalyEnvelope(client, site, p.Days, p.MinClicksPrior, p.MinClicksLost, p.Now)
+	env, pairsCount, err := buildCTRAnomalyEnvelope(client, site, p.Days, p.MinClicksPrior, p.MinClicksLost, p.Now)
 	if err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
 	if err := diagcmd.Render(p.Stdout, env, p.Format, ctrAnomalyColumns, ctrAnomalyTextRow); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
+	}
+
+	// Sparse-data UX warning: when no anomalies came back AND the joined
+	// sample is small, the Operator should know "0 anomalies" reflects
+	// data scarcity rather than a clean run. Stderr-only so JSON
+	// consumers never see it.
+	if len(env.Results) == 0 && pairsCount < ctrAnomalySparsePairsThreshold {
+		fmt.Fprintf(p.Stderr,
+			"warning: only %d (query, page) pairs cleared --min-clicks-prior=%d — too few to detect anomalies reliably. Try a longer window (e.g. --days 90) or lower --min-clicks-prior.\n",
+			pairsCount, p.MinClicksPrior)
 	}
 
 	return diagcmd.ExitCode(nil, len(env.Results) > 0)
@@ -190,7 +206,7 @@ func ctrAnomalyWindows(now time.Time, days int) (string, string, string, string)
 	return currentStart.Format(fmt), currentEnd.Format(fmt), priorStart.Format(fmt), priorEnd.Format(fmt)
 }
 
-func buildCTRAnomalyEnvelope(client gsc.SearchAPI, site string, days int, minClicksPrior, minClicksLost int64, now time.Time) (CTRAnomalyOutput, error) {
+func buildCTRAnomalyEnvelope(client gsc.SearchAPI, site string, days int, minClicksPrior, minClicksLost int64, now time.Time) (CTRAnomalyOutput, int, error) {
 	curStart, curEnd, priorStart, priorEnd := ctrAnomalyWindows(now, days)
 
 	currentReport, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
@@ -202,7 +218,7 @@ func buildCTRAnomalyEnvelope(client gsc.SearchAPI, site string, days int, minCli
 		DataState:  "final",
 	})
 	if err != nil {
-		return CTRAnomalyOutput{}, fmt.Errorf("search analytics current window failed: %w", err)
+		return CTRAnomalyOutput{}, 0, fmt.Errorf("search analytics current window failed: %w", err)
 	}
 
 	priorReport, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
@@ -214,7 +230,7 @@ func buildCTRAnomalyEnvelope(client gsc.SearchAPI, site string, days int, minCli
 		DataState:  "final",
 	})
 	if err != nil {
-		return CTRAnomalyOutput{}, fmt.Errorf("search analytics prior window failed: %w", err)
+		return CTRAnomalyOutput{}, 0, fmt.Errorf("search analytics prior window failed: %w", err)
 	}
 
 	pairs := joinSearchAnalyticsRows(currentReport.Rows, priorReport.Rows, minClicksPrior)
@@ -242,7 +258,7 @@ func buildCTRAnomalyEnvelope(client gsc.SearchAPI, site string, days int, minCli
 		})
 	}
 
-	return diagcmd.NewEnvelope(ctrAnomalyCommandName, site, now, rows, priorReport.QuotaUsed), nil
+	return diagcmd.NewEnvelope(ctrAnomalyCommandName, site, now, rows, priorReport.QuotaUsed), len(pairs), nil
 }
 
 // joinSearchAnalyticsRows pairs current-window and prior-window rows by
