@@ -98,6 +98,12 @@ import {
   buildCTRAnomalyArgs,
   parseCTRAnomalyOutput,
 } from './tools/gsc-ctr-anomaly.js'
+import {
+  gscHealthTool,
+  gscHealthInputSchema,
+  buildHealthArgs,
+  parseHealthOutput,
+} from './tools/gsc-health.js'
 
 // gsc_monitor_urls is dual-mode (native URL loop OR CLI), handled below.
 import {
@@ -321,6 +327,13 @@ const SPECS: ToolSpec[] = [
     command: 'gsc',
     buildArgs: buildCTRAnomalyArgs,
     parse: (out) => parseCTRAnomalyOutput(out),
+  }),
+  cli({
+    tool: gscHealthTool,
+    schema: gscHealthInputSchema,
+    command: 'gsc',
+    buildArgs: buildHealthArgs,
+    parse: (out) => parseHealthOutput(out),
   }),
 
   // ── gsc_monitor_urls: dual-mode (native URL loop OR CLI config run) ─────────
