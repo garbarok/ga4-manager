@@ -8,7 +8,7 @@ import {
 } from './gsc-cannibalization.js'
 
 describe('gscCannibalizationInputSchema', () => {
-  it('accepts a config path with default min_impressions, days, and with_coverage_state', () => {
+  it('accepts a config path with default min_impressions, days, with_coverage_state, and only_actionable', () => {
     const parsed = gscCannibalizationInputSchema.safeParse({
       config: 'configs/mysite.yaml',
     })
@@ -17,6 +17,7 @@ describe('gscCannibalizationInputSchema', () => {
       expect(parsed.data.min_impressions).toBe(10)
       expect(parsed.data.days).toBe(28)
       expect(parsed.data.with_coverage_state).toBe(false)
+      expect(parsed.data.only_actionable).toBe(false)
     }
   })
 
@@ -74,6 +75,7 @@ describe('buildCannibalizationArgs', () => {
       min_impressions: 10,
       days: 28,
       with_coverage_state: false,
+      only_actionable: false,
     } as GscCannibalizationInput)
     expect(args).toEqual([
       'cannibalization',
@@ -94,6 +96,7 @@ describe('buildCannibalizationArgs', () => {
       min_impressions: 25,
       days: 28,
       with_coverage_state: false,
+      only_actionable: false,
     } as GscCannibalizationInput)
     expect(args).toContain('--min-impressions')
     expect(args).toContain('25')
@@ -105,6 +108,7 @@ describe('buildCannibalizationArgs', () => {
       min_impressions: 10,
       days: 90,
       with_coverage_state: false,
+      only_actionable: false,
     } as GscCannibalizationInput)
     expect(args).toContain('--days')
     expect(args).toContain('90')
@@ -116,6 +120,7 @@ describe('buildCannibalizationArgs', () => {
       min_impressions: 10,
       days: 28,
       with_coverage_state: true,
+      only_actionable: false,
     } as GscCannibalizationInput)
     expect(on).toContain('--with-coverage-state')
 
@@ -124,8 +129,29 @@ describe('buildCannibalizationArgs', () => {
       min_impressions: 10,
       days: 28,
       with_coverage_state: false,
+      only_actionable: false,
     } as GscCannibalizationInput)
     expect(off).not.toContain('--with-coverage-state')
+  })
+
+  it('appends --only-actionable when true; omits when false', () => {
+    const on = buildCannibalizationArgs({
+      config: 'configs/mysite.yaml',
+      min_impressions: 10,
+      days: 28,
+      with_coverage_state: false,
+      only_actionable: true,
+    } as GscCannibalizationInput)
+    expect(on).toContain('--only-actionable')
+
+    const off = buildCannibalizationArgs({
+      config: 'configs/mysite.yaml',
+      min_impressions: 10,
+      days: 28,
+      with_coverage_state: false,
+      only_actionable: false,
+    } as GscCannibalizationInput)
+    expect(off).not.toContain('--only-actionable')
   })
 })
 

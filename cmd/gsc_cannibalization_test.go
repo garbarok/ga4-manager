@@ -358,3 +358,200 @@ func TestRunCannibalizationCommand_WithCoverageStateAddsTableColumn(t *testing.T
 		t.Errorf("table missing actionable severity: %q", out)
 	}
 }
+
+// Regression test for the operator's BO-04 finding: when a consolidating
+// result's impression leader IS the redirected page, canonical_candidate
+// must be replaced with the impression leader among NON-redirect pages so
+// the Operator never sees "canonicalise to this redirect target" advice.
+func TestRunCannibalizationCommand_WithCoverageStateRedirectAwareCanonical(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			// Legacy URL has MORE impressions than the canonical target.
+			cannibalisationRow("uk-query", "https://example.com/legacy", 27),
+			cannibalisationRow("uk-query", "https://example.com/canonical", 13),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/legacy":    "Page with redirect",
+			"https://example.com/canonical": "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.WithCoverageState = true
+
+	runCannibalizationCommand(params)
+
+	var got CannibalizationOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(got.Results))
+	}
+	if got.Results[0].Severity != SeverityConsolidating {
+		t.Fatalf("severity = %q, want consolidating", got.Results[0].Severity)
+	}
+	if got.Results[0].CanonicalCandidate != "https://example.com/canonical" {
+		t.Errorf("canonical_candidate = %q, want %q (impression-leader among non-redirect pages)",
+			got.Results[0].CanonicalCandidate, "https://example.com/canonical")
+	}
+}
+
+func TestRunCannibalizationCommand_OnlyActionableFiltersConsolidating(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			// Consolidating finding (one side redirects).
+			cannibalisationRow("legacy-query", "https://example.com/legacy", 50),
+			cannibalisationRow("legacy-query", "https://example.com/new", 30),
+			// Actionable finding (both sides indexed).
+			cannibalisationRow("hot-query", "https://example.com/a", 40),
+			cannibalisationRow("hot-query", "https://example.com/b", 35),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/legacy": "Page with redirect",
+			"https://example.com/new":    "Submitted and indexed",
+			"https://example.com/a":      "Submitted and indexed",
+			"https://example.com/b":      "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.OnlyActionable = true
+
+	status := runCannibalizationCommand(params)
+
+	var got CannibalizationOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("len(results) = %d, want 1 (the actionable one)", len(got.Results))
+	}
+	if got.Results[0].Query != "hot-query" {
+		t.Errorf("kept the wrong finding: %q", got.Results[0].Query)
+	}
+	if got.Results[0].Severity != SeverityActionable {
+		t.Errorf("severity = %q, want actionable", got.Results[0].Severity)
+	}
+	if status != diagcmd.ExitIssues {
+		t.Errorf("status = %d, want %d (still issues — one actionable left)", status, diagcmd.ExitIssues)
+	}
+}
+
+func TestRunCannibalizationCommand_OnlyActionableExitsCleanWhenAllConsolidating(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("q", "https://example.com/legacy", 50),
+			cannibalisationRow("q", "https://example.com/new", 30),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/legacy": "Page with redirect",
+			"https://example.com/new":    "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.OnlyActionable = true
+
+	status := runCannibalizationCommand(params)
+
+	if status != diagcmd.ExitClean {
+		t.Errorf("status = %d, want %d (everything filtered out → exit clean for cron-friendliness)",
+			status, diagcmd.ExitClean)
+	}
+
+	var got CannibalizationOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(got.Results) != 0 {
+		t.Errorf("results should be empty after --only-actionable filter, got %d", len(got.Results))
+	}
+}
+
+func TestRunCannibalizationCommand_OnlyActionableImpliesWithCoverageState(t *testing.T) {
+	// No coverageByPage map needed — setting --only-actionable alone should
+	// still cause Inspect calls because the flag implies --with-coverage-state.
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("q", "https://example.com/a", 50),
+			cannibalisationRow("q", "https://example.com/b", 30),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/a": "Submitted and indexed",
+			"https://example.com/b": "Submitted and indexed",
+		},
+	}
+	params, _, _ := newParams(t, fake, diagcmd.FormatJSON)
+	params.OnlyActionable = true
+	// Intentionally leaving params.WithCoverageState = false.
+
+	runCannibalizationCommand(params)
+
+	if fake.inspectCalls == 0 {
+		t.Error("expected --only-actionable to imply --with-coverage-state (Inspect should fire)")
+	}
+}
+
+func TestRunCannibalizationCommand_TextSummaryFooter(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("q1", "https://example.com/legacy", 50),
+			cannibalisationRow("q1", "https://example.com/new", 30),
+			cannibalisationRow("q2", "https://example.com/a", 40),
+			cannibalisationRow("q2", "https://example.com/b", 35),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/legacy": "Page with redirect",
+			"https://example.com/new":    "Submitted and indexed",
+			"https://example.com/a":      "Submitted and indexed",
+			"https://example.com/b":      "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
+	params.WithCoverageState = true
+
+	runCannibalizationCommand(params)
+	out := stdout.String()
+
+	if !strings.Contains(out, "→ 2 findings: 1 actionable, 1 consolidating.") {
+		t.Errorf("summary footer missing or wrong:\n%s", out)
+	}
+}
+
+func TestRunCannibalizationCommand_TextSummaryFooterNoActionRequired(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("q", "https://example.com/legacy", 50),
+			cannibalisationRow("q", "https://example.com/new", 30),
+		},
+		coverageByPage: map[string]string{
+			"https://example.com/legacy": "Page with redirect",
+			"https://example.com/new":    "Submitted and indexed",
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
+	params.WithCoverageState = true
+
+	runCannibalizationCommand(params)
+	out := stdout.String()
+
+	if !strings.Contains(out, "No action required") {
+		t.Errorf("expected 'No action required' phrasing when all consolidating:\n%s", out)
+	}
+}
+
+func TestRunCannibalizationCommand_TextSummaryFooterOmittedWithoutCoverageState(t *testing.T) {
+	fake := &fakeCannibalizationClient{
+		rows: []gsc.SearchAnalyticsRow{
+			cannibalisationRow("q", "https://example.com/a", 50),
+			cannibalisationRow("q", "https://example.com/b", 30),
+		},
+	}
+	params, stdout, _ := newParams(t, fake, diagcmd.FormatTable)
+	// withCoverageState off — no severity, no summary footer.
+
+	runCannibalizationCommand(params)
+	out := stdout.String()
+
+	if strings.Contains(out, "→") || strings.Contains(out, "actionable") {
+		t.Errorf("summary footer should not appear without --with-coverage-state:\n%s", out)
+	}
+}
