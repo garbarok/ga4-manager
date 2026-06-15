@@ -11,6 +11,7 @@ If your error is not here, please [open an issue](https://github.com/garbarok/ga
 - [Permission errors](#permission-errors)
 - [Property ID and site format errors](#property-id-and-site-format-errors)
 - [Tool-specific errors](#tool-specific-errors)
+- [False positives (signals to ignore)](#false-positives-signals-to-ignore)
 - [MCP server / Claude Desktop errors](#mcp-server--claude-desktop-errors)
 
 ---
@@ -404,6 +405,49 @@ The tool's keyless throttle (`bottleneck` 1 req per 100s) still applies as a saf
 **Cause:** One of the two GSC requests failed (most often quota or transient 5xx).
 
 **Fix:** Retry the call. The two requests run in parallel; transient failure on one does not invalidate the other.
+
+---
+
+## False positives (signals to ignore)
+
+These signals look like problems but are not. Do not report them as page defects
+or open issues for them — they are upstream-deprecated fields or missing
+measurements, not failures of the audited site.
+
+### `MobileUsable: false` on every URL (`gsc_inspect_url`, `gsc_monitor_urls`, `gsc_health`)
+
+```json
+{
+  "MobileUsable": false,
+  "MobileIssues": []
+}
+```
+
+**This is not a mobile problem.** Google **deprecated the Mobile Usability report
+and the URL Inspection API's `mobileUsability` field in December 2023** (the
+report was fully removed in 2024). The API now returns `MobileUsable: false`
+(typically with an **empty `MobileIssues` array**) for *every* URL regardless of
+how mobile-friendly the page actually is. It is a sunset-field artifact.
+
+**Tell-tale sign:** *all* inspected URLs report `false` with no issues listed. A
+real usability defect would affect specific pages and populate `MobileIssues`.
+
+**What to do:** ignore the field. To assess real mobile UX, measure Core Web
+Vitals via `seo_page_audit` with `check_cwv: true` (requires a PSI API key — see
+[PSI returns 429](#seo_page_audit--psi-returns-429-with-quota_limit_value-0)), or
+run Lighthouse. Health-diff tooling should **not** treat `mobile_usable`
+transitioning to `false` as a regression in isolation.
+
+---
+
+### `cwv_unavailable` / `psi_unavailable` means "not measured", not "failed"
+
+A `cwv_unavailable` or `psi_unavailable` warning from `seo_page_audit` means Core
+Web Vitals **could not be fetched** (no PSI API key / rate limit / `quota = 0` —
+see the [PSI 429 section](#seo_page_audit--psi-returns-429-with-quota_limit_value-0)).
+It is **not** a signal that the page failed CWV. Do not report a page as failing
+Core Web Vitals on the basis of a missing measurement — provision the PSI key
+first, then re-audit.
 
 ---
 
