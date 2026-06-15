@@ -156,14 +156,14 @@ func runAuditCommand() int {
 			if gscAuditSource == auditSourceSitemap {
 				return diagcmd.FailWith(os.Stderr, "no sitemap URL: pass --sitemap or use a config with search_console.sitemaps")
 			}
-			color.Yellow("⚠ No sitemap URL available (sc-domain property without --sitemap); skipping sitemap source")
+			fmt.Fprintln(os.Stderr, "⚠ No sitemap URL available (sc-domain property without --sitemap); skipping sitemap source")
 		} else {
 			urls, err := prober.FetchSitemapURLs(ctx, sitemapURL)
 			if err != nil {
 				if gscAuditSource == auditSourceSitemap {
 					return diagcmd.FailWith(os.Stderr, "failed to fetch sitemap: %v", err)
 				}
-				color.Yellow("⚠ Could not fetch sitemap (%v); continuing with GSC pages only", err)
+				fmt.Fprintf(os.Stderr, "⚠ Could not fetch sitemap (%v); continuing with GSC pages only\n", err)
 			}
 			for _, u := range urls {
 				addAuditSource(collected, u, auditSourceSitemap, 0)
@@ -177,7 +177,8 @@ func runAuditCommand() int {
 
 	urls := sortedAuditURLs(collected, gscAuditLimit)
 
-	color.Cyan("🔎 Auditing %d URL(s) for %s (UA: Googlebot)...", len(urls), site)
+	// Progress goes to stderr so --format json keeps stdout pure JSON.
+	fmt.Fprintf(os.Stderr, "🔎 Auditing %d URL(s) for %s...\n", len(urls), site)
 	results := probeAll(ctx, prober, urls, collected, gscAuditConcurrency)
 	sortAuditResults(results)
 

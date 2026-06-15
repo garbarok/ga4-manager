@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority filtering (`--priority high/medium/low`)
 - Incremental updates for partial updates
 
+## [2.4.1] - 2026-06-15
+
+### Fixed
+
+- **`gsc audit-urls --format json` emitted a non-JSON progress line on stdout.** The "🔎 Auditing N URL(s)…" status line and the sitemap fallback warnings now go to stderr, so stdout is pure JSON and parseable by downstream consumers.
+
 ## [2.4.0] - 2026-06-15
 
 ### SEO auditing + false-positive hardening
