@@ -250,6 +250,7 @@ For Cline (VS Code extension), configure via Cline settings:
 | `GSC_DEFAULT_SITE` | Default GSC site URL | None | `sc-domain:example.com` |
 | `GA4_CONFIG_DIR` | Directory for YAML configs | `./configs` | `/path/to/configs` |
 | `GA4_TIMEOUT` | CLI execution timeout (ms) | `30000` | `60000` |
+| `PSI_API_KEY` | PageSpeed Insights API key for Core Web Vitals in `seo_page_audit`/`seo_audit_batch`. Without it, keyless PSI is throttled and per-project quota is often 0. A per-call `psi_api_key` takes precedence. | None | `AIzaSy...` |
 
 ### Using Default Property ID
 

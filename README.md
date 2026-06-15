@@ -62,13 +62,15 @@ ga4 validate --config configs/site.yaml     # YAML check
 ga4 setup    --config configs/site.yaml --dry-run
 ga4 setup    --config configs/site.yaml     # apply
 ga4 report   --property-id 123456789 --days 28
+ga4 gsc whoami      --config configs/site.yaml   # identity + per-property permissions
+ga4 gsc audit-urls  --config configs/site.yaml   # probe indexed + sitemap URLs for 404s/redirects
 ```
 
 YAML structure and field reference: [configs/examples/README.md](configs/examples/README.md).
 
 ---
 
-## MCP server (16 tools)
+## MCP server (17 tools)
 
 Register the server with your AI client and Claude can run any of these directly.
 
@@ -76,7 +78,7 @@ Register the server with your AI client and Claude can run any of these directly
 |-------|-------|
 | GA4 ops | `ga4_setup`, `ga4_report`, `ga4_cleanup`, `ga4_link`, `ga4_validate` |
 | GSC ops | `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage` |
-| Diagnostics & SEO | `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit` |
+| Diagnostics & SEO | `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch` |
 
 ### Setup
 

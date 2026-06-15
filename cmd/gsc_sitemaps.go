@@ -176,6 +176,12 @@ func runGSCSitemapsSubmit(cmd *cobra.Command, args []string) error {
 	}
 	defer func() { _ = client.Close() }()
 
+	// Preflight: fail fast with a clear message if the account is read-only,
+	// rather than surfacing a bare 403 from the write call.
+	if err := preflightWritable(client, gscSiteURL); err != nil {
+		return err
+	}
+
 	// Submit sitemap
 	color.Cyan("📤 Submitting sitemap to Google Search Console...")
 	color.Cyan("   Site: %s", gscSiteURL)
@@ -200,6 +206,11 @@ func runGSCSitemapsDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer func() { _ = client.Close() }()
+
+	// Preflight: fail fast with a clear message if the account is read-only.
+	if err := preflightWritable(client, gscSiteURL); err != nil {
+		return err
+	}
 
 	// Delete sitemap
 	color.Cyan("🗑️  Deleting sitemap from Google Search Console...")
@@ -311,4 +322,29 @@ func sitemapsContentsTableRow(content gsc.SitemapContentInfo) []string {
 		fmt.Sprintf("%d", content.Submitted),
 		fmt.Sprintf("%d (%.1f%%)", content.Indexed, indexedPct),
 	}
+}
+
+// preflightWritable verifies the authenticated account can write to the
+// property before a sitemap submit/delete. A definitively read-only account
+// returns an actionable error so the caller never hits a bare 403. If the
+// permission cannot be determined (e.g. sites.get itself is restricted), it
+// logs a warning and lets the write proceed so the real API error surfaces.
+func preflightWritable(client *gsc.Client, site string) error {
+	perm, err := client.GetSitePermission(site)
+	if err != nil {
+		color.Yellow("⚠ Could not verify write permission (%v); attempting anyway...", err)
+		return nil
+	}
+	if perm.CanWrite {
+		return nil
+	}
+
+	id := gsc.LoadServiceAccountIdentity()
+	color.Red("✗ Write blocked: this account has read-only access to %s", site)
+	fmt.Printf("   Identity:   %s\n", orUnknownValue(id.ClientEmail))
+	fmt.Printf("   Permission: %s (need siteOwner or siteFullUser to submit/delete sitemaps)\n", perm.PermissionLevel)
+	fmt.Println("   Fix: Search Console → Settings → Users and permissions → grant this account 'Full' access,")
+	fmt.Println("        or point GOOGLE_APPLICATION_CREDENTIALS at a key that has write access.")
+	fmt.Println("   Tip: run 'ga4 gsc whoami' to see permissions for every accessible property.")
+	return fmt.Errorf("read-only access to %s (permission: %s)", site, perm.PermissionLevel)
 }

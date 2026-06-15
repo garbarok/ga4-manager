@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority filtering (`--priority high/medium/low`)
 - Incremental updates for partial updates
 
+## [2.4.0] - 2026-06-15
+
+### SEO auditing + false-positive hardening
+
+#### Added
+
+- **`gsc audit-urls` — live HTTP audit of indexed + sitemap URLs.** Unions the pages GSC has search impressions for with every `<loc>` in the sitemap (sitemap-index files are followed), then probes each over HTTP, following redirects manually, and classifies the outcome:
+  - `ok` — terminal 2xx, no redirect
+  - `redirect` — reached 2xx via redirects; trailing-slash mismatches (requested URL is not the canonical slash form) are surfaced as issues
+  - `broken` — terminal status ≥ 400 (e.g. a renamed page whose old URL is still indexed but now 404s)
+  - `blocked` — 401/403/429; reported but **not** treated as a failure, since these are usually CDN bot-protection/rate-limiting from a non-Google IP
+  - `error` — transport failure
+  Exits `2` when any broken/error URL is found. Flags: `--source` (both/sitemap/gsc), `--days`, `--min-impressions`, `--limit`, `--concurrency`, `--timeout`, `--user-agent` (defaults to Googlebot), `--format` (table/json). Catches the class of problem the Search Console API alone cannot see.
+- **`gsc whoami` — authenticated identity + per-property permissions.** Reports the service-account email and GCP project, plus each accessible property's permission level and whether it allows writes. Run it first when a write command returns `403`.
+
+#### Changed
+
+- **Write commands now preflight permissions.** `gsc sitemaps submit`/`delete` check the property permission level before calling the API and fail with an actionable message (read-only access → how to grant Full access) instead of a bare `403`.
+- **`gsc cannibalization` is language-aware.** Findings whose pages are hreflang translations of one another (distinct locales, no single locale holding ≥2 pages) are **excluded by default** as false positives; a genuine same-language pair (plus any translations) is still reported. Pass `--include-cross-language` to show the excluded findings. JSON output gains a `cross_language` field.
+- **Mobile Usability is no longer reported as a failure.** Google deprecated the Mobile Usability report/API field in December 2023. `gsc inspect`/`monitor`/`health` now trust the verdict only when a real PASS/FAIL/PARTIAL is returned; the deprecated empty verdict shows as "n/a (deprecated)" and is no longer diffed as a health regression.
+- **CLI flags now override config in `gsc analytics run`.** An explicitly-set `--days`/`--dimensions`/`--site` wins over the config's `search_analytics` values (previously config silently overrode the flag).
+- **`gsc analytics run` paginates.** `--limit` accepts up to 100000 rows, fetched via `StartRow` pagination in 25000-row pages; the default was raised 100 → 1000.
+
 ## [2.3.1] - 2026-06-05
 
 ### Polish — small-site usability for the diagnostic family

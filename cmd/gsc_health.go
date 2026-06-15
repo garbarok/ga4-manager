@@ -47,8 +47,8 @@ var gscHealthCmd = &cobra.Command{
 	Long: `Inspect every URL declared under search_console.url_inspection.priority_urls
 in the config file, diff each URL's coverage state against the prior snapshot,
 and report regressions, recoveries, and first-time baselines. Designed to run
-on a weekly cron so noindex bugs, canonical mismatches, and mobile-usability
-regressions are caught within days instead of weeks.
+on a weekly cron so noindex bugs and canonical mismatches are caught within
+days instead of weeks.
 
 State per ADR-0005: ` + "`" + `.ga4-state/health.<site>.json` + "`" + ` (or use --state-dir
 to override). Atomic temp-file-plus-rename writes; an interrupted run never
@@ -58,9 +58,12 @@ Per-URL field-level diffs surface the following moves as regressions:
   coverage_state moving away from "Submitted and indexed"
   robots_blocked transitioning to true
   indexing_allowed transitioning to false
-  mobile_usable transitioning to false
   rich_results_status moving away from "PASS"
   google_canonical changing
+
+mobile_usable is recorded in the snapshot for transparency but is NOT diffed:
+Google deprecated the Mobile Usability report/API field in December 2023, so an
+absent verdict would otherwise look like a permanent regression on every URL.
 
 Moves in the opposite direction are surfaced as recoveries (good news).
 
@@ -109,10 +112,14 @@ type healthURLState struct {
 	CoverageState     string `json:"coverage_state"`
 	GoogleCanonical   string `json:"google_canonical"`
 	UserCanonical     string `json:"user_canonical"`
-	RobotsBlocked     bool   `json:"robots_blocked"`
-	IndexingAllowed   bool   `json:"indexing_allowed"`
-	MobileUsable      bool   `json:"mobile_usable"`
-	RichResultsStatus string `json:"rich_results_status"`
+	RobotsBlocked   bool `json:"robots_blocked"`
+	IndexingAllowed bool `json:"indexing_allowed"`
+	// MobileUsable / MobileUsabilityChecked: Google deprecated the Mobile
+	// Usability signal (Dec 2023). It is recorded for transparency but NOT
+	// diffed for regressions — an absent verdict must not look like a failure.
+	MobileUsable           bool   `json:"mobile_usable"`
+	MobileUsabilityChecked bool   `json:"mobile_usability_checked"`
+	RichResultsStatus      string `json:"rich_results_status"`
 }
 
 // healthFieldChange is one field-level diff inside a URL's result entry.
@@ -274,8 +281,9 @@ func inspectAllHealth(client gsc.InspectAPI, site string, urls []string) (map[st
 			UserCanonical:     r.UserCanonical,
 			RobotsBlocked:     r.RobotsBlocked,
 			IndexingAllowed:   r.IndexingAllowed,
-			MobileUsable:      r.MobileUsable,
-			RichResultsStatus: r.RichResultsStatus,
+			MobileUsable:           r.MobileUsable,
+			MobileUsabilityChecked: r.MobileUsabilityChecked,
+			RichResultsStatus:      r.RichResultsStatus,
 		}
 	}
 	return state, len(ordered), nil
@@ -348,7 +356,8 @@ func compareHealthStates(before, after healthURLState) []healthFieldChange {
 	add("user_canonical", before.UserCanonical, after.UserCanonical)
 	addBool("robots_blocked", before.RobotsBlocked, after.RobotsBlocked)
 	addBool("indexing_allowed", before.IndexingAllowed, after.IndexingAllowed)
-	addBool("mobile_usable", before.MobileUsable, after.MobileUsable)
+	// mobile_usable is intentionally NOT diffed: Google deprecated the signal
+	// (Dec 2023) and the API returns no verdict, so any movement is noise.
 	add("rich_results_status", before.RichResultsStatus, after.RichResultsStatus)
 	return changes
 }
@@ -396,10 +405,6 @@ func anyChangeIsBad(changes []healthFieldChange, before, after healthURLState) b
 			if before.IndexingAllowed && !after.IndexingAllowed {
 				return true
 			}
-		case "mobile_usable":
-			if before.MobileUsable && !after.MobileUsable {
-				return true
-			}
 		case "rich_results_status":
 			if before.RichResultsStatus == healthRichPass &&
 				after.RichResultsStatus != healthRichPass &&
@@ -430,10 +435,6 @@ func anyChangeIsGood(changes []healthFieldChange, before, after healthURLState) 
 			}
 		case "indexing_allowed":
 			if !before.IndexingAllowed && after.IndexingAllowed {
-				return true
-			}
-		case "mobile_usable":
-			if !before.MobileUsable && after.MobileUsable {
 				return true
 			}
 		case "rich_results_status":

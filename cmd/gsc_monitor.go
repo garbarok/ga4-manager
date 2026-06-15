@@ -197,7 +197,7 @@ func monitorColumns() []string {
 
 func monitorTableRow(r gsc.URLInspectionResult) []string {
 	status := getColoredStatus(r.IndexStatus)
-	mobile := getMobileStatus(r.MobileUsable, r.MobileIssues)
+	mobile := getMobileStatus(r.MobileUsabilityChecked, r.MobileUsable, r.MobileIssues)
 
 	var issues string
 	if len(r.IndexingIssues) > 0 {
@@ -273,7 +273,11 @@ func displayMarkdownResults(results []gsc.URLInspectionResult, siteURL string) {
 
 		fmt.Printf("- **Index Status**: %s\n", r.IndexStatus)
 		fmt.Printf("- **Coverage State**: %s\n", r.CoverageState)
-		fmt.Printf("- **Mobile Usable**: %t\n", r.MobileUsable)
+		if r.MobileUsabilityChecked {
+			fmt.Printf("- **Mobile Usable**: %t\n", r.MobileUsable)
+		} else {
+			fmt.Printf("- **Mobile Usable**: n/a (Google deprecated this signal in Dec 2023)\n")
+		}
 
 		if len(r.IndexingIssues) > 0 {
 			fmt.Printf("- **Issues**: %d\n", len(r.IndexingIssues))
@@ -339,14 +343,19 @@ func getColoredStatus(status string) string {
 	}
 }
 
-func getMobileStatus(usable bool, issues []string) string {
+func getMobileStatus(checked, usable bool, issues []string) string {
+	// Google deprecated the Mobile Usability signal in Dec 2023; when no verdict
+	// is returned, report it as not-applicable rather than a false failure.
+	if !checked {
+		return color.HiBlackString("– n/a (deprecated)")
+	}
 	if usable {
 		return color.GreenString("✓ Usable")
 	}
 	if len(issues) > 0 {
 		return color.RedString("✗ Issues (%d)", len(issues))
 	}
-	return color.YellowString("⚠ Unknown")
+	return color.RedString("✗ Not usable")
 }
 
 func displayQuotaStatus(client *gsc.Client) {

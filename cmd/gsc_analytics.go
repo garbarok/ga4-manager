@@ -106,8 +106,8 @@ func init() {
 	// Dimensions flag (default: query,page)
 	gscAnalyticsRunCmd.Flags().StringVar(&gscAnalyticsDimensions, "dimensions", "query,page", "Dimensions to include (comma-separated, max 3)")
 
-	// Row limit flag (default: 100)
-	gscAnalyticsRunCmd.Flags().IntVarP(&gscAnalyticsRowLimit, "limit", "l", 100, "Maximum rows to return (1-25000)")
+	// Row limit flag. Values above 25000 are fetched by paginating with StartRow.
+	gscAnalyticsRunCmd.Flags().IntVarP(&gscAnalyticsRowLimit, "limit", "l", 1000, "Maximum rows to return (1-100000; auto-paginated in 25000-row pages)")
 
 	// Format flag (default: table)
 	gscAnalyticsRunCmd.Flags().StringVarP(&gscAnalyticsFormat, "format", "f", "table", "Output format: table, json, csv, or markdown")
@@ -117,12 +117,16 @@ func init() {
 }
 
 func runGSCAnalytics(cmd *cobra.Command, args []string) error {
-	var siteURL string
-	var dimensions []string
-	var days int
-	var rowLimit int
+	// Start from the flag values (each carries its own default). Config, when
+	// provided, fills in values the user did NOT set explicitly on the command
+	// line. An explicitly-set flag always wins over config — checked via
+	// cmd.Flags().Changed — so `--days 90` is honoured even when the config
+	// pins search_analytics.date_range.days.
+	siteURL := gscAnalyticsSite
+	days := gscAnalyticsDays
+	dimensions := strings.Split(gscAnalyticsDimensions, ",")
+	rowLimit := gscAnalyticsRowLimit
 
-	// Load from config if provided
 	if gscAnalyticsConfig != "" {
 		cfg, err := config.LoadConfig(gscAnalyticsConfig)
 		if err != nil {
@@ -135,43 +139,24 @@ func runGSCAnalytics(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("missing search_console config")
 		}
 
-		siteURL = cfg.SearchConsole.SiteURL
-
-		// Use config values if analytics config exists
-		if cfg.SearchConsole.SearchAnalytics != nil {
-			// Use config date range if specified
-			if cfg.SearchConsole.SearchAnalytics.DateRange != nil && cfg.SearchConsole.SearchAnalytics.DateRange.Days > 0 {
-				days = cfg.SearchConsole.SearchAnalytics.DateRange.Days
-			} else {
-				days = gscAnalyticsDays
-			}
-
-			// Use config dimensions if specified
-			if len(cfg.SearchConsole.SearchAnalytics.Dimensions) > 0 {
-				dimensions = cfg.SearchConsole.SearchAnalytics.Dimensions
-			} else {
-				dimensions = strings.Split(gscAnalyticsDimensions, ",")
-			}
-
-			// Row limit (use default if not in config)
-			rowLimit = gscAnalyticsRowLimit
-		} else {
-			// No analytics config, use flag defaults
-			days = gscAnalyticsDays
-			dimensions = strings.Split(gscAnalyticsDimensions, ",")
-			rowLimit = gscAnalyticsRowLimit
-		}
-	} else {
-		// Use flags directly
-		if gscAnalyticsSite == "" {
-			color.Red("✗ Either --site or --config must be provided")
-			return fmt.Errorf("missing site URL or config file")
+		// Site comes from config unless --site was given explicitly.
+		if !cmd.Flags().Changed("site") {
+			siteURL = cfg.SearchConsole.SiteURL
 		}
 
-		siteURL = gscAnalyticsSite
-		days = gscAnalyticsDays
-		dimensions = strings.Split(gscAnalyticsDimensions, ",")
-		rowLimit = gscAnalyticsRowLimit
+		if sa := cfg.SearchConsole.SearchAnalytics; sa != nil {
+			if !cmd.Flags().Changed("days") && sa.DateRange != nil && sa.DateRange.Days > 0 {
+				days = sa.DateRange.Days
+			}
+			if !cmd.Flags().Changed("dimensions") && len(sa.Dimensions) > 0 {
+				dimensions = sa.Dimensions
+			}
+			// Row limit has no config field; the flag value (default or
+			// explicit) always applies.
+		}
+	} else if siteURL == "" {
+		color.Red("✗ Either --site or --config must be provided")
+		return fmt.Errorf("missing site URL or config file")
 	}
 
 	// Trim whitespace from dimensions

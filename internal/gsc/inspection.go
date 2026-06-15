@@ -18,8 +18,14 @@ type URLInspectionResult struct {
 	UserCanonical     string
 	RobotsBlocked     bool
 	IndexingAllowed   bool
-	MobileUsable      bool
-	MobileIssues      []string
+	// MobileUsable reflects the Mobile Usability verdict. Google deprecated the
+	// Mobile Usability report and its URL Inspection field in December 2023, so
+	// the API now usually returns no verdict at all. Trust MobileUsable ONLY
+	// when MobileUsabilityChecked is true; otherwise the field is unknown, not a
+	// failure. See docs/TROUBLESHOOTING "False positives".
+	MobileUsable           bool
+	MobileUsabilityChecked bool
+	MobileIssues           []string
 	RichResultsStatus string
 	RichResultsIssues []string
 	RichResultTypes   []string         // e.g., ["Recipe", "FAQ", "Breadcrumb"]
@@ -189,13 +195,21 @@ func transformInspectionResponse(response *searchconsole.InspectUrlIndexResponse
 		detectPageFetchIssues(indexStatus.PageFetchState, &result.IndexingIssues)
 	}
 
-	// Mobile usability
-	if inspectionResult.MobileUsabilityResult != nil {
-		mobileResult := inspectionResult.MobileUsabilityResult
-		result.MobileUsable = mobileResult.Verdict == "PASS"
+	// Mobile usability.
+	//
+	// Google deprecated the Mobile Usability report and the URL Inspection API's
+	// mobileUsability field in December 2023. The API now typically returns no
+	// MobileUsabilityResult (or one with an unspecified verdict) for every URL,
+	// which previously surfaced as a false "Not mobile usable" on every page.
+	// Only treat the verdict as authoritative when a concrete PASS/FAIL/PARTIAL
+	// is present, and only then emit mobile issues. Otherwise the result is
+	// "unknown" (MobileUsabilityChecked stays false), not a failure.
+	if mobileResult := inspectionResult.MobileUsabilityResult; mobileResult != nil {
+		switch mobileResult.Verdict {
+		case "PASS", "FAIL", "PARTIAL":
+			result.MobileUsabilityChecked = true
+			result.MobileUsable = mobileResult.Verdict == "PASS"
 
-		// Extract mobile issues
-		if mobileResult.Issues != nil {
 			for _, issue := range mobileResult.Issues {
 				result.MobileIssues = append(result.MobileIssues, issue.IssueType)
 				result.IndexingIssues = append(result.IndexingIssues, IndexingIssue{

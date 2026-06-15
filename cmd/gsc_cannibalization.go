@@ -48,6 +48,7 @@ var (
 	gscCannibalizationDays              int
 	gscCannibalizationWithCoverageState bool
 	gscCannibalizationOnlyActionable    bool
+	gscCannibalizationIncludeCrossLang  bool
 )
 
 var gscCannibalizationCmd = &cobra.Command{
@@ -85,6 +86,13 @@ set after coverage-state annotation. Useful for cron wrappers that want
 "silent on all-green" semantics when every finding is an in-flight
 migration. Implies --with-coverage-state.
 
+Language-aware: on multilingual sites a language-neutral query (e.g. "astro 5")
+legitimately ranks the same article in several languages. Those are hreflang
+translations, not cannibalisation, so by default findings whose pages span
+distinct locales with no single locale holding two or more pages are EXCLUDED.
+A query with two same-language pages (plus any translations) is still reported.
+Pass --include-cross-language to show the excluded translation findings.
+
 Exit codes:
   0  no actionable cannibalising queries (after --only-actionable filter)
   2  at least one cannibalising query in the result set
@@ -109,6 +117,7 @@ func init() {
 	gscCannibalizationCmd.Flags().IntVar(&gscCannibalizationDays, "days", cannibalizationDaysDefault, "Lookback window in days (1–485)")
 	gscCannibalizationCmd.Flags().BoolVar(&gscCannibalizationWithCoverageState, "with-coverage-state", false, "Inspect each candidate page via URL Inspection and emit a severity tier per finding")
 	gscCannibalizationCmd.Flags().BoolVar(&gscCannibalizationOnlyActionable, "only-actionable", false, "Drop consolidating findings from the result set (implies --with-coverage-state)")
+	gscCannibalizationCmd.Flags().BoolVar(&gscCannibalizationIncludeCrossLang, "include-cross-language", false, "Include cross-language (hreflang translation) findings, which are excluded by default as false positives")
 }
 
 // cannibalizationClient is the union of GSC capabilities this command can
@@ -146,6 +155,10 @@ type CannibalizationResultRow struct {
 	// Severity is populated only when --with-coverage-state is set;
 	// otherwise the field is omitted from JSON output.
 	Severity string `json:"severity,omitempty"`
+	// CrossLanguage is true when the qualifying pages are hreflang
+	// translations of one another rather than same-language duplicates.
+	// Such findings are excluded by default (see --include-cross-language).
+	CrossLanguage bool `json:"cross_language"`
 }
 
 // CannibalizationOutput is the JSON envelope emitted under --format json.
@@ -153,32 +166,34 @@ type CannibalizationOutput = diagcmd.Envelope[CannibalizationResultRow]
 
 func cannibalizationRunE(_ *cobra.Command, _ []string) error {
 	status := runCannibalizationCommand(cannibalizationParams{
-		ConfigPath:        gscCannibalizationConfig,
-		MinImpressions:    gscCannibalizationMinImpressions,
-		Format:            gscCannibalizationFormat,
-		Days:              gscCannibalizationDays,
-		WithCoverageState: gscCannibalizationWithCoverageState,
-		OnlyActionable:    gscCannibalizationOnlyActionable,
-		Factory:           gscClientFactory,
-		Stdout:            os.Stdout,
-		Stderr:            os.Stderr,
-		Now:               time.Now().UTC(),
+		ConfigPath:           gscCannibalizationConfig,
+		MinImpressions:       gscCannibalizationMinImpressions,
+		Format:               gscCannibalizationFormat,
+		Days:                 gscCannibalizationDays,
+		WithCoverageState:    gscCannibalizationWithCoverageState,
+		OnlyActionable:       gscCannibalizationOnlyActionable,
+		IncludeCrossLanguage: gscCannibalizationIncludeCrossLang,
+		Factory:              gscClientFactory,
+		Stdout:               os.Stdout,
+		Stderr:               os.Stderr,
+		Now:                  time.Now().UTC(),
 	})
 	os.Exit(status)
 	return nil
 }
 
 type cannibalizationParams struct {
-	ConfigPath        string
-	MinImpressions    int64
-	Format            string
-	Days              int
-	WithCoverageState bool
-	OnlyActionable    bool
-	Factory           func() (cannibalizationClient, func(), error)
-	Stdout            io.Writer
-	Stderr            io.Writer
-	Now               time.Time
+	ConfigPath           string
+	MinImpressions       int64
+	Format               string
+	Days                 int
+	WithCoverageState    bool
+	OnlyActionable       bool
+	IncludeCrossLanguage bool
+	Factory              func() (cannibalizationClient, func(), error)
+	Stdout               io.Writer
+	Stderr               io.Writer
+	Now                  time.Time
 }
 
 func runCannibalizationCommand(p cannibalizationParams) int {
@@ -205,7 +220,7 @@ func runCannibalizationCommand(p cannibalizationParams) int {
 	}
 	defer cleanup()
 
-	env, severityCounts, err := buildCannibalizationEnvelope(client, site, p.MinImpressions, p.Days, withCoverageState, p.OnlyActionable, p.Now)
+	env, severityCounts, err := buildCannibalizationEnvelope(client, site, p.MinImpressions, p.Days, withCoverageState, p.OnlyActionable, p.IncludeCrossLanguage, p.Now)
 	if err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
@@ -214,11 +229,18 @@ func runCannibalizationCommand(p cannibalizationParams) int {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}
 
-	// Text-mode summary footer: appended only when coverage-state annotation
-	// happened (otherwise there is no severity to summarise). JSON output is
-	// unchanged — consumers compute their own breakdown from results[].severity.
-	if p.Format == diagcmd.FormatTable && withCoverageState {
-		writeCannibalizationSummary(p.Stdout, len(env.Results), severityCounts, p.OnlyActionable)
+	if p.Format == diagcmd.FormatTable {
+		// Note any hreflang translation findings excluded as false positives,
+		// so their absence is explicit rather than silent.
+		if severityCounts.CrossLanguageExcluded > 0 {
+			_, _ = fmt.Fprintf(p.Stdout, "→ excluded %d cross-language (hreflang) finding(s); pass --include-cross-language to show them.\n", severityCounts.CrossLanguageExcluded)
+		}
+		// Severity footer: appended only when coverage-state annotation
+		// happened (otherwise there is no severity to summarise). JSON output is
+		// unchanged — consumers compute their own breakdown from results[].
+		if withCoverageState {
+			writeCannibalizationSummary(p.Stdout, len(env.Results), severityCounts, p.OnlyActionable)
+		}
 	}
 
 	return diagcmd.ExitCode(nil, len(env.Results) > 0)
@@ -237,13 +259,14 @@ func validateCannibalizationDays(days int) error {
 // actionable, 10 consolidating; --only-actionable dropped 10" even when
 // the filter empties the result set.
 type cannibalizationSeverityCounts struct {
-	Actionable    int
-	Consolidating int
-	HadFilter     bool
-	DroppedByOnly int
+	Actionable            int
+	Consolidating         int
+	HadFilter             bool
+	DroppedByOnly         int
+	CrossLanguageExcluded int
 }
 
-func buildCannibalizationEnvelope(client cannibalizationClient, site string, minImpressions int64, days int, withCoverageState, onlyActionable bool, now time.Time) (CannibalizationOutput, cannibalizationSeverityCounts, error) {
+func buildCannibalizationEnvelope(client cannibalizationClient, site string, minImpressions int64, days int, withCoverageState, onlyActionable, includeCrossLanguage bool, now time.Time) (CannibalizationOutput, cannibalizationSeverityCounts, error) {
 	var counts cannibalizationSeverityCounts
 
 	startDate, endDate := gsc.BuildDateRange(days)
@@ -260,8 +283,18 @@ func buildCannibalizationEnvelope(client cannibalizationClient, site string, min
 	}
 
 	diag := diagnostics.Cannibalisation(report.Rows, minImpressions)
+	// Classify hreflang translation sets so they can be flagged and, by
+	// default, excluded as false positives.
+	diagnostics.MarkCrossLanguage(diag)
 	rows := make([]CannibalizationResultRow, 0, len(diag))
 	for _, r := range diag {
+		// Drop cross-language (translation) findings unless explicitly
+		// requested. Done before coverage-state inspection so excluded
+		// findings cost no URL Inspection quota.
+		if r.CrossLanguage && !includeCrossLanguage {
+			counts.CrossLanguageExcluded++
+			continue
+		}
 		pages := make([]CannibalizationPage, 0, len(r.Pages))
 		for _, p := range r.Pages {
 			pages = append(pages, CannibalizationPage{Page: p.Page, Impressions: p.Impressions})
@@ -271,6 +304,7 @@ func buildCannibalizationEnvelope(client cannibalizationClient, site string, min
 			Pages:              pages,
 			TotalImpressions:   r.TotalImpressions,
 			CanonicalCandidate: r.CanonicalCandidate,
+			CrossLanguage:      r.CrossLanguage,
 		})
 	}
 
@@ -372,14 +406,14 @@ func annotateWithCoverageState(client gsc.InspectAPI, site string, rows []Cannib
 func writeCannibalizationSummary(w io.Writer, shownCount int, counts cannibalizationSeverityCounts, onlyActionable bool) {
 	switch {
 	case counts.HadFilter && counts.Actionable == 0:
-		fmt.Fprintf(w, "→ 0 actionable findings (filtered out %d consolidating). No action required.\n", counts.DroppedByOnly)
+		_, _ = fmt.Fprintf(w, "→ 0 actionable findings (filtered out %d consolidating). No action required.\n", counts.DroppedByOnly)
 	case onlyActionable:
-		fmt.Fprintf(w, "→ %d actionable findings (filtered out %d consolidating).\n", shownCount, counts.DroppedByOnly)
+		_, _ = fmt.Fprintf(w, "→ %d actionable findings (filtered out %d consolidating).\n", shownCount, counts.DroppedByOnly)
 	case counts.Actionable == 0 && counts.Consolidating > 0:
-		fmt.Fprintf(w, "→ %d findings: 0 actionable, %d consolidating. No action required.\n",
+		_, _ = fmt.Fprintf(w, "→ %d findings: 0 actionable, %d consolidating. No action required.\n",
 			shownCount, counts.Consolidating)
 	default:
-		fmt.Fprintf(w, "→ %d findings: %d actionable, %d consolidating.\n",
+		_, _ = fmt.Fprintf(w, "→ %d findings: %d actionable, %d consolidating.\n",
 			shownCount, counts.Actionable, counts.Consolidating)
 	}
 }

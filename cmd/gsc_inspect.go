@@ -189,9 +189,14 @@ func displayInspectionResult(result *gsc.URLInspectionResult, richResultsOnly bo
 
 	// Mobile Usability
 	color.Cyan("Mobile Usability:")
-	if result.MobileUsable {
+	switch {
+	case !result.MobileUsabilityChecked:
+		// Google deprecated the Mobile Usability report/API field (Dec 2023);
+		// no verdict is returned, so this is "unknown", not a failure.
+		color.HiBlack("  – Not reported (Google deprecated this signal in Dec 2023)")
+	case result.MobileUsable:
 		color.Green("  ✓ Mobile Usable")
-	} else {
+	default:
 		color.Red("  ✗ Not Mobile Usable")
 	}
 

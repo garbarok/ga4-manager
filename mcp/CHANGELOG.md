@@ -5,6 +5,17 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-06-15
+
+### Added
+
+- **`seo_audit_batch` tool.** Audit many pages at once from an explicit `urls[]` list and/or a `sitemap` URL (sitemap-index files are followed and expanded). Runs the single-page auditor over each URL with bounded concurrency (same-host requests stay throttled to 1/sec for politeness) and returns per-URL results plus a summary (`audited`, `clean`, `pages_with_errors`, `total_error_issues`, `failed_fetch`). Honours `limit`, `concurrency`, `check_cwv`, `psi_strategy`, `psi_api_key`, `respect_robots`, `as_googlebot` (default `true`).
+
+### Changed
+
+- **`seo_page_audit` reads `PSI_API_KEY` from the environment.** Core Web Vitals now work without passing `psi_api_key` on every call — set `PSI_API_KEY` in the MCP server env (a per-call `psi_api_key` still takes precedence).
+- **TROUBLESHOOTING: documented Mobile Usability and CWV false positives.** `MobileUsable: false` on every URL is an artifact of Google's deprecated Mobile Usability field (sunset Dec 2023), not a defect; `cwv_unavailable`/`psi_unavailable` means CWV were not measured, not that the page failed them.
+
 ## [1.0.0] - 2024-12-27
 
 ### Added

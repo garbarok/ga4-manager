@@ -14,7 +14,7 @@ type SearchAnalyticsQuery struct {
 	StartDate  string                              // Start date (YYYY-MM-DD)
 	EndDate    string                              // End date (YYYY-MM-DD)
 	Dimensions []string                            // Dimensions: query, page, country, device, searchAppearance
-	RowLimit   int                                 // Maximum rows to return (max 25,000)
+	RowLimit   int                                 // Maximum rows to return (paginated in 25,000-row pages)
 	Filters    []*searchconsole.ApiDimensionFilter // Filters to apply
 	DataState  string                              // "all" or "final" (default: final)
 }
@@ -57,6 +57,16 @@ type ReportMetadata struct {
 	FilterCount int       // Number of filters applied
 }
 
+// maxRowsPerPage is the maximum number of rows the GSC Search Analytics API
+// returns in a single request. Larger row limits are satisfied by paginating
+// with StartRow inside QuerySearchAnalytics.
+const maxRowsPerPage = 25000
+
+// maxTotalRows caps how many rows a single QuerySearchAnalytics call will
+// paginate through. It is a safety bound on quota/time, well above the row
+// count of any normal property.
+const maxTotalRows = 100000
+
 // ValidDimensions lists all valid Search Console dimensions
 var ValidDimensions = map[string]bool{
 	"query":            true,
@@ -92,56 +102,76 @@ func (c *Client) QuerySearchAnalytics(query *SearchAnalyticsQuery) (*SearchAnaly
 		return nil, fmt.Errorf("invalid search query: %w", err)
 	}
 
-	// Check daily quota and increment counter atomically before making API call.
-	if err := c.useQuota(); err != nil {
-		return nil, fmt.Errorf("quota check failed: %w", err)
-	}
-
-	// Wait for rate limiter
-	if err := c.waitForRateLimit("QuerySearchAnalytics"); err != nil {
-		return nil, fmt.Errorf("rate limit wait failed: %w", err)
-	}
-
-	// Build the Search Console API request
-	request := &searchconsole.SearchAnalyticsQueryRequest{
-		StartDate:  query.StartDate,
-		EndDate:    query.EndDate,
-		Dimensions: query.Dimensions,
-		RowLimit:   int64(query.RowLimit),
-		DataState:  query.DataState,
-	}
-
-	// Add filters if provided
+	// Build dimension filter groups once; they are reused across pages.
+	var filterGroups []*searchconsole.ApiDimensionFilterGroup
 	if len(query.Filters) > 0 {
-		request.DimensionFilterGroups = []*searchconsole.ApiDimensionFilterGroup{
-			{
-				Filters: query.Filters,
-			},
-		}
+		filterGroups = []*searchconsole.ApiDimensionFilterGroup{{Filters: query.Filters}}
 	}
 
-	// Execute the API call
 	c.logger.Info("querying search analytics",
 		"site_url", query.SiteURL,
 		"date_range", fmt.Sprintf("%s to %s", query.StartDate, query.EndDate),
 	)
 
-	response, err := c.service.Searchanalytics.Query(query.SiteURL, request).Context(c.ctx).Do()
-	if err != nil {
-		c.logger.Error("search analytics query failed",
-			"site_url", query.SiteURL,
-			"error", err,
-		)
-		return nil, fmt.Errorf("search analytics query failed for %s: %w", query.SiteURL, err)
+	// Page through results with StartRow until we have collected RowLimit rows
+	// or the API returns a short (final) page. A single GSC request returns at
+	// most maxRowsPerPage rows, so larger limits require pagination.
+	aggregated := &searchconsole.SearchAnalyticsQueryResponse{}
+	startRow := int64(0)
+	for {
+		remaining := query.RowLimit - len(aggregated.Rows)
+		if remaining <= 0 {
+			break
+		}
+		pageSize := remaining
+		if pageSize > maxRowsPerPage {
+			pageSize = maxRowsPerPage
+		}
+
+		// Each page is a separate API call: account for quota and rate limit per page.
+		if err := c.useQuota(); err != nil {
+			return nil, fmt.Errorf("quota check failed: %w", err)
+		}
+		if err := c.waitForRateLimit("QuerySearchAnalytics"); err != nil {
+			return nil, fmt.Errorf("rate limit wait failed: %w", err)
+		}
+
+		request := &searchconsole.SearchAnalyticsQueryRequest{
+			StartDate:             query.StartDate,
+			EndDate:               query.EndDate,
+			Dimensions:            query.Dimensions,
+			RowLimit:              int64(pageSize),
+			StartRow:              startRow,
+			DataState:             query.DataState,
+			DimensionFilterGroups: filterGroups,
+		}
+
+		response, err := c.service.Searchanalytics.Query(query.SiteURL, request).Context(c.ctx).Do()
+		if err != nil {
+			c.logger.Error("search analytics query failed",
+				"site_url", query.SiteURL,
+				"start_row", startRow,
+				"error", err,
+			)
+			return nil, fmt.Errorf("search analytics query failed for %s: %w", query.SiteURL, err)
+		}
+
+		aggregated.Rows = append(aggregated.Rows, response.Rows...)
+
+		// A short page means there are no more rows to fetch.
+		if len(response.Rows) < pageSize {
+			break
+		}
+		startRow += int64(len(response.Rows))
 	}
 
 	c.logger.Info("search analytics query completed",
 		"site_url", query.SiteURL,
-		"rows_returned", len(response.Rows),
+		"rows_returned", len(aggregated.Rows),
 	)
 
-	// Transform API response to our report format
-	report := c.transformSearchAnalyticsResponse(query, response)
+	// Transform aggregated API rows to our report format
+	report := c.transformSearchAnalyticsResponse(query, aggregated)
 
 	return report, nil
 }
@@ -248,7 +278,8 @@ func ValidateDimensions(dimensions []string) error {
 
 // ValidateAnalyticsParams validates the inputs for a search analytics query:
 // a non-empty site URL, a lookback window of 1-180 days, valid dimensions, and a
-// row limit of 1-25000. It is the canonical entry point for CLI input validation.
+// row limit of 1-maxTotalRows (paginated in maxRowsPerPage chunks). It is the
+// canonical entry point for CLI input validation.
 func ValidateAnalyticsParams(siteURL string, days int, dimensions []string, rowLimit int) error {
 	if siteURL == "" {
 		return fmt.Errorf("site URL is required")
@@ -262,8 +293,8 @@ func ValidateAnalyticsParams(siteURL string, days int, dimensions []string, rowL
 		return err
 	}
 
-	if rowLimit < 1 || rowLimit > 25000 {
-		return fmt.Errorf("row limit must be between 1 and 25,000, got %d", rowLimit)
+	if rowLimit < 1 || rowLimit > maxTotalRows {
+		return fmt.Errorf("row limit must be between 1 and %d, got %d", maxTotalRows, rowLimit)
 	}
 
 	return nil
@@ -339,8 +370,8 @@ func (c *Client) validateSearchQuery(query *SearchAnalyticsQuery) error {
 	if query.RowLimit <= 0 {
 		return fmt.Errorf("row limit must be greater than 0")
 	}
-	if query.RowLimit > 25000 {
-		return fmt.Errorf("row limit cannot exceed 25,000 (GSC API limit), got %d", query.RowLimit)
+	if query.RowLimit > maxTotalRows {
+		return fmt.Errorf("row limit cannot exceed %d, got %d", maxTotalRows, query.RowLimit)
 	}
 
 	// Validate filters (if any)

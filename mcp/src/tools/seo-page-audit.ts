@@ -242,6 +242,10 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   const effectiveUA = as_googlebot ? GOOGLEBOT_UA : input.user_agent
   const warnings: string[] = []
 
+  // Fall back to the PSI_API_KEY env var when no key is passed per-call, so CWV
+  // works without threading the key through every invocation (see CONFIGURATION.md).
+  const effectivePsiKey = psi_api_key ?? process.env.PSI_API_KEY ?? undefined
+
   // Robots check before fetching
   if (respect_robots) {
     const allowed = await robotsIsAllowed(url, effectiveUA)
@@ -342,8 +346,8 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
     }
     if (!cwv) {
       try {
-        const doFetch = () => fetchCwv(finalUrl, psi_strategy, psi_api_key)
-        cwv = psi_api_key ? await doFetch() : await keylessPsiLimiter.schedule(doFetch)
+        const doFetch = () => fetchCwv(finalUrl, psi_strategy, effectivePsiKey)
+        cwv = effectivePsiKey ? await doFetch() : await keylessPsiLimiter.schedule(doFetch)
         psiCache.set(cacheKey, cwv)
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)

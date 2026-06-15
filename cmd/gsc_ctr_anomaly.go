@@ -176,7 +176,7 @@ func runCTRAnomalyCommand(p ctrAnomalyParams) int {
 	// data scarcity rather than a clean run. Stderr-only so JSON
 	// consumers never see it.
 	if len(env.Results) == 0 && pairsCount < ctrAnomalySparsePairsThreshold {
-		fmt.Fprintf(p.Stderr,
+		_, _ = fmt.Fprintf(p.Stderr,
 			"warning: only %d (query, page) pairs cleared --min-clicks-prior=%d — too few to detect anomalies reliably. Try a longer window (e.g. --days 90) or lower --min-clicks-prior.\n",
 			pairsCount, p.MinClicksPrior)
 	}

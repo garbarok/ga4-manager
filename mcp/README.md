@@ -7,7 +7,7 @@ A Model Context Protocol (MCP) server that exposes GA4 Manager CLI commands as 1
 [![Tests](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
 [![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.25-purple)]()
-[![Tools](https://img.shields.io/badge/MCP%20Tools-16-orange)]()
+[![Tools](https://img.shields.io/badge/MCP%20Tools-17-orange)]()
 
 ---
 
@@ -129,7 +129,7 @@ claude mcp list
 
 ---
 
-## Available Tools (16)
+## Available Tools (17)
 
 ### Tool Categories
 
@@ -150,10 +150,11 @@ claude mcp list
 - `gsc_monitor_urls` - Batch URL monitoring
 - `gsc_index_coverage` - Index coverage report
 
-**Diagnostics & SEO (3 tools)** - Traffic analysis and page auditing
+**Diagnostics & SEO (4 tools)** - Traffic analysis and page auditing
 - `gsc_traffic_compare` - Diff GSC traffic between two date ranges per URL
 - `ga4_consent_health` - Consent banner grant/deny rates and health score
 - `seo_page_audit` - On-page SEO audit with optional Core Web Vitals
+- `seo_audit_batch` - Batch on-page SEO audit over a sitemap or URL list
 
 ### Tool Operation Types
 

@@ -130,6 +130,11 @@ import {
   seoPageAuditInputSchema,
   runSeoPageAudit,
 } from './tools/seo-page-audit.js'
+import {
+  seoAuditBatchTool,
+  seoAuditBatchInputSchema,
+  runSeoAuditBatch,
+} from './tools/seo-audit-batch.js'
 
 /**
  * GA4 Manager MCP Server
@@ -383,6 +388,14 @@ const SPECS: ToolSpec[] = [
     schema: seoPageAuditInputSchema,
     run: async (input) => {
       const output = await runSeoPageAudit(input)
+      return { output, isError: !output.success }
+    },
+  }),
+  native({
+    tool: seoAuditBatchTool,
+    schema: seoAuditBatchInputSchema,
+    run: async (input) => {
+      const output = await runSeoAuditBatch(input)
       return { output, isError: !output.success }
     },
   }),
