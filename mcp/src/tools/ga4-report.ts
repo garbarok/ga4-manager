@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 /**
  * Input schema for ga4_report tool
@@ -521,3 +522,11 @@ export const ga4ReportTool = {
     readOnlyHint: true,
   },
 };
+
+export const ga4ReportSpec = cli({
+  tool: ga4ReportTool,
+  schema: ga4ReportInputSchema,
+  command: 'report',
+  buildArgs: buildReportArgs,
+  parse: (out) => parseReportOutput(out),
+});

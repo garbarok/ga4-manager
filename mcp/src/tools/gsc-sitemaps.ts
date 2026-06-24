@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 // ============================================================================
 // GSC Sitemaps List Tool
@@ -520,3 +521,35 @@ export const gscSitemapsTools = [
   gscSitemapsDeleteTool,
   gscSitemapsGetTool,
 ] as const;
+
+export const gscSitemapsListSpec = cli({
+  tool: gscSitemapsListTool,
+  schema: gscSitemapsListInputSchema,
+  command: 'gsc',
+  buildArgs: buildSitemapsListArgs,
+  parse: (out) => parseSitemapsListOutput(out),
+});
+
+export const gscSitemapsSubmitSpec = cli({
+  tool: gscSitemapsSubmitTool,
+  schema: gscSitemapsSubmitInputSchema,
+  command: 'gsc',
+  buildArgs: buildSitemapsSubmitArgs,
+  parse: (out) => parseSitemapsSubmitOutput(out),
+});
+
+export const gscSitemapsDeleteSpec = cli({
+  tool: gscSitemapsDeleteTool,
+  schema: gscSitemapsDeleteInputSchema,
+  command: 'gsc',
+  buildArgs: buildSitemapsDeleteArgs,
+  parse: (out) => parseSitemapsDeleteOutput(out),
+});
+
+export const gscSitemapsGetSpec = cli({
+  tool: gscSitemapsGetTool,
+  schema: gscSitemapsGetInputSchema,
+  command: 'gsc',
+  buildArgs: buildSitemapsGetArgs,
+  parse: (out) => parseSitemapsGetOutput(out),
+});

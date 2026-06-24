@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cli } from '../tool-spec.js'
 
 // ============================================================================
 // Input Schema
@@ -175,3 +176,11 @@ export const gscCannibalizationTool = {
     readOnlyHint: true,
   },
 } as const
+
+export const gscCannibalizationSpec = cli({
+  tool: gscCannibalizationTool,
+  schema: gscCannibalizationInputSchema,
+  command: 'gsc',
+  buildArgs: buildCannibalizationArgs,
+  parse: (out) => parseCannibalizationOutput(out),
+})

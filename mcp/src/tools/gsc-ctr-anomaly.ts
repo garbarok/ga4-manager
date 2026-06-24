@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cli } from '../tool-spec.js'
 
 // ============================================================================
 // Input Schema
@@ -146,3 +147,11 @@ export const gscCTRAnomalyTool = {
   },
   annotations: { title: 'Detect CTR anomalies', readOnlyHint: true },
 } as const
+
+export const gscCTRAnomalySpec = cli({
+  tool: gscCTRAnomalyTool,
+  schema: gscCTRAnomalyInputSchema,
+  command: 'gsc',
+  buildArgs: buildCTRAnomalyArgs,
+  parse: (out) => parseCTRAnomalyOutput(out),
+})

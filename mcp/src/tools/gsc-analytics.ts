@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 // ============================================================================
 // Valid Values for GSC Analytics
@@ -572,3 +573,11 @@ export const gscAnalyticsRunTool = {
 export const gscAnalyticsTools = [
   gscAnalyticsRunTool,
 ] as const;
+
+export const gscAnalyticsRunSpec = cli({
+  tool: gscAnalyticsRunTool,
+  schema: gscAnalyticsRunInputSchema,
+  command: 'gsc',
+  buildArgs: buildAnalyticsRunArgs,
+  parse: (out) => parseAnalyticsRunOutput(out),
+});

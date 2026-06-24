@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 /**
  * Input schema for ga4_cleanup tool
@@ -463,3 +464,11 @@ export const ga4CleanupTool = {
     destructiveHint: true,
   },
 };
+
+export const ga4CleanupSpec = cli({
+  tool: ga4CleanupTool,
+  schema: ga4CleanupInputSchema,
+  command: 'cleanup',
+  buildArgs: buildCleanupArgs,
+  parse: (out, input) => parseCleanupOutput(out, input.dry_run || false),
+});

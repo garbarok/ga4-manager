@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cli } from '../tool-spec.js'
 
 // ============================================================================
 // Input Schema
@@ -149,3 +150,11 @@ export const gscOpportunitiesTool = {
     readOnlyHint: true,
   },
 } as const
+
+export const gscOpportunitiesSpec = cli({
+  tool: gscOpportunitiesTool,
+  schema: gscOpportunitiesInputSchema,
+  command: 'gsc',
+  buildArgs: buildOpportunitiesArgs,
+  parse: (out) => parseOpportunitiesOutput(out),
+})

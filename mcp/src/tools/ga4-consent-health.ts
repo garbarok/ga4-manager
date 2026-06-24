@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { native } from '../tool-spec.js'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
 import {
   ToolError,
@@ -242,3 +243,12 @@ export const ga4ConsentHealthTool = {
     readOnlyHint: true,
   },
 }
+
+export const ga4ConsentHealthSpec = native({
+  tool: ga4ConsentHealthTool,
+  schema: ga4ConsentHealthInputSchema,
+  run: async (input) => {
+    const output = await runGa4ConsentHealth(input)
+    return { output, isError: !output.success }
+  },
+})

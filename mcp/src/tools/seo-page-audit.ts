@@ -1,5 +1,6 @@
 import Bottleneck from 'bottleneck'
 import { z } from 'zod'
+import { native } from '../tool-spec.js'
 import { extractSignals, type HtmlSignals } from './html-signals.js'
 import { runIssueRules, summarizeIssues, type SeoIssue, type IssueSummary } from './issue-rules.js'
 import { fetchWithTrace, type RedirectHop } from '../utils/redirect-trace.js'
@@ -428,3 +429,12 @@ export const seoPageAuditTool = {
   },
   annotations: { title: 'Audit a page for SEO', readOnlyHint: true, openWorldHint: true },
 }
+
+export const seoPageAuditSpec = native({
+  tool: seoPageAuditTool,
+  schema: seoPageAuditInputSchema,
+  run: async (input) => {
+    const output = await runSeoPageAudit(input)
+    return { output, isError: !output.success }
+  },
+})

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cli } from '../tool-spec.js'
 
 // ============================================================================
 // Input Schema
@@ -123,3 +124,11 @@ export const gscHealthTool = {
   },
   annotations: { title: 'Search Console health check', readOnlyHint: true },
 } as const
+
+export const gscHealthSpec = cli({
+  tool: gscHealthTool,
+  schema: gscHealthInputSchema,
+  command: 'gsc',
+  buildArgs: buildHealthArgs,
+  parse: (out) => parseHealthOutput(out),
+})

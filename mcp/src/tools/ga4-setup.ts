@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 /**
  * Input schema for ga4_setup tool
@@ -337,3 +338,11 @@ export const ga4SetupTool = {
     destructiveHint: true,
   },
 };
+
+export const ga4SetupSpec = cli({
+  tool: ga4SetupTool,
+  schema: ga4SetupInputSchema,
+  command: 'setup',
+  buildArgs: buildSetupArgs,
+  parse: (out, input) => parseSetupOutput(out, input.dry_run || false),
+});

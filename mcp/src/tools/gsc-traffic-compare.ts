@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { native } from '../tool-spec.js'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
 import {
   ToolError,
@@ -394,3 +395,12 @@ export const gscTrafficCompareTool = {
   },
   annotations: { title: 'Compare Search Console traffic', readOnlyHint: true },
 }
+
+export const gscTrafficCompareSpec = native({
+  tool: gscTrafficCompareTool,
+  schema: gscTrafficCompareInputSchema,
+  run: async (input) => {
+    const output = await runGscTrafficCompare(input)
+    return { output, isError: !output.success }
+  },
+})

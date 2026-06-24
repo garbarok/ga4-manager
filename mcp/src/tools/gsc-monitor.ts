@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { native, isSuccessExit } from '../tool-spec.js';
+import { mapCLIError } from '../utils/errors.js';
 
 // ============================================================================
 // GSC Monitor URLs Tool
@@ -650,3 +652,29 @@ export const gscMonitorUrlsTool = {
 // ============================================================================
 
 export const gscMonitorTools = [gscMonitorUrlsTool] as const;
+
+// gsc_monitor_urls is dual-mode: an explicit `urls[]` array runs a native
+// per-URL inspection loop; otherwise it delegates to the `ga4 gsc` CLI.
+export const gscMonitorUrlsSpec = native({
+  tool: gscMonitorUrlsTool,
+  schema: gscMonitorUrlsInputSchema,
+  run: async (input, exec) => {
+    if ('urls' in input) {
+      const output = await processUrlArrayMode(input, (site, url) =>
+        exec.execute({
+          command: 'gsc',
+          args: ['inspect', 'url', '--site', site, '--url', url],
+        }),
+      );
+      return { output, isError: !output.success };
+    }
+    const result = await exec.execute({
+      command: 'gsc',
+      args: buildMonitorUrlsArgs(input),
+    });
+    if (!isSuccessExit(result.exitCode)) {
+      return { output: mapCLIError(result, 'gsc_monitor_urls'), isError: true };
+    }
+    return { output: parseMonitorUrlsOutput(result.stdout, input), isError: false };
+  },
+});
