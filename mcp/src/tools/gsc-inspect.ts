@@ -455,6 +455,11 @@ export const gscInspectUrlTool = {
     },
     required: ['site', 'url'],
   },
+  annotations: {
+    title: 'Inspect URL in Search Console',
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
 };
 
 // ============================================================================

@@ -9,7 +9,8 @@ import { z } from 'zod'
 import { CLIExecutor } from './cli/executor.js'
 import { mapCLIError } from './utils/errors.js'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname, join, delimiter } from 'path'
+import { accessSync, constants, readFileSync } from 'fs'
 
 // GA4 tools (CLI-backed)
 import {
@@ -31,10 +32,18 @@ import {
   parseCleanupOutput,
 } from './tools/ga4-cleanup.js'
 import {
-  ga4LinkTool,
-  ga4LinkInputSchema,
-  buildLinkArgs,
-  parseLinkOutput,
+  ga4LinkListTool,
+  ga4LinkCreateTool,
+  ga4LinkRemoveTool,
+  ga4LinkListInputSchema,
+  ga4LinkCreateInputSchema,
+  ga4LinkRemoveInputSchema,
+  buildLinkListArgs,
+  buildLinkCreateArgs,
+  buildLinkRemoveArgs,
+  parseLinkListOutput,
+  parseLinkCreateOutput,
+  parseLinkRemoveOutput,
 } from './tools/ga4-link.js'
 import {
   ga4ValidateTool,
@@ -151,9 +160,63 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-// Binary path from environment or default (relative to dist/)
-const binaryPath = process.env.GA4_BINARY_PATH || join(__dirname, '../../ga4')
+/**
+ * Resolve the ga4 CLI binary, in priority order:
+ *   1. GA4_BINARY_PATH — explicit override (used verbatim, even if missing,
+ *      so an intentional misconfiguration still surfaces a clear error).
+ *   2. The repo-root build next to mcp/ (../../ga4) — the dev default.
+ *   3. A `ga4` on the user's PATH (e.g. a globally installed binary).
+ *
+ * Without (3), installing the CLI globally but not symlinking it into the
+ * repo root crashed the server on startup. Falling back to PATH removes
+ * the need for that manual symlink. If nothing is found, we return the
+ * repo-root default so CLIExecutor emits the helpful "build it first" hint.
+ */
+function resolveBinaryPath(): string {
+  if (process.env.GA4_BINARY_PATH) return process.env.GA4_BINARY_PATH
+
+  const repoRootBinary = join(__dirname, '../../ga4')
+  if (isExecutable(repoRootBinary)) return repoRootBinary
+
+  const onPath = findOnPath('ga4')
+  if (onPath) return onPath
+
+  return repoRootBinary
+}
+
+function isExecutable(path: string): boolean {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function findOnPath(name: string): string | null {
+  const pathEnv = process.env.PATH
+  if (!pathEnv) return null
+  for (const dir of pathEnv.split(delimiter)) {
+    if (!dir) continue
+    const candidate = join(dir, name)
+    if (isExecutable(candidate)) return candidate
+  }
+  return null
+}
+
+const binaryPath = resolveBinaryPath()
 const executor = new CLIExecutor(binaryPath)
+
+// Single source of truth for the server version: package.json (dist/ -> ../package.json).
+function readServerVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'))
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+const serverVersion = readServerVersion()
 
 // Framework convention (see CONTEXT.md, docs/BACKLOG.md "Implementation notes"):
 //   exit 0 — clean run, no findings
@@ -170,11 +233,21 @@ const isSuccessExit = (code: number): boolean => SUCCESS_EXIT_CODES.has(code)
 // Tool registry
 // ============================================================================
 
+/** Standard MCP tool annotations (title + behavior hints). */
+interface ToolAnnotations {
+  title: string
+  readOnlyHint?: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+  openWorldHint?: boolean
+}
+
 /** The shape every tool module exports as its MCP definition. */
 interface ToolDef {
   name: string
   description: string
   inputSchema: Record<string, unknown>
+  annotations?: ToolAnnotations
 }
 
 /**
@@ -248,11 +321,25 @@ const SPECS: ToolSpec[] = [
     parse: (out, input) => parseCleanupOutput(out, input.dry_run || false),
   }),
   cli({
-    tool: ga4LinkTool,
-    schema: ga4LinkInputSchema,
+    tool: ga4LinkListTool,
+    schema: ga4LinkListInputSchema,
     command: 'link',
-    buildArgs: buildLinkArgs,
-    parse: (out, input) => parseLinkOutput(out, input),
+    buildArgs: buildLinkListArgs,
+    parse: (out) => parseLinkListOutput(out),
+  }),
+  cli({
+    tool: ga4LinkCreateTool,
+    schema: ga4LinkCreateInputSchema,
+    command: 'link',
+    buildArgs: buildLinkCreateArgs,
+    parse: (out, input) => parseLinkCreateOutput(out, input.service),
+  }),
+  cli({
+    tool: ga4LinkRemoveTool,
+    schema: ga4LinkRemoveInputSchema,
+    command: 'link',
+    buildArgs: buildLinkRemoveArgs,
+    parse: (out, input) => parseLinkRemoveOutput(out, input.service),
   }),
   cli({
     tool: ga4ValidateTool,
@@ -420,7 +507,7 @@ function jsonContent(payload: unknown, isError = false) {
 // ============================================================================
 
 const server = new Server(
-  { name: 'ga4-manager', version: '1.0.0' },
+  { name: 'ga4-manager', version: serverVersion },
   { capabilities: { tools: {} } },
 )
 

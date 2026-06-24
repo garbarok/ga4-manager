@@ -5,6 +5,21 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING: `ga4_link` is split into `ga4_link_list`, `ga4_link_create`, and `ga4_link_remove`.** A single tool may not mix safe (read) and unsafe (write/delete) operations under the Claude connector directory review rules. The old `list` / `unlink` flags are gone: list links with `ga4_link_list`, create with `ga4_link_create` (`service` now required), and unlink with `ga4_link_remove` (`service` is `bigquery` | `channels`). All three call the same `ga4 link` CLI command — no Go CLI change.
+- **All tools now declare MCP `annotations`** (`title` plus `readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`). These drive auto-permission behavior and are required for directory submission.
+- **`seo_page_audit` / `seo_audit_batch` descriptions** now state they fetch user-supplied URLs over HTTP.
+
+### Fixed
+
+- **MCP server resolves the `ga4` binary from `PATH`** when neither `GA4_BINARY_PATH` nor the repo-root `ga4` is present. A globally installed `ga4` now works without a repo-root symlink. Resolution order: `GA4_BINARY_PATH` → repo-root `../../ga4` → `ga4` on `PATH`.
+- **`serverInfo.version`** is now read from `package.json` instead of a hard-coded `1.0.0`.
+- **Test suite no longer double-runs** the compiled `dist/**/*.test.js` copies (vitest now excludes `dist/`).
+- **`gsc_sitemaps_list` parser tests** updated to the real CLI table format. The fixtures used a pipe-delimited table the CLI never emits (it renders space-padded `tabwriter` output); the parser was correct, the fixtures were stale.
+
 ## [2.4.0] - 2026-06-15
 
 ### Added

@@ -126,7 +126,7 @@ Repeat for every Search Console property you want to query.
 
 ## Google Analytics 4 (GA4)
 
-**Affects tools:** `ga4_report`, `ga4_setup`, `ga4_cleanup`, `ga4_validate`, `ga4_link`, `ga4_consent_health`
+**Affects tools:** `ga4_report`, `ga4_setup`, `ga4_cleanup`, `ga4_validate`, `ga4_link_list`, `ga4_link_create`, `ga4_link_remove`, `ga4_consent_health`
 
 ### Steps
 

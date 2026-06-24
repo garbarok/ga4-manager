@@ -144,4 +144,5 @@ export const gscCTRAnomalyTool = {
       },
     },
   },
+  annotations: { title: 'Detect CTR anomalies', readOnlyHint: true },
 } as const

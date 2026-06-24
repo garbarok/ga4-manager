@@ -29,6 +29,7 @@ export class CLIExecutor {
         `ga4 CLI binary not found or not executable at ${this.binaryPath} (${reason}).\n` +
           `Build it first: 'make build' or 'go build -o ga4 .' from the repo root.\n` +
           `Override the path with the GA4_BINARY_PATH environment variable.`,
+        { cause: err },
       );
     }
   }

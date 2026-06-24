@@ -144,4 +144,8 @@ export const gscOpportunitiesTool = {
       },
     },
   },
+  annotations: {
+    title: 'Find SEO opportunities',
+    readOnlyHint: true,
+  },
 } as const

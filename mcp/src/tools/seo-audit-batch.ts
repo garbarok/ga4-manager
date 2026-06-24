@@ -255,7 +255,7 @@ export const seoAuditBatchTool = {
   description:
     'Audit many pages at once for SEO problems (missing title/description, bad canonical, noindex, redirect issues, HTTP errors). ' +
     'Provide an explicit urls[] list and/or a sitemap URL (sitemap-index files are followed and expanded). ' +
-    'Runs the single-page auditor over each URL with bounded concurrency and returns per-URL results plus a summary. ' +
+    'Runs the single-page auditor over each URL with bounded concurrency, fetching each supplied URL over HTTP, and returns per-URL results plus a summary. ' +
     'Optionally fetches Core Web Vitals via PageSpeed Insights (needs a PSI key; set PSI_API_KEY or pass psi_api_key).',
   inputSchema: {
     type: 'object',
@@ -305,4 +305,5 @@ export const seoAuditBatchTool = {
       },
     },
   },
+  annotations: { title: 'Batch SEO page audit', readOnlyHint: true, openWorldHint: true },
 }

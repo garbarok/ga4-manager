@@ -516,4 +516,8 @@ export const ga4ReportTool = {
     // Note: Zod schema handles mutual exclusivity validation
     // MCP doesn't support oneOf at top level
   },
+  annotations: {
+    title: 'Run GA4 report',
+    readOnlyHint: true,
+  },
 };

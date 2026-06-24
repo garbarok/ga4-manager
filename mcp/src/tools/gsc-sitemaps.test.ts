@@ -67,15 +67,15 @@ describe('gsc_sitemaps_list tool', () => {
 
   describe('parseSitemapsListOutput', () => {
     it('parses successful output with multiple sitemaps', () => {
+      // The CLI renders this table with tabwriter (2-space-padded columns),
+      // not pipe-delimited markdown. Columns: URL, URLs, Errors, Warnings,
+      // Last Submitted, Status.
       const output = `
 Listing sitemaps for sc-domain:example.com
-+--------------------------------------+------+--------+----------+------------------+--------+
-|             SITEMAP URL              | URLS | ERRORS | WARNINGS |  LAST SUBMITTED  | STATUS |
-+--------------------------------------+------+--------+----------+------------------+--------+
-| https://example.com/sitemap.xml      |  150 |      0 |        0 | 2024-01-15 10:30 | OK     |
-| https://example.com/sitemap-blog.xml |   45 |      0 |        2 | 2024-01-14 08:00 | Warnings: 2 |
-| https://example.com/sitemap-news.xml |   30 |      1 |        0 | 2024-01-13 12:15 | Errors: 1   |
-+--------------------------------------+------+--------+----------+------------------+--------+
+Sitemap URL                            URLs  Errors  Warnings  Last Submitted    Status
+https://example.com/sitemap.xml        150   0       0         2024-01-15 10:30  OK
+https://example.com/sitemap-blog.xml   45    0       2         2024-01-14 08:00  Warnings: 2
+https://example.com/sitemap-news.xml   30    1       0         2024-01-13 12:15  Errors: 1
 
 Found 3 sitemap(s)
 `;
@@ -111,11 +111,8 @@ No sitemaps found for this site
     it('parses output with sitemap index', () => {
       const output = `
 Listing sitemaps for sc-domain:example.com
-+----------------------------------------+------+--------+----------+------------------+--------+
-|              SITEMAP URL               | URLS | ERRORS | WARNINGS |  LAST SUBMITTED  | STATUS |
-+----------------------------------------+------+--------+----------+------------------+--------+
-| https://example.com/sitemap.xml (Index) |  500 |      0 |        0 | 2024-01-15 10:30 | OK     |
-+----------------------------------------+------+--------+----------+------------------+--------+
+Sitemap URL                               URLs  Errors  Warnings  Last Submitted    Status
+https://example.com/sitemap.xml (Index)   500   0       0         2024-01-15 10:30  OK
 
 Found 1 sitemap(s)
 `;
@@ -130,11 +127,8 @@ Found 1 sitemap(s)
     it('parses output with pending status', () => {
       const output = `
 Listing sitemaps for sc-domain:example.com
-+----------------------------------------+------+--------+----------+------------------+---------+
-|              SITEMAP URL               | URLS | ERRORS | WARNINGS |  LAST SUBMITTED  | STATUS  |
-+----------------------------------------+------+--------+----------+------------------+---------+
-| https://example.com/sitemap.xml        |    0 |      0 |        0 | 2024-01-15 10:30 | Pending |
-+----------------------------------------+------+--------+----------+------------------+---------+
+Sitemap URL                       URLs  Errors  Warnings  Last Submitted    Status
+https://example.com/sitemap.xml   0     0       0         2024-01-15 10:30  Pending
 
 Found 1 sitemap(s)
 `;

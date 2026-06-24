@@ -431,6 +431,10 @@ export const gscIndexCoverageTool = {
       },
     },
   },
+  annotations: {
+    title: 'Search Console index coverage',
+    readOnlyHint: true,
+  },
 };
 
 // ============================================================================

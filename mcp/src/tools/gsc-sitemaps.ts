@@ -132,6 +132,10 @@ export const gscSitemapsListTool = {
     },
     required: ['site'],
   },
+  annotations: {
+    title: 'List sitemaps',
+    readOnlyHint: true,
+  },
 };
 
 // ============================================================================
@@ -224,6 +228,12 @@ export const gscSitemapsSubmitTool = {
     },
     required: ['site', 'url'],
   },
+  annotations: {
+    title: 'Submit a sitemap',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+  },
 };
 
 // ============================================================================
@@ -315,6 +325,12 @@ export const gscSitemapsDeleteTool = {
       },
     },
     required: ['site', 'url'],
+  },
+  annotations: {
+    title: 'Delete a sitemap',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
   },
 };
 
@@ -487,6 +503,10 @@ export const gscSitemapsGetTool = {
       },
     },
     required: ['site', 'url'],
+  },
+  annotations: {
+    title: 'Get sitemap details',
+    readOnlyHint: true,
   },
 };
 
