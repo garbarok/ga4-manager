@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 // ============================================================================
 // GSC URL Inspect Tool
@@ -467,3 +468,11 @@ export const gscInspectUrlTool = {
 // ============================================================================
 
 export const gscInspectTools = [gscInspectUrlTool] as const;
+
+export const gscInspectUrlSpec = cli({
+  tool: gscInspectUrlTool,
+  schema: gscInspectUrlInputSchema,
+  command: 'gsc',
+  buildArgs: buildInspectUrlArgs,
+  parse: (out) => parseInspectUrlOutput(out),
+});

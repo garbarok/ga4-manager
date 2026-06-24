@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 /**
  * Input schema for ga4_validate tool
@@ -424,3 +425,11 @@ export const ga4ValidateTool = {
     readOnlyHint: true,
   },
 };
+
+export const ga4ValidateSpec = cli({
+  tool: ga4ValidateTool,
+  schema: ga4ValidateInputSchema,
+  command: 'validate',
+  buildArgs: buildValidateArgs,
+  parse: (out, input) => parseValidateOutput(out, input.verbose || false),
+});

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 /**
  * ga4_link is split into three operation-specific tools so that a single
@@ -486,3 +487,27 @@ export const ga4LinkRemoveTool = {
     idempotentHint: true,
   },
 };
+
+export const ga4LinkListSpec = cli({
+  tool: ga4LinkListTool,
+  schema: ga4LinkListInputSchema,
+  command: 'link',
+  buildArgs: buildLinkListArgs,
+  parse: (out) => parseLinkListOutput(out),
+});
+
+export const ga4LinkCreateSpec = cli({
+  tool: ga4LinkCreateTool,
+  schema: ga4LinkCreateInputSchema,
+  command: 'link',
+  buildArgs: buildLinkCreateArgs,
+  parse: (out, input) => parseLinkCreateOutput(out, input.service),
+});
+
+export const ga4LinkRemoveSpec = cli({
+  tool: ga4LinkRemoveTool,
+  schema: ga4LinkRemoveInputSchema,
+  command: 'link',
+  buildArgs: buildLinkRemoveArgs,
+  parse: (out, input) => parseLinkRemoveOutput(out, input.service),
+});

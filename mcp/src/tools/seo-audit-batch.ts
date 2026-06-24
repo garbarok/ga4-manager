@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { native } from '../tool-spec.js'
 import {
   runSeoPageAudit,
   seoPageAuditInputSchema,
@@ -307,3 +308,12 @@ export const seoAuditBatchTool = {
   },
   annotations: { title: 'Batch SEO page audit', readOnlyHint: true, openWorldHint: true },
 }
+
+export const seoAuditBatchSpec = native({
+  tool: seoAuditBatchTool,
+  schema: seoAuditBatchInputSchema,
+  run: async (input) => {
+    const output = await runSeoAuditBatch(input)
+    return { output, isError: !output.success }
+  },
+})

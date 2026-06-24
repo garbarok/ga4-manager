@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cli } from '../tool-spec.js';
 
 // ============================================================================
 // Valid Values for GSC Coverage
@@ -444,3 +445,11 @@ export const gscIndexCoverageTool = {
 export const gscCoverageTools = [
   gscIndexCoverageTool,
 ] as const;
+
+export const gscIndexCoverageSpec = cli({
+  tool: gscIndexCoverageTool,
+  schema: gscIndexCoverageInputSchema,
+  command: 'gsc',
+  buildArgs: buildIndexCoverageArgs,
+  parse: (out) => parseIndexCoverageOutput(out),
+});
