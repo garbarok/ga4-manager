@@ -245,7 +245,9 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
 
   // Fall back to the PSI_API_KEY env var when no key is passed per-call, so CWV
   // works without threading the key through every invocation (see CONFIGURATION.md).
-  const effectivePsiKey = psi_api_key ?? process.env.PSI_API_KEY ?? undefined
+  // `|| undefined` (not `??`): the MCPB manifest always sets PSI_API_KEY in the
+  // server env, so an unconfigured key arrives as "" rather than unset.
+  const effectivePsiKey = psi_api_key ?? (process.env.PSI_API_KEY || undefined)
 
   // Robots check before fetching
   if (respect_robots) {

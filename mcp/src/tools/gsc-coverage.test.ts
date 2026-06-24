@@ -5,7 +5,6 @@ import {
   buildIndexCoverageArgs,
   parseIndexCoverageOutput,
   VALID_STATES,
-  VALID_FORMATS,
   GscIndexCoverageInput,
 } from './gsc-coverage.js';
 
@@ -33,7 +32,6 @@ describe('gsc_index_coverage input schema', () => {
         days: 7,
         state: 'indexed' as const,
         top_issues: 5,
-        format: 'csv' as const,
         dry_run: true,
       };
       const result = gscIndexCoverageInputSchema.safeParse(input);
@@ -52,7 +50,6 @@ describe('gsc_index_coverage input schema', () => {
       const input = {
         config: 'configs/mysite.yaml',
         days: 14,
-        format: 'markdown' as const,
       };
       const result = gscIndexCoverageInputSchema.safeParse(input);
       expect(result.success).toBe(true);
@@ -67,7 +64,7 @@ describe('gsc_index_coverage input schema', () => {
     });
 
     it('rejects input with only optional parameters', () => {
-      const input = { days: 30, format: 'json' };
+      const input = { days: 30 };
       const result = gscIndexCoverageInputSchema.safeParse(input);
       expect(result.success).toBe(false);
     });
@@ -144,20 +141,6 @@ describe('gsc_index_coverage input schema', () => {
       expect(result.success).toBe(false);
     });
   });
-
-  describe('format parameter validation', () => {
-    it.each(VALID_FORMATS)('accepts valid format: %s', (format) => {
-      const input = { site: 'sc-domain:example.com', format };
-      const result = gscIndexCoverageInputSchema.safeParse(input);
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects invalid format', () => {
-      const input = { site: 'sc-domain:example.com', format: 'xml' };
-      const result = gscIndexCoverageInputSchema.safeParse(input);
-      expect(result.success).toBe(false);
-    });
-  });
 });
 
 // ============================================================================
@@ -167,12 +150,12 @@ describe('gsc_index_coverage input schema', () => {
 describe('buildIndexCoverageArgs', () => {
   it('builds args with site only', () => {
     const args = buildIndexCoverageArgs({ site: 'sc-domain:example.com' } as GscIndexCoverageInput);
-    expect(args).toEqual(['coverage', '--site', 'sc-domain:example.com']);
+    expect(args).toEqual(['coverage', '--site', 'sc-domain:example.com', '--format', 'json']);
   });
 
   it('builds args with config only', () => {
     const args = buildIndexCoverageArgs({ config: 'configs/mysite.yaml' } as GscIndexCoverageInput);
-    expect(args).toEqual(['coverage', '--config', 'configs/mysite.yaml']);
+    expect(args).toEqual(['coverage', '--config', 'configs/mysite.yaml', '--format', 'json']);
   });
 
   it('builds args with custom days', () => {
@@ -208,15 +191,13 @@ describe('buildIndexCoverageArgs', () => {
     expect(args).not.toContain('--top-issues');
   });
 
-  it('builds args with custom format', () => {
-    const args = buildIndexCoverageArgs({ site: 'sc-domain:example.com', format: 'csv' } as GscIndexCoverageInput);
+  // The CLI is ALWAYS asked for JSON: only the JSON path carries the per-page
+  // pages_sample array (the CLI default, `table`, drops it). There is no
+  // user-facing output-format knob.
+  it('always requests JSON from the CLI', () => {
+    const args = buildIndexCoverageArgs({ site: 'sc-domain:example.com' } as GscIndexCoverageInput);
     expect(args).toContain('--format');
-    expect(args).toContain('csv');
-  });
-
-  it('omits default format (json)', () => {
-    const args = buildIndexCoverageArgs({ site: 'sc-domain:example.com', format: 'json' } as GscIndexCoverageInput);
-    expect(args).not.toContain('--format');
+    expect(args[args.indexOf('--format') + 1]).toBe('json');
   });
 
   it('builds args with dry-run flag', () => {
@@ -235,7 +216,6 @@ describe('buildIndexCoverageArgs', () => {
       days: 14,
       state: 'low_impressions',
       top_issues: 5,
-      format: 'markdown',
       dry_run: true,
     };
     const args = buildIndexCoverageArgs(input);
@@ -553,7 +533,6 @@ describe('gscIndexCoverageTool definition', () => {
     expect(props.days).toBeDefined();
     expect(props.state).toBeDefined();
     expect(props.top_issues).toBeDefined();
-    expect(props.format).toBeDefined();
     expect(props.dry_run).toBeDefined();
   });
 });

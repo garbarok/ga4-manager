@@ -5,6 +5,22 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-06-24
+
+### Added
+
+- **MCPB bundle packaging.** `npm run pack:mcpb` builds a self-contained `.mcpb` (compiled server + production `node_modules` staged via `pnpm deploy`, plus a prebuilt per-platform `ga4` binary) that installs in Claude Desktop without Node or Go. Credentials are supplied per-install through `manifest.json` `user_config` — no secrets are baked into the bundle. Pass a target to cross-compile, e.g. `npm run pack:mcpb linux/amd64`.
+
+### Fixed
+
+- **`gsc_analytics_run` and `gsc_index_coverage` now return their per-row arrays.** Both omitted `--format json` when calling the CLI (whose default format is `table`), so the table parser ran and silently dropped `rows[]` / `pages_sample[]`, leaving only aggregates regardless of the requested format. They now always request JSON, and JSON detection tolerates the CLI's status-line preamble.
+- **`seo_page_audit` treats an empty `PSI_API_KEY` as unset.** The MCPB manifest always sets the env var, so an unconfigured key arrived as `""`; it no longer disables Core Web Vitals.
+- **Test suite excludes `build/` and `dist-mcpb/`** so the staged bundle's vendored `*.test.ts` files (e.g. zod's) are not picked up.
+
+### Changed
+
+- **Removed the no-op `format` parameter** from `gsc_analytics_run` and `gsc_index_coverage`. These MCP tools always return structured JSON; the parameter never changed the result. Unknown keys are ignored, so callers still passing `format` are unaffected.
+
 ## [3.0.0] - 2026-06-24
 
 ### Changed

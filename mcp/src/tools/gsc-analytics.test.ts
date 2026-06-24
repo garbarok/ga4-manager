@@ -6,7 +6,6 @@ import {
   parseAnalyticsRunOutput,
   validateDimensions,
   VALID_DIMENSIONS,
-  VALID_FORMATS,
   GscAnalyticsRunInput,
 } from './gsc-analytics.js';
 
@@ -34,7 +33,6 @@ describe('gsc_analytics_run input schema', () => {
         days: 7,
         dimensions: 'query,page,country',
         limit: 500,
-        format: 'csv' as const,
         dry_run: true,
       };
       const result = gscAnalyticsRunInputSchema.safeParse(input);
@@ -53,7 +51,6 @@ describe('gsc_analytics_run input schema', () => {
       const input = {
         config: 'configs/mysite.yaml',
         days: 14,
-        format: 'markdown' as const,
       };
       const result = gscAnalyticsRunInputSchema.safeParse(input);
       expect(result.success).toBe(true);
@@ -68,7 +65,7 @@ describe('gsc_analytics_run input schema', () => {
     });
 
     it('rejects input with only optional parameters', () => {
-      const input = { days: 30, format: 'json' };
+      const input = { days: 30 };
       const result = gscAnalyticsRunInputSchema.safeParse(input);
       expect(result.success).toBe(false);
     });
@@ -131,20 +128,6 @@ describe('gsc_analytics_run input schema', () => {
       expect(result.success).toBe(false);
     });
   });
-
-  describe('format parameter validation', () => {
-    it.each(VALID_FORMATS)('accepts valid format: %s', (format) => {
-      const input = { site: 'sc-domain:example.com', format };
-      const result = gscAnalyticsRunInputSchema.safeParse(input);
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects invalid format', () => {
-      const input = { site: 'sc-domain:example.com', format: 'xml' };
-      const result = gscAnalyticsRunInputSchema.safeParse(input);
-      expect(result.success).toBe(false);
-    });
-  });
 });
 
 // ============================================================================
@@ -202,12 +185,12 @@ describe('validateDimensions', () => {
 describe('buildAnalyticsRunArgs', () => {
   it('builds args with site only', () => {
     const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com' } as GscAnalyticsRunInput);
-    expect(args).toEqual(['analytics', 'run', '--site', 'sc-domain:example.com']);
+    expect(args).toEqual(['analytics', 'run', '--site', 'sc-domain:example.com', '--format', 'json']);
   });
 
   it('builds args with config only', () => {
     const args = buildAnalyticsRunArgs({ config: 'configs/mysite.yaml' } as GscAnalyticsRunInput);
-    expect(args).toEqual(['analytics', 'run', '--config', 'configs/mysite.yaml']);
+    expect(args).toEqual(['analytics', 'run', '--config', 'configs/mysite.yaml', '--format', 'json']);
   });
 
   it('builds args with custom days', () => {
@@ -243,15 +226,13 @@ describe('buildAnalyticsRunArgs', () => {
     expect(args).not.toContain('--limit');
   });
 
-  it('builds args with custom format', () => {
-    const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com', format: 'csv' } as GscAnalyticsRunInput);
+  // The CLI is ALWAYS asked for JSON: it is the only output the MCP can parse
+  // into per-page rows (the CLI default, `table`, drops them). There is no
+  // user-facing output-format knob.
+  it('always requests JSON from the CLI', () => {
+    const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com' } as GscAnalyticsRunInput);
     expect(args).toContain('--format');
-    expect(args).toContain('csv');
-  });
-
-  it('omits default format (json)', () => {
-    const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com', format: 'json' } as GscAnalyticsRunInput);
-    expect(args).not.toContain('--format');
+    expect(args[args.indexOf('--format') + 1]).toBe('json');
   });
 
   it('builds args with dry-run flag', () => {
@@ -270,7 +251,6 @@ describe('buildAnalyticsRunArgs', () => {
       days: 14,
       dimensions: 'query,country',
       limit: 200,
-      format: 'markdown',
       dry_run: true,
     };
     const args = buildAnalyticsRunArgs(input);
@@ -683,7 +663,6 @@ describe('gscAnalyticsRunTool definition', () => {
     expect(props.days).toBeDefined();
     expect(props.dimensions).toBeDefined();
     expect(props.limit).toBeDefined();
-    expect(props.format).toBeDefined();
     expect(props.dry_run).toBeDefined();
   });
 });

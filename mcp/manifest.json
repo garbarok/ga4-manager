@@ -1,0 +1,57 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "ga4-manager-mcp",
+  "display_name": "GA4 Manager",
+  "version": "3.0.0",
+  "description": "Manage GA4 properties and audit Search Console / SEO from Claude.",
+  "long_description": "Exposes the GA4 Manager toolkit as MCP tools: GA4 property setup, reporting, cleanup and data-stream linking (via a bundled `ga4` CLI), Search Console analytics, coverage, cannibalization, CTR-anomaly and URL inspection, plus native SEO page/batch audits and consent-health checks. Runs locally so it can read your Google service-account credentials and talk to the Admin/Search Console APIs on your behalf.",
+  "author": {
+    "name": "Oscar Gallego",
+    "email": "ai@oscargallegoruiz.com"
+  },
+  "homepage": "https://github.com/garbarok/ga4-manager",
+  "documentation": "https://github.com/garbarok/ga4-manager/tree/main/mcp",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/dist/index.js"],
+      "env": {
+        "GA4_BINARY_PATH": "${__dirname}/bin/ga4",
+        "GOOGLE_APPLICATION_CREDENTIALS": "${user_config.credentials}",
+        "GOOGLE_CLOUD_PROJECT": "${user_config.project}",
+        "PSI_API_KEY": "${user_config.psi_api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "credentials": {
+      "type": "file",
+      "title": "Google credentials JSON",
+      "description": "Service-account key file, or an Application Default Credentials file (~/.config/gcloud/application_default_credentials.json).",
+      "required": true
+    },
+    "project": {
+      "type": "string",
+      "title": "Google Cloud project ID",
+      "description": "The GCP project that owns the GA4 / Search Console access.",
+      "required": true
+    },
+    "psi_api_key": {
+      "type": "string",
+      "title": "PageSpeed Insights API key (optional)",
+      "description": "Enables Core Web Vitals in SEO audits. Leave blank to skip CWV.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

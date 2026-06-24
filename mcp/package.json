@@ -1,6 +1,6 @@
 {
   "name": "ga4-manager-mcp",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "MCP server for GA4 Manager - Analytics and Search Console tools",
   "type": "module",
   "main": "dist/index.js",
@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:watch": "vitest watch",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "pack:mcpb": "bash scripts/build-mcpb.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -20,12 +20,6 @@ export const VALID_DIMENSIONS = [
 
 export type ValidDimension = typeof VALID_DIMENSIONS[number];
 
-/**
- * Valid output formats
- */
-export const VALID_FORMATS = ['json', 'csv', 'table', 'markdown'] as const;
-export type ValidFormat = typeof VALID_FORMATS[number];
-
 // ============================================================================
 // GSC Analytics Run Tool
 // ============================================================================
@@ -47,8 +41,6 @@ export const gscAnalyticsRunInputSchema = z.object({
   dimensions: z.string().optional().default('query,page'),
   /** Maximum rows to return (1-25000, default: 100) */
   limit: z.number().int().min(1).max(25000).optional().default(100),
-  /** Output format: json, csv, table, markdown (default: json) */
-  format: z.enum(VALID_FORMATS).optional().default('json'),
   /** Preview query without making API call */
   dry_run: z.boolean().optional(),
 }).refine(
@@ -191,9 +183,13 @@ export function buildAnalyticsRunArgs(input: GscAnalyticsRunInput): string[] {
     args.push('--limit', input.limit.toString());
   }
 
-  if (input.format !== undefined && input.format !== 'json') {
-    args.push('--format', input.format);
-  }
+  // Always request JSON from the CLI. parseJsonOutput is the ONLY parser that
+  // preserves per-page rows; the CLI's own default is `table`
+  // (cmd/gsc_analytics.go), whose output carries no rows once parsed by
+  // parseTableOutput. This MCP tool always returns structured JSON, so there is
+  // no output-format knob — omitting this flag previously dropped every
+  // per-page breakdown.
+  args.push('--format', 'json');
 
   if (input.dry_run) {
     args.push('--dry-run');
@@ -262,8 +258,12 @@ export function parseAnalyticsRunOutput(output: string): AnalyticsRunOutput {
     return parseDryRunOutput(output);
   }
 
-  // Parse JSON output (primary format for MCP)
-  if (output.trim().startsWith('{')) {
+  // Parse JSON output (primary format for MCP). The CLI prepends human-readable
+  // status lines (📊/📅/📈) and slog INFO lines before the JSON payload, so the
+  // output does NOT start with '{'. Detect a JSON object anywhere — routing on
+  // startsWith('{') misfires to parseTableOutput, which can't read JSON and
+  // silently drops rows/aggregates (returns only site/period).
+  if (/\{[\s\S]*\}/.test(output)) {
     return parseJsonOutput(output);
   }
 
@@ -544,12 +544,6 @@ export const gscAnalyticsRunTool = {
         default: 100,
         minimum: 1,
         maximum: 25000,
-      },
-      format: {
-        type: 'string',
-        enum: ['json', 'csv', 'table', 'markdown'],
-        description: 'Output format. Use json for structured data processing. Default: json.',
-        default: 'json',
       },
       dry_run: {
         type: 'boolean',
