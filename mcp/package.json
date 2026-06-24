@@ -18,18 +18,18 @@
     "csv-parse": "^6.2.1",
     "node-html-parser": "^7.1.0",
     "robots-parser": "^3.0.1",
-    "tldts": "^7.4.2",
+    "tldts": "^7.4.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.9.1",
-    "@typescript-eslint/eslint-plugin": "^8.60.0",
-    "@typescript-eslint/parser": "^8.60.0",
-    "eslint": "^10.4.1",
-    "globals": "^17.6.0",
+    "@types/node": "^25.9.4",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
+    "eslint": "^10.5.0",
+    "globals": "^17.7.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }

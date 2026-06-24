@@ -75,33 +75,42 @@ export function parseSitemapsListOutput(output: string): SitemapsListOutput {
     return result;
   }
 
-  // Parse table rows - match URL patterns with optional (Index) suffix
-  // Table format: | URL | URLS | ERRORS | WARNINGS | LAST SUBMITTED | STATUS |
-  const tableRowRegex = /\|\s*(https?:\/\/[^\s|]+(?:\s*\(Index\))?)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/g;
+  // Parse tabwriter space-padded table rows.
+  // The CLI renders with tabwriter (2-space column padding), NOT pipe-delimited.
+  // Splitting each line on 2+ whitespace correctly handles:
+  //   - the "(Index)" URL suffix, which uses a single space inside the URL field
+  //   - the "Last Submitted" date-time "2026-04-30 16:45", which also uses a single space
+  // Column order: URL, URLs, Errors, Warnings, [Last Submitted], Status
+  for (const line of output.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('http')) continue;
 
-  let match;
-  while ((match = tableRowRegex.exec(output)) !== null) {
-    let url = match[1].trim();
+    const parts = trimmed.split(/\s{2,}/);
+    if (parts.length < 5) continue;
+
+    let url = parts[0].trim();
     const isIndex = url.includes('(Index)');
     if (isIndex) {
       url = url.replace(/\s*\(Index\)/, '').trim();
     }
 
-    const status = match[6].trim();
+    // 6 parts → date is present: [url, urls, errors, warnings, date_time, status]
+    // 5 parts → no date:          [url, urls, errors, warnings, status]
+    const hasDate = parts.length >= 6;
+    const lastSubmitted = hasDate ? parts[4].trim() : undefined;
+    const status = (hasDate ? parts[5] : parts[4]).trim();
     const isPending = status.toLowerCase().includes('pending');
 
-    const sitemap: SitemapInfo = {
+    result.sitemaps.push({
       url,
-      urls_count: parseInt(match[2], 10),
-      errors: parseInt(match[3], 10),
-      warnings: parseInt(match[4], 10),
-      last_submitted: match[5].trim(),
+      urls_count: parseInt(parts[1], 10) || 0,
+      errors: parseInt(parts[2], 10) || 0,
+      warnings: parseInt(parts[3], 10) || 0,
+      last_submitted: lastSubmitted,
       status,
       is_index: isIndex || undefined,
       is_pending: isPending || undefined,
-    };
-
-    result.sitemaps.push(sitemap);
+    });
   }
 
   return result;
