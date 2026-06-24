@@ -1,63 +1,58 @@
 import { z } from 'zod';
 
 /**
- * Input schema for ga4_link tool
+ * ga4_link is split into three operation-specific tools so that a single
+ * tool never mixes safe (read) and unsafe (write/delete) operations:
  *
- * Links external services to GA4 properties:
- * - search-console: Generates setup guide for Search Console linking
- * - bigquery: Creates/manages BigQuery export links
- * - channels: Sets up default channel groupings
+ * - ga4_link_list   — read existing links (safe)
+ * - ga4_link_create — create a BigQuery/Channels link or SC guide (write)
+ * - ga4_link_remove — unlink an existing BigQuery/Channels link (destructive)
  *
- * Operations:
- * - Link a service (requires project_name + service)
- * - List existing links (requires project_name + list)
- * - Unlink a service (requires project_name + unlink)
+ * All three dispatch to the same `ga4 link` CLI subcommand with different
+ * flags, so the Go CLI is unchanged.
  */
-export const ga4LinkInputSchema = z.object({
-  /** Config file name (without .yaml) - required for all operations */
-  project_name: z.string(),
-  /** Service to link */
-  service: z.enum(['search-console', 'bigquery', 'channels']).optional(),
-  /** Site URL for Search Console linking */
-  url: z.string().optional(),
-  /** GCP Project ID for BigQuery linking */
-  gcp_project: z.string().optional(),
-  /** BigQuery dataset ID */
-  dataset: z.string().optional(),
-  /** List existing links */
-  list: z.boolean().optional(),
-  /** Service to unlink */
-  unlink: z.enum(['bigquery', 'channels']).optional(),
-}).refine(
-  (data) => data.service || data.list || data.unlink,
-  {
-    error: 'At least one of service, list, or unlink must be provided',
-  }
-).refine(
-  (data) => {
-    // If service is search-console, url is required
-    if (data.service === 'search-console' && !data.url) {
-      return false;
-    }
-    return true;
-  },
-  {
-    error: 'url is required when service is search-console',
-  }
-).refine(
-  (data) => {
-    // If service is bigquery, gcp_project and dataset are required
-    if (data.service === 'bigquery' && (!data.gcp_project || !data.dataset)) {
-      return false;
-    }
-    return true;
-  },
-  {
-    error: 'gcp_project and dataset are required when service is bigquery',
-  }
-);
 
-export type GA4LinkInput = z.infer<typeof ga4LinkInputSchema>;
+// ── Input schemas ────────────────────────────────────────────────────────────
+
+/** List existing links for all services. */
+export const ga4LinkListInputSchema = z.object({
+  /** Config file name (without .yaml) */
+  project_name: z.string(),
+});
+export type GA4LinkListInput = z.infer<typeof ga4LinkListInputSchema>;
+
+/** Create/manage a link for one service. */
+export const ga4LinkCreateInputSchema = z
+  .object({
+    /** Config file name (without .yaml) */
+    project_name: z.string(),
+    /** Service to link */
+    service: z.enum(['search-console', 'bigquery', 'channels']),
+    /** Site URL for Search Console linking */
+    url: z.string().optional(),
+    /** GCP Project ID for BigQuery linking */
+    gcp_project: z.string().optional(),
+    /** BigQuery dataset ID */
+    dataset: z.string().optional(),
+  })
+  .refine((data) => data.service !== 'search-console' || !!data.url, {
+    error: 'url is required when service is search-console',
+  })
+  .refine((data) => data.service !== 'bigquery' || (!!data.gcp_project && !!data.dataset), {
+    error: 'gcp_project and dataset are required when service is bigquery',
+  });
+export type GA4LinkCreateInput = z.infer<typeof ga4LinkCreateInputSchema>;
+
+/** Unlink an existing link. Search Console links cannot be removed via the API. */
+export const ga4LinkRemoveInputSchema = z.object({
+  /** Config file name (without .yaml) */
+  project_name: z.string(),
+  /** Service to unlink */
+  service: z.enum(['bigquery', 'channels']),
+});
+export type GA4LinkRemoveInput = z.infer<typeof ga4LinkRemoveInputSchema>;
+
+// ── Output types ─────────────────────────────────────────────────────────────
 
 /**
  * BigQuery link information
@@ -126,77 +121,68 @@ export interface LinkOutput {
   error?: string;
 }
 
-/**
- * Build CLI arguments from input
- *
- * @param input - Validated input
- * @returns Array of CLI arguments
- */
-export function buildLinkArgs(input: GA4LinkInput): string[] {
-  const args: string[] = ['--project', input.project_name];
+// ── Build CLI arguments ──────────────────────────────────────────────────────
 
-  if (input.list) {
-    args.push('--list');
-  } else if (input.unlink) {
-    args.push('--unlink', input.unlink);
-  } else if (input.service) {
-    args.push('--service', input.service);
+export function buildLinkListArgs(input: GA4LinkListInput): string[] {
+  return ['--project', input.project_name, '--list'];
+}
 
-    if (input.service === 'search-console' && input.url) {
-      args.push('--url', input.url);
+export function buildLinkCreateArgs(input: GA4LinkCreateInput): string[] {
+  const args: string[] = ['--project', input.project_name, '--service', input.service];
+
+  if (input.service === 'search-console' && input.url) {
+    args.push('--url', input.url);
+  }
+
+  if (input.service === 'bigquery') {
+    if (input.gcp_project) {
+      args.push('--gcp-project', input.gcp_project);
     }
-
-    if (input.service === 'bigquery') {
-      if (input.gcp_project) {
-        args.push('--gcp-project', input.gcp_project);
-      }
-      if (input.dataset) {
-        args.push('--dataset', input.dataset);
-      }
+    if (input.dataset) {
+      args.push('--dataset', input.dataset);
     }
   }
 
   return args;
 }
 
-/**
- * Parse CLI output into structured LinkOutput
- *
- * Handles three types of operations:
- * - List: Parses existing links for all services
- * - Link: Parses link creation result
- * - Unlink: Parses unlink operation result
- *
- * @param output - Raw CLI output
- * @param input - Original input for context
- * @returns Structured link output
- */
-export function parseLinkOutput(output: string, input: GA4LinkInput): LinkOutput {
-  const result: LinkOutput = {
-    success: true,
-    operation: 'link',
-    action: input.list ? 'list' : input.unlink ? 'unlink' : 'link',
-  };
+export function buildLinkRemoveArgs(input: GA4LinkRemoveInput): string[] {
+  return ['--project', input.project_name, '--unlink', input.service];
+}
 
-  // Check for errors
+// ── Parse CLI output ─────────────────────────────────────────────────────────
+
+/** Shared prelude: detect a top-level error, else extract project info. */
+function startResult(output: string, action: LinkOutput['action']): LinkOutput {
+  const result: LinkOutput = { success: true, operation: 'link', action };
   const errorMatch = output.match(/Error:\s*(.+)/);
   if (errorMatch) {
     result.success = false;
     result.error = errorMatch[1].trim();
     return result;
   }
-
-  // Extract project info
   result.project = extractProjectInfo(output);
+  return result;
+}
 
-  if (input.list) {
-    result.results = parseListOutput(output);
-  } else if (input.unlink) {
-    result.results = parseUnlinkOutput(output, input.unlink);
-  } else if (input.service) {
-    result.results = parseLinkServiceOutput(output, input.service);
-  }
+export function parseLinkListOutput(output: string): LinkOutput {
+  const result = startResult(output, 'list');
+  if (!result.success) return result;
+  result.results = parseListOutput(output);
+  return result;
+}
 
+export function parseLinkCreateOutput(output: string, service: GA4LinkCreateInput['service']): LinkOutput {
+  const result = startResult(output, 'link');
+  if (!result.success) return result;
+  result.results = parseLinkServiceOutput(output, service);
+  return result;
+}
+
+export function parseLinkRemoveOutput(output: string, service: GA4LinkRemoveInput['service']): LinkOutput {
+  const result = startResult(output, 'unlink');
+  if (!result.success) return result;
+  result.results = parseUnlinkOutput(output, service);
   return result;
 }
 
@@ -408,12 +394,35 @@ function extractSection(output: string, startMarker: string, endMarker: string |
     : output.slice(startIdx, endIdx);
 }
 
-/**
- * MCP Tool definition for ga4_link
- */
-export const ga4LinkTool = {
-  name: 'ga4_link',
-  description: 'Link external services to GA4 property (Search Console, BigQuery, Channel Groups)',
+// ── MCP tool definitions ─────────────────────────────────────────────────────
+
+export const ga4LinkListTool = {
+  name: 'ga4_link_list',
+  description:
+    'List existing external-service links for a GA4 property: BigQuery export links and custom Channel Groups. ' +
+    '(Search Console links cannot be listed via the GA4 Admin API and are reported as requiring a manual check.)',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      project_name: {
+        type: 'string',
+        description: 'Config file name (without .yaml) - required',
+      },
+    },
+    required: ['project_name'] as const,
+  },
+  annotations: {
+    title: 'List GA4 service links',
+    readOnlyHint: true,
+  },
+};
+
+export const ga4LinkCreateTool = {
+  name: 'ga4_link_create',
+  description:
+    'Create an external-service link for a GA4 property. service=bigquery creates a BigQuery export link ' +
+    '(requires gcp_project + dataset); service=channels sets up default Channel Groups; ' +
+    'service=search-console returns a manual setup guide (the Admin API cannot link Search Console programmatically).',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -438,16 +447,42 @@ export const ga4LinkTool = {
         type: 'string',
         description: 'BigQuery dataset ID (required for bigquery)',
       },
-      list: {
-        type: 'boolean',
-        description: 'List existing links for all services',
+    },
+    required: ['project_name', 'service'] as const,
+  },
+  annotations: {
+    title: 'Create GA4 service link',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+  },
+};
+
+export const ga4LinkRemoveTool = {
+  name: 'ga4_link_remove',
+  description:
+    'Remove (unlink) an existing external-service link from a GA4 property. ' +
+    'service=bigquery deletes the BigQuery export link; service=channels removes custom Channel Groups. ' +
+    'Search Console links cannot be removed via the Admin API.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      project_name: {
+        type: 'string',
+        description: 'Config file name (without .yaml) - required',
       },
-      unlink: {
+      service: {
         type: 'string',
         enum: ['bigquery', 'channels'],
         description: 'Service to unlink (removes existing link)',
       },
     },
-    required: ['project_name'] as const,
+    required: ['project_name', 'service'] as const,
+  },
+  annotations: {
+    title: 'Remove GA4 service link',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
   },
 };

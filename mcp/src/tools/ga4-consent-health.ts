@@ -237,4 +237,8 @@ export const ga4ConsentHealthTool = {
       },
     },
   },
+  annotations: {
+    title: 'GA4 consent-mode health',
+    readOnlyHint: true,
+  },
 }

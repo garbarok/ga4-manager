@@ -133,11 +133,13 @@ claude mcp list
 
 ### Tool Categories
 
-**GA4 Analytics (5 tools)** - Configuration and management
+**GA4 Analytics (7 tools)** - Configuration and management
 - `ga4_setup` - Create conversions, dimensions, metrics
 - `ga4_report` - View current configuration
 - `ga4_cleanup` - Remove unused resources
-- `ga4_link` - External service integration
+- `ga4_link_list` - List existing external-service links
+- `ga4_link_create` - Create a Search Console/BigQuery/Channels link
+- `ga4_link_remove` - Remove (unlink) a BigQuery/Channels link
 - `ga4_validate` - Configuration validation
 
 **Search Console (8 tools)** - SEO and indexing
@@ -159,10 +161,10 @@ claude mcp list
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`
+- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`
 
 **Modifying (Use with caution):**
-- `ga4_setup`, `ga4_cleanup`, `ga4_link`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
+- `ga4_setup`, `ga4_cleanup`, `ga4_link_create`, `ga4_link_remove`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
 
 **Always use dry-run first for modifying operations!**
 
@@ -358,30 +360,45 @@ Archives unused conversions, dimensions, and metrics to free up quota.
 
 ---
 
-#### `ga4_link` - External Service Integration
+#### External Service Integration (`ga4_link_list` / `ga4_link_create` / `ga4_link_remove`)
 
-Manage links to Search Console, BigQuery, and Channel Groups.
+Linking is split into three tools so that read, write, and delete operations
+are distinct (this is required for the Claude connector directory — a single
+tool may not mix safe and unsafe operations). All three dispatch to the same
+`ga4 link` CLI command.
 
-**Input Schema:**
+##### `ga4_link_list` - List Links (read-only)
+
+Lists existing BigQuery export links and custom Channel Groups. (Search Console
+links can't be listed via the GA4 Admin API and are reported as
+`manual_check_required`.)
 
 ```typescript
 {
   project_name: string;     // Required: Project name
-  service?: string;         // "search-console" | "bigquery" | "channels"
-  list?: boolean;           // List existing links
-  unlink?: string;          // "bigquery" | "channels" (remove link)
-  url?: string;             // Site URL (for search-console)
-  gcp_project?: string;     // GCP project (for bigquery)
-  dataset?: string;         // BigQuery dataset (for bigquery)
 }
 ```
 
-**Example Request (List):**
+**Example Request:**
 
 ```typescript
 {
-  "project_name": "example-site",
-  "list": true
+  "project_name": "example-site"
+}
+```
+
+##### `ga4_link_create` - Create a Link (modifying)
+
+Creates a BigQuery export link, sets up default Channel Groups, or returns a
+Search Console setup guide.
+
+```typescript
+{
+  project_name: string;     // Required: Project name
+  service: string;          // Required: "search-console" | "bigquery" | "channels"
+  url?: string;             // Site URL (required for search-console)
+  gcp_project?: string;     // GCP project (required for bigquery)
+  dataset?: string;         // BigQuery dataset (required for bigquery)
 }
 ```
 
@@ -392,6 +409,27 @@ Manage links to Search Console, BigQuery, and Channel Groups.
   "project_name": "example-site",
   "service": "search-console",
   "url": "https://example.com"
+}
+```
+
+##### `ga4_link_remove` - Remove a Link (destructive)
+
+Unlinks an existing BigQuery export or Channel Group. (Search Console links
+cannot be removed via the Admin API.)
+
+```typescript
+{
+  project_name: string;     // Required: Project name
+  service: string;          // Required: "bigquery" | "channels"
+}
+```
+
+**Example Request:**
+
+```typescript
+{
+  "project_name": "example-site",
+  "service": "bigquery"
 }
 ```
 

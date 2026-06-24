@@ -392,4 +392,5 @@ export const gscTrafficCompareTool = {
       },
     },
   },
+  annotations: { title: 'Compare Search Console traffic', readOnlyHint: true },
 }

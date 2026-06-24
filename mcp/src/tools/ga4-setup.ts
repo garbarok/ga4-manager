@@ -331,4 +331,9 @@ export const ga4SetupTool = {
     // Note: Zod schema handles mutual exclusivity validation
     // MCP doesn't support oneOf at top level
   },
+  annotations: {
+    title: 'Set up GA4/GSC from config',
+    readOnlyHint: false,
+    destructiveHint: true,
+  },
 };

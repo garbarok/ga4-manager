@@ -378,7 +378,7 @@ export const seoPageAuditTool = {
   name: 'seo_page_audit',
   description:
     'Use when auditing a single page for SEO problems: missing title or description, bad canonical, noindex directives, missing OG image, heading structure issues, redirect chain problems. ' +
-    'Fetches the URL with manual redirect tracing (max 5 hops), parses on-page signals (title, meta description, canonical, robots, Open Graph, Schema.org types, h1/h2 counts, hreflang). ' +
+    'Fetches the given URL over HTTP with manual redirect tracing (max 5 hops), parses on-page signals (title, meta description, canonical, robots, Open Graph, Schema.org types, h1/h2 counts, hreflang). ' +
     'Returns a structured issues list with severity (error/warning/info) and the full redirect chain. ' +
     'Optionally checks Core Web Vitals via PageSpeed Insights API.',
   inputSchema: {
@@ -426,4 +426,5 @@ export const seoPageAuditTool = {
       },
     },
   },
+  annotations: { title: 'Audit a page for SEO', readOnlyHint: true, openWorldHint: true },
 }

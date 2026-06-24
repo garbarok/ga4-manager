@@ -457,4 +457,9 @@ export const ga4CleanupTool = {
     // Note: Zod schema handles mutual exclusivity validation
     // MCP doesn't support oneOf at top level
   },
+  annotations: {
+    title: 'Clean up GA4 resources',
+    readOnlyHint: false,
+    destructiveHint: true,
+  },
 };

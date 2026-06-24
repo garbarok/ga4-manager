@@ -121,4 +121,5 @@ export const gscHealthTool = {
       },
     },
   },
+  annotations: { title: 'Search Console health check', readOnlyHint: true },
 } as const

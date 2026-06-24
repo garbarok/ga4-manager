@@ -419,4 +419,8 @@ export const ga4ValidateTool = {
     // Note: Zod schema handles mutual exclusivity validation
     // MCP doesn't support oneOf at top level
   },
+  annotations: {
+    title: 'Validate GA4 configuration',
+    readOnlyHint: true,
+  },
 };

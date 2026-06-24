@@ -170,4 +170,8 @@ export const gscCannibalizationTool = {
       },
     },
   },
+  annotations: {
+    title: 'Detect keyword cannibalization',
+    readOnlyHint: true,
+  },
 } as const

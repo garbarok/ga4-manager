@@ -642,6 +642,7 @@ export const gscMonitorUrlsTool = {
       },
     },
   },
+  annotations: { title: 'Monitor URLs in Search Console', readOnlyHint: true, openWorldHint: true },
 };
 
 // ============================================================================
