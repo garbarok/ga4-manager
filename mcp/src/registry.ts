@@ -26,6 +26,8 @@ import { gscTrafficCompareSpec } from './tools/gsc-traffic-compare.js'
 import { ga4ConsentHealthSpec } from './tools/ga4-consent-health.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
+import { adsenseAccountsListSpec } from './tools/adsense-accounts.js'
+import { adsenseReportSpec } from './tools/adsense-report.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
@@ -55,6 +57,9 @@ export const SPECS: ToolSpec[] = [
   ga4ConsentHealthSpec,
   seoPageAuditSpec,
   seoAuditBatchSpec,
+  // AdSense (publisher reporting — native, no CLI)
+  adsenseAccountsListSpec,
+  adsenseReportSpec,
 ]
 
 /** Lookup by tool name for dispatch. */

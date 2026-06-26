@@ -5,9 +5,9 @@ import { SPECS, SPEC_BY_NAME } from './registry.js';
 // to live inside index.ts and was only reachable at runtime. A miswired tool
 // (missing command, wrong kind, missing annotations) now fails here.
 describe('tool registry', () => {
-  it('registers 23 tools with unique names', () => {
+  it('registers 25 tools with unique names', () => {
     const names = SPECS.map((s) => s.tool.name);
-    expect(names).toHaveLength(23);
+    expect(names).toHaveLength(25);
     expect(new Set(names).size).toBe(names.length);
   });
 
