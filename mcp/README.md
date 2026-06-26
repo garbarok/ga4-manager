@@ -121,7 +121,7 @@ See **[CONFIGURATION.md](./CONFIGURATION.md)** for setup guides:
 **Claude CLI:**
 ```bash
 claude mcp list
-# Should show: ga4-manager (16 tools)
+# Should show: ga4-manager (25 tools)
 ```
 
 **VS Code/Cursor:**
@@ -129,7 +129,7 @@ claude mcp list
 
 ---
 
-## Available Tools (17)
+## Available Tools (25)
 
 ### Tool Categories
 
@@ -142,7 +142,7 @@ claude mcp list
 - `ga4_link_remove` - Remove (unlink) a BigQuery/Channels link
 - `ga4_validate` - Configuration validation
 
-**Search Console (8 tools)** - SEO and indexing
+**Search Console (12 tools)** - SEO and indexing
 - `gsc_sitemaps_list` - List all sitemaps
 - `gsc_sitemaps_submit` - Submit new sitemap
 - `gsc_sitemaps_delete` - Remove sitemap
@@ -151,6 +151,10 @@ claude mcp list
 - `gsc_analytics_run` - Search performance data
 - `gsc_monitor_urls` - Batch URL monitoring
 - `gsc_index_coverage` - Index coverage report
+- `gsc_cannibalization` - Detect keyword cannibalization across URLs
+- `gsc_opportunities` - Surface ranking/CTR improvement opportunities
+- `gsc_ctr_anomaly` - Flag pages with anomalous CTR for their position
+- `gsc_health` - Search Console health overview
 
 **Diagnostics & SEO (4 tools)** - Traffic analysis and page auditing
 - `gsc_traffic_compare` - Diff GSC traffic between two date ranges per URL
@@ -158,10 +162,14 @@ claude mcp list
 - `seo_page_audit` - On-page SEO audit with optional Core Web Vitals
 - `seo_audit_batch` - Batch on-page SEO audit over a sitemap or URL list
 
+**AdSense (2 tools)** - Publisher earnings reporting
+- `adsense_accounts_list` - List accessible AdSense publisher accounts
+- `adsense_report` - Earnings / page views / impressions / clicks / RPM by date, domain, country, ad unit
+
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`
+- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`
 
 **Modifying (Use with caution):**
 - `ga4_setup`, `ga4_cleanup`, `ga4_link_create`, `ga4_link_remove`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
@@ -1057,6 +1065,69 @@ Single-URL on-page SEO audit: title/description length and pixel-width checks, c
   },
   "redirects": [],
   "schema_types": ["Product", "BreadcrumbList"]
+}
+```
+
+---
+
+### AdSense Tools
+
+Publisher-side reporting via the [AdSense Management API v2](https://developers.google.com/adsense/management/reference/rest). These tools answer "how much do the ads **on my own site** earn" — the opposite of the advertiser-side Google Ads API. They are **read-only** and need **no developer token or Manager account**: just the `adsense.readonly` OAuth scope on the same credentials used for GA4/GSC (see [PERMISSIONS.md](PERMISSIONS.md)).
+
+> **Scope:** Add `https://www.googleapis.com/auth/adsense.readonly` to your credential. For an ADC user credential, re-run `gcloud auth application-default login --scopes=...,https://www.googleapis.com/auth/adsense.readonly`. Note: a personal AdSense account cannot be read with a service-account key — use ADC user credentials.
+
+#### `adsense_accounts_list` - List AdSense Accounts
+
+Lists the AdSense publisher accounts the authenticated identity can access. Call this first — the returned `name` (`accounts/pub-XXXXXXXXXXXXXXXX`) is the `account` argument every other AdSense tool needs. No parameters.
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "accounts": [
+    { "name": "accounts/pub-1234567890123456", "displayName": "example.com", "state": "READY", "timeZone": { "id": "America/Los_Angeles" } }
+  ]
+}
+```
+
+#### `adsense_report` - Generate AdSense Report
+
+Generates an earnings report for one account, returning each row as a `header → value` map plus totals.
+
+**Input Schema:**
+
+```typescript
+{
+  account: string;        // Required: "accounts/pub-..." from adsense_accounts_list
+  date_range?:            // Preset window (default "LAST_7_DAYS")
+    | "CUSTOM" | "TODAY" | "YESTERDAY" | "MONTH_TO_DATE" | "YEAR_TO_DATE"
+    | "LAST_7_DAYS" | "LAST_30_DAYS" | "LAST_MONTH"
+    | "LAST_3_MONTHS" | "LAST_6_MONTHS" | "LAST_12_MONTHS" | "LAST_YEAR";
+  start_date?: string;    // YYYY-MM-DD, required when date_range = "CUSTOM"
+  end_date?: string;      // YYYY-MM-DD, required when date_range = "CUSTOM"
+  metrics?: string[];     // default ESTIMATED_EARNINGS, PAGE_VIEWS, IMPRESSIONS, CLICKS, IMPRESSIONS_RPM
+  dimensions?: string[];  // default ["DATE"]; e.g. DOMAIN_NAME, COUNTRY_NAME, AD_UNIT_NAME
+  currency_code?: string; // ISO-4217, e.g. "USD" (defaults to account currency)
+  limit?: number;         // max rows (default 100, max 1000)
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "success": true,
+  "account": "accounts/pub-1234567890123456",
+  "date_range": "LAST_7_DAYS",
+  "start_date": "2026-06-19",
+  "end_date": "2026-06-25",
+  "headers": ["DATE", "ESTIMATED_EARNINGS", "PAGE_VIEWS", "IMPRESSIONS", "CLICKS", "IMPRESSIONS_RPM"],
+  "rows": [
+    { "DATE": "2026-06-19", "ESTIMATED_EARNINGS": "1.23", "PAGE_VIEWS": "842", "IMPRESSIONS": "910", "CLICKS": "7", "IMPRESSIONS_RPM": "1.35" }
+  ],
+  "totals": { "ESTIMATED_EARNINGS": "9.81", "PAGE_VIEWS": "5894" },
+  "warnings": []
 }
 ```
 

@@ -12,6 +12,7 @@ This guide explains how to grant the access each tool in the GA4 Manager MCP ser
 - [Google Search Console (GSC)](#google-search-console-gsc)
 - [Google Analytics 4 (GA4)](#google-analytics-4-ga4)
 - [PageSpeed Insights (PSI)](#pagespeed-insights-psi)
+- [AdSense](#adsense)
 - [Batch Onboarding](#batch-onboarding)
 - [Troubleshooting](#troubleshooting)
 
@@ -36,22 +37,25 @@ The MCP server reads credentials from the `GOOGLE_APPLICATION_CREDENTIALS` env v
 
 ```bash
 # 1. Re-login with all required scopes
+#    (drop the adsense.readonly scope if you don't use the AdSense tools)
 gcloud auth application-default login \
   --scopes=openid,\
 https://www.googleapis.com/auth/cloud-platform,\
 https://www.googleapis.com/auth/analytics.readonly,\
 https://www.googleapis.com/auth/webmasters.readonly,\
+https://www.googleapis.com/auth/adsense.readonly,\
 https://www.googleapis.com/auth/userinfo.email
 
 # 2. Set quota project (the GCP project that gets billed for API calls)
 gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 
-# 3. Enable the four APIs in that project
+# 3. Enable the APIs in that project (adsense.googleapis.com only for AdSense tools)
 gcloud services enable \
   analyticsdata.googleapis.com \
   analyticsadmin.googleapis.com \
   searchconsole.googleapis.com \
   pagespeedonline.googleapis.com \
+  adsense.googleapis.com \
   --project=YOUR_PROJECT_ID
 
 # 4. Verify
@@ -183,6 +187,21 @@ If you skip the API key, PSI calls will return:
 ```
 
 The tool surfaces this as a `psi_unavailable` warning and returns the HTML audit without `cwv` data. The `check_cwv: false` path continues to work unaffected.
+
+---
+
+## AdSense
+
+**Affects tools:** `adsense_accounts_list`, `adsense_report`
+
+These read the **publisher** side — earnings from ads running **on your own site** — via the AdSense Management API v2. Unlike the advertiser-side Google Ads API, **no developer token and no Manager (MCC) account are required**. Access is granted by one OAuth scope plus enabling one API:
+
+1. **Scope** — `https://www.googleapis.com/auth/adsense.readonly` must be consented on the credential. For ADC user creds it is already included in the Setup A login above; if you logged in earlier without it, re-run the `gcloud auth application-default login` command (scopes are fixed at login time, not per call).
+2. **API** — enable `adsense.googleapis.com` in your quota project (included in the Setup A `gcloud services enable` list above).
+
+> **Use ADC user credentials (Setup A), not a service-account key.** A personal AdSense account is owned by a Google *user*, and there is no way to grant a service-account email access to it. A service-account key authenticates fine but `adsense_accounts_list` returns no accessible accounts. Service accounts can only reach AdSense through Google Workspace domain-wide delegation, which is uncommon.
+
+The principal is your Google account, so any AdSense account you own is accessible with no further per-resource grant. Run `adsense_accounts_list` first to get your `accounts/pub-XXXXXXXXXXXXXXXX` id, then pass it as the `account` argument to `adsense_report`.
 
 ---
 

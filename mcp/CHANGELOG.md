@@ -5,6 +5,15 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-06-26
+
+### Added
+
+- **AdSense publisher reporting tools.** Two read-only tools backed by the [AdSense Management API v2](https://developers.google.com/adsense/management/reference/rest), answering "how much do the ads *on my own site* earn" (publisher side — the opposite of the advertiser-side Google Ads API):
+  - **`adsense_accounts_list`** — lists the AdSense accounts the authenticated identity can access; returns each account `name` (`accounts/pub-XXXXXXXXXXXXXXXX`) to use with the report tool.
+  - **`adsense_report`** — generates an earnings report for one account (default: last 7 days; `ESTIMATED_EARNINGS`, `PAGE_VIEWS`, `IMPRESSIONS`, `CLICKS`, `IMPRESSIONS_RPM` by `DATE`), with `CUSTOM` date windows and arbitrary metric/dimension selection. Rows are returned as `header → value` maps plus totals.
+- No developer token or Manager account is required (unlike Google Ads). Auth reuses the existing `getGoogleAuthHeaders` credential resolution with the new `https://www.googleapis.com/auth/adsense.readonly` scope; a new `utils/adsense-client.ts` handles REST + structured error mapping, mirroring the GSC native tools. See [PERMISSIONS.md → AdSense](PERMISSIONS.md#adsense) (use ADC user credentials — a service-account key cannot read a personal AdSense account).
+
 ## [3.1.0] - 2026-06-24
 
 ### Added

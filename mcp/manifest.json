@@ -3,9 +3,9 @@
   "manifest_version": "0.4",
   "name": "ga4-manager-mcp",
   "display_name": "GA4 Manager",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "description": "Manage GA4 properties and audit Search Console / SEO from Claude.",
-  "long_description": "Exposes the GA4 Manager toolkit as MCP tools: GA4 property setup, reporting, cleanup and data-stream linking (via a bundled `ga4` CLI), Search Console analytics, coverage, cannibalization, CTR-anomaly and URL inspection, plus native SEO page/batch audits and consent-health checks. Runs locally so it can read your Google service-account credentials and talk to the Admin/Search Console APIs on your behalf.",
+  "long_description": "Exposes the GA4 Manager toolkit as MCP tools: GA4 property setup, reporting, cleanup and data-stream linking (via a bundled `ga4` CLI), Search Console analytics, coverage, cannibalization, CTR-anomaly and URL inspection, native SEO page/batch audits and consent-health checks, plus AdSense publisher reporting (earnings, page views, impressions, clicks, RPM). Runs locally so it can read your Google service-account credentials and talk to the Admin/Search Console/AdSense APIs on your behalf.",
   "author": {
     "name": "Oscar Gallego",
     "email": "ai@oscargallegoruiz.com"
