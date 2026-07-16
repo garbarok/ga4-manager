@@ -5,6 +5,12 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-07-16
+
+### Fixed
+
+- **Bundled `ga4` binary: `setup` no longer reports ✓/"Created" for resources rejected with 409 ALREADY_EXISTS.** GA4 display names are unique across custom dimensions AND metrics combined; a colliding create now surfaces as `○ <name> (conflict: already exists, skipping)` and counts as Skipped. Preflight additionally fails when a config reuses a display_name across the dimensions+metrics sections, and display names are validated against GA4's charset (letters, digits, underscores, spaces).
+
 ## [3.2.0] - 2026-06-26
 
 ### Added
