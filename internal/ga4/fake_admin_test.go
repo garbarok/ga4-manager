@@ -13,7 +13,7 @@ import (
 )
 
 // errAlreadyExists is an error whose message satisfies isAlreadyExistsError,
-// so tests can drive the idempotent "already exists → success" create path.
+// so tests can drive the "already exists → ErrAlreadyExists" create path.
 var errAlreadyExists = errors.New("resource already exists")
 
 // fakeAdminAPI is a programmable, in-memory adminAPI for tests. It records the

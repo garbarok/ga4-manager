@@ -1,6 +1,14 @@
 package ga4
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+// ErrAlreadyExists is returned (wrapped) by Create* methods when the GA4 API
+// rejects a create with 409 ALREADY_EXISTS. Callers decide whether that is a
+// skippable conflict or a failure; it must never be reported as a creation.
+var ErrAlreadyExists = errors.New("resource already exists")
 
 // errMsgAlreadyExists is the error message substring returned by the GA4 API
 // when a resource already exists. Centralised here so that if the API changes

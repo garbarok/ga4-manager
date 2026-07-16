@@ -27,13 +27,13 @@ func TestCreateConversion_CallsAPIWithParentAndPayload(t *testing.T) {
 }
 
 // An "already exists" API error is idempotent success, not a failure.
-func TestCreateConversion_AlreadyExistsTreatedAsSuccess(t *testing.T) {
+func TestCreateConversion_AlreadyExistsSurfacedAsSentinel(t *testing.T) {
 	fake := &fakeAdminAPI{createConvErr: errAlreadyExists}
 	c := newTestClient(fake)
 
 	err := c.CreateConversion("123456789", "purchase", "ONCE_PER_EVENT")
 
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrAlreadyExists)
 	assert.Equal(t, 1, fake.createConvCalls)
 }
 

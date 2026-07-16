@@ -1,6 +1,7 @@
 package ga4
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -67,7 +68,7 @@ func (c *Client) ListCustomMetrics(propertyID string) ([]*analyticsadmin.GoogleA
 // SetupCustomMetrics creates all custom metrics for a project
 func (c *Client) SetupCustomMetrics(propertyID string, metrics []config.MetricConfig) error {
 	for _, metric := range metrics {
-		if err := c.CreateCustomMetric(propertyID, metric); err != nil {
+		if err := c.CreateCustomMetric(propertyID, metric); err != nil && !errors.Is(err, ErrAlreadyExists) {
 			return fmt.Errorf("failed to setup metric %s: %w", metric.DisplayName, err)
 		}
 	}

@@ -251,6 +251,23 @@ func (pv *PreflightValidator) ValidateGA4Resources() ValidationResult {
 		}
 	}
 
+	// Display names must be unique across custom dimensions AND metrics
+	// combined — GA4 enforces one namespace, so a metric colliding with a
+	// dimension gets a 409 the per-section checks above can't predict.
+	displayNames := make(map[string]string) // display name → "dimension"/"metric"
+	for _, dim := range pv.config.Dimensions {
+		if prev, ok := displayNames[dim.DisplayName]; ok {
+			errors = append(errors, fmt.Sprintf("duplicate display_name %q (dimension collides with %s)", dim.DisplayName, prev))
+		}
+		displayNames[dim.DisplayName] = "dimension"
+	}
+	for _, metric := range pv.config.Metrics {
+		if prev, ok := displayNames[metric.DisplayName]; ok {
+			errors = append(errors, fmt.Sprintf("duplicate display_name %q (metric collides with %s)", metric.DisplayName, prev))
+		}
+		displayNames[metric.DisplayName] = "metric"
+	}
+
 	// Validate metrics
 	for _, metric := range pv.config.Metrics {
 		if err := validation.ValidateParameterName(metric.ParameterName); err != nil {

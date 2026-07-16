@@ -36,11 +36,23 @@ func TestCreateCustomMetric_CallsAPIWithParentAndPayload(t *testing.T) {
 	assert.Equal(t, "EVENT", fake.gotCreateMet.Scope)
 }
 
-func TestCreateCustomMetric_AlreadyExistsTreatedAsSuccess(t *testing.T) {
+func TestCreateCustomMetric_AlreadyExistsSurfacedAsSentinel(t *testing.T) {
 	fake := &fakeAdminAPI{createMetErr: errAlreadyExists}
 	c := newTestClient(fake)
 
 	err := c.CreateCustomMetric("123456789", sampleMetric())
+
+	require.ErrorIs(t, err, ErrAlreadyExists)
+	assert.Equal(t, 1, fake.createMetCalls)
+}
+
+// SetupCustomMetrics stays idempotent: an already-exists conflict is skipped,
+// not fatal.
+func TestSetupCustomMetrics_SkipsAlreadyExisting(t *testing.T) {
+	fake := &fakeAdminAPI{createMetErr: errAlreadyExists}
+	c := newTestClient(fake)
+
+	err := c.SetupCustomMetrics("123456789", []config.MetricConfig{sampleMetric()})
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, fake.createMetCalls)

@@ -16,9 +16,12 @@ import (
 // "custom metric"); list messages pluralise it by appending "s".
 
 // createResource performs the rate-limited creation of a single GA4 resource.
-// An "already exists" API error is treated as success (idempotent setup). The
-// caller is responsible for input validation and any descriptive pre-call
-// logging; do performs the actual Properties.<X>.Create call against parent.
+// An "already exists" API error is surfaced as ErrAlreadyExists so callers can
+// distinguish a conflict from a real creation (409s can come from collisions —
+// e.g. display names are unique across dimensions AND metrics — not just from
+// re-running setup). The caller is responsible for input validation and any
+// descriptive pre-call logging; do performs the actual Properties.<X>.Create
+// call against parent.
 func (c *Client) createResource(kind, propertyID, name string, do func(parent string) error) error {
 	if err := c.waitForRateLimit(c.ctx, "Create "+kind); err != nil {
 		return err
@@ -35,7 +38,7 @@ func (c *Client) createResource(kind, propertyID, name string, do func(parent st
 		return nil
 	case isAlreadyExistsError(err):
 		c.logger.Debug(kind+" already exists", slog.String("name", name))
-		return nil
+		return fmt.Errorf("%s '%s' in property %s: %w", kind, name, propertyID, ErrAlreadyExists)
 	default:
 		c.logger.Error("failed to create "+kind,
 			slog.String("name", name),

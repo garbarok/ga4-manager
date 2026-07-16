@@ -24,6 +24,10 @@ These names are reserved by GA4 and cannot be used for custom dimensions or metr
 
 Source: `internal/config/limits.go:ReservedParameters`
 
+## Display Names Share One Namespace
+
+Custom dimension and custom metric display names are unique across BOTH kinds combined — a metric whose display_name matches an existing dimension gets 409 ALREADY_EXISTS. Display names may only contain letters, digits, underscores, and spaces. Both rules are enforced at preflight (`internal/setup/preflight.go:ValidateGA4Resources`, `internal/validation/validation.go:ValidateDisplayName`); a 409 at create time surfaces as `ga4.ErrAlreadyExists` and counts as skipped, never created.
+
 ## API Limitations
 
 | Resource | Status |

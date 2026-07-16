@@ -1,6 +1,7 @@
 package ga4
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -44,7 +45,7 @@ func conversionToSDK(conv config.ConversionConfig) *admin.GoogleAnalyticsAdminV1
 
 func (c *Client) SetupConversions(propertyID string, conversions []config.ConversionConfig) error {
 	for _, conv := range conversions {
-		if err := c.CreateConversion(propertyID, conv.Name, conv.CountingMethod); err != nil {
+		if err := c.CreateConversion(propertyID, conv.Name, conv.CountingMethod); err != nil && !errors.Is(err, ErrAlreadyExists) {
 			return err
 		}
 	}

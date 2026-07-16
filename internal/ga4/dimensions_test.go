@@ -34,13 +34,13 @@ func TestCreateDimension_CallsAPIWithParentAndPayload(t *testing.T) {
 	assert.Equal(t, "USER", fake.gotCreateDim.Scope)
 }
 
-func TestCreateDimension_AlreadyExistsTreatedAsSuccess(t *testing.T) {
+func TestCreateDimension_AlreadyExistsSurfacedAsSentinel(t *testing.T) {
 	fake := &fakeAdminAPI{createDimErr: errAlreadyExists}
 	c := newTestClient(fake)
 
 	err := c.CreateDimension("123456789", sampleDimension())
 
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrAlreadyExists)
 	assert.Equal(t, 1, fake.createDimCalls)
 }
 

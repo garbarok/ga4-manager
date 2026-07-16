@@ -1,6 +1,7 @@
 package ga4
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -44,7 +45,7 @@ func dimToSDK(dim config.DimensionConfig) *admin.GoogleAnalyticsAdminV1alphaCust
 
 func (c *Client) SetupDimensions(propertyID string, dims []config.DimensionConfig) error {
 	for _, dim := range dims {
-		if err := c.CreateDimension(propertyID, dim); err != nil {
+		if err := c.CreateDimension(propertyID, dim); err != nil && !errors.Is(err, ErrAlreadyExists) {
 			return err
 		}
 	}

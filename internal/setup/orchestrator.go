@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -251,6 +252,11 @@ func (so *SetupOrchestrator) SetupGA4() error {
 			createdCount++
 		} else {
 			err := so.ga4Client.CreateConversion(propertyID, conv.Name, conv.CountingMethod)
+			if errors.Is(err, ga4.ErrAlreadyExists) {
+				fmt.Printf("  %s %s %s\n", yellow("○"), conv.Name, blue("(conflict: already exists, skipping)"))
+				skippedCount++
+				continue
+			}
 			if err != nil {
 				fmt.Printf("  %s %s: %s\n", red("✗"), conv.Name, err)
 				return fmt.Errorf("create conversion %s: %w", conv.Name, err)
@@ -294,6 +300,11 @@ func (so *SetupOrchestrator) SetupGA4() error {
 			createdCount++
 		} else {
 			err := so.ga4Client.CreateDimension(propertyID, dim)
+			if errors.Is(err, ga4.ErrAlreadyExists) {
+				fmt.Printf("  %s %s %s\n", yellow("○"), dim.DisplayName, blue("(conflict: already exists, skipping)"))
+				skippedCount++
+				continue
+			}
 			if err != nil {
 				fmt.Printf("  %s %s: %s\n", red("✗"), dim.DisplayName, err)
 				return fmt.Errorf("create dimension %s: %w", dim.DisplayName, err)
@@ -329,6 +340,11 @@ func (so *SetupOrchestrator) SetupGA4() error {
 			createdCount++
 		} else {
 			err := so.ga4Client.CreateCustomMetric(propertyID, metric)
+			if errors.Is(err, ga4.ErrAlreadyExists) {
+				fmt.Printf("  %s %s %s\n", yellow("○"), metric.DisplayName, blue("(conflict: already exists, skipping)"))
+				skippedCount++
+				continue
+			}
 			if err != nil {
 				fmt.Printf("  %s %s: %s\n", red("✗"), metric.DisplayName, err)
 				return fmt.Errorf("create metric %s: %w", metric.DisplayName, err)

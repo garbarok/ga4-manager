@@ -88,7 +88,8 @@ func TestValidateDisplayName(t *testing.T) {
 		wantError   bool
 	}{
 		{"Valid display name", "User Type", false},
-		{"Valid long name", "This is a valid display name with spaces and special chars!", false},
+		{"Valid with underscore and digits", "Article_Word_Count 2", false},
+		{"Special chars rejected", "Word Count!", true},
 		{"Empty", "", true},
 		{"Too long", "This is an extremely long display name that definitely exceeds the maximum allowed eighty-two character limit for GA4 dimension display names", true},
 	}
