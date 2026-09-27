@@ -102,6 +102,43 @@ var baselineCTRByBucket = map[int]float64{
 // (or an LLM consumer) acts on the biggest revenue win first, not on the
 // largest relative gap.
 func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
+	return OpportunityWith(rows, OpportunityOptions{MinPeers: DefaultMinPeers})
+}
+
+// DefaultMinPeers is the query-granularity peer minimum: a bucket needs two
+// rows before its own median is trusted over the baseline curve.
+const DefaultMinPeers = 2
+
+// PageMinPeers is the page-granularity peer minimum. Sites have few pages per
+// position bucket; with only two peers the "median" is the midpoint of the
+// target and one neighbour, which lets a single high-CTR or zero-CTR page
+// hide the target entirely. Three peers is the smallest set with a real
+// middle value.
+const PageMinPeers = 3
+
+// OpportunityOptions tunes the peer rule. Callers apply their impression
+// floor to rows before calling, so every row passed in is an eligible peer.
+type OpportunityOptions struct {
+	// MinPeers is the number of rows a bucket needs to use its own median;
+	// below it the baseline curve is used.
+	MinPeers int
+	// BaselineFloor makes the baseline curve a lower bound on the expected
+	// CTR: max(site median, baseline). Page granularity sets it so a page
+	// is never excused because its neighbours (legal pages, fragment URLs)
+	// also under-convert. Query granularity leaves it off — there the site's
+	// own curve is the intended comparison.
+	BaselineFloor bool
+}
+
+// OpportunityWith is Opportunity with an explicit peer rule — see
+// OpportunityOptions. Opportunity(rows) is OpportunityWith(rows,
+// OpportunityOptions{MinPeers: DefaultMinPeers}).
+func OpportunityWith(rows []gsc.SearchAnalyticsRow, opts OpportunityOptions) []OpportunityResult {
+	minPeers := opts.MinPeers
+	if minPeers < 2 {
+		minPeers = 2
+	}
+
 	type entry struct {
 		row    gsc.SearchAnalyticsRow
 		bucket int
@@ -129,7 +166,7 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 	}
 	medians := make(map[int]bucketMedian, len(buckets))
 	for bucket, ctrs := range buckets {
-		if len(ctrs) >= 2 {
+		if len(ctrs) >= minPeers {
 			sorted := append([]float64(nil), ctrs...)
 			sort.Float64s(sorted)
 			n := len(sorted)
@@ -138,6 +175,10 @@ func Opportunity(rows []gsc.SearchAnalyticsRow) []OpportunityResult {
 				m = sorted[n/2]
 			} else {
 				m = (sorted[n/2-1] + sorted[n/2]) / 2.0
+			}
+			if baseline, ok := baselineCTRByBucket[bucket]; ok && opts.BaselineFloor && baseline > m {
+				medians[bucket] = bucketMedian{ctr: baseline, source: MedianSourceBaseline}
+				continue
 			}
 			medians[bucket] = bucketMedian{ctr: m, source: MedianSourceSite}
 			continue

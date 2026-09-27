@@ -17,7 +17,7 @@ One JSON file per `(command, gsc_site)` pair, named `<command>.<gsc-site-with-co
 {
   "schema_version": 1,
   "command": "health",
-  "site": "sc-domain:wealthsim.app",
+  "site": "sc-domain:example.com",
   "generated_at": "2026-06-05T12:00:00Z",
   "data": { ... }
 }

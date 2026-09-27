@@ -1,5 +1,5 @@
 import { getGoogleAuthHeaders } from './google-auth.js'
-import { ToolError, ErrorCode } from './errors.js'
+import { ToolError, ErrorCode, errorCodeForStatus } from './errors.js'
 
 /**
  * Thin client for the AdSense Management API v2 (publisher reporting).
@@ -89,8 +89,5 @@ function mapAdsenseError(status: number, body: string): ToolError {
       'Back off and retry later; AdSense enforces per-minute and per-day request quotas.',
     )
   }
-  return new ToolError(
-    ErrorCode.UPSTREAM_5XX,
-    `AdSense API error (HTTP ${status}): ${body}`,
-  )
+  return new ToolError(errorCodeForStatus(status), `AdSense API error (HTTP ${status}): ${body}`)
 }

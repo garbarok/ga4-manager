@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { adsenseGet } from '../utils/adsense-client.js'
 import { ToolError, ErrorCode } from '../utils/errors.js'
 import {
+  DATE_RANGES,
   adsenseReportInputSchema,
   adsenseReportTool,
   runAdsenseReport,
@@ -124,6 +125,84 @@ describe('runAdsenseReport', () => {
     const result = await runAdsenseReport(adsenseReportInputSchema.parse({ account: 'accounts/pub-1' }))
     expect(result.success).toBe(false)
     if (!result.success) expect(result.error.code).toBe(ErrorCode.QUOTA_EXCEEDED)
+  })
+})
+
+describe('date_range presets', () => {
+  it.each(['LAST_MONTH', 'LAST_3_MONTHS', 'LAST_6_MONTHS', 'LAST_12_MONTHS', 'LAST_YEAR'])(
+    'rejects %s locally with a CUSTOM hint',
+    async (preset) => {
+      const result = await runAdsenseReport(
+        adsenseReportInputSchema.parse({ account: 'accounts/pub-1', date_range: preset }),
+      )
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe(ErrorCode.INVALID_INPUT)
+        expect(result.error.hint).toContain('CUSTOM')
+      }
+      expect(mockGet).not.toHaveBeenCalled()
+    },
+  )
+
+  it('sends a supported preset through', async () => {
+    mockGet.mockResolvedValueOnce(SAMPLE_REPORT as never)
+    await runAdsenseReport(adsenseReportInputSchema.parse({ account: 'accounts/pub-1', date_range: 'LAST_30_DAYS' }))
+    expect(mockGet.mock.calls[0][1]).toMatchObject({ dateRange: 'LAST_30_DAYS' })
+  })
+
+  it('advertises exactly the supported presets', () => {
+    const advertised = (adsenseReportTool.inputSchema.properties as Record<string, { enum?: string[] }>).date_range.enum
+    expect(advertised).toEqual([...DATE_RANGES])
+    expect(advertised).toEqual([
+      'CUSTOM',
+      'TODAY',
+      'YESTERDAY',
+      'MONTH_TO_DATE',
+      'YEAR_TO_DATE',
+      'LAST_7_DAYS',
+      'LAST_30_DAYS',
+    ])
+  })
+})
+
+describe('order_by', () => {
+  it('passes entries through in order as repeated orderBy params', async () => {
+    mockGet.mockResolvedValueOnce(SAMPLE_REPORT as never)
+    await runAdsenseReport(
+      adsenseReportInputSchema.parse({
+        account: 'accounts/pub-1',
+        dimensions: ['COUNTRY_NAME'],
+        metrics: ['ESTIMATED_EARNINGS', 'PAGE_VIEWS'],
+        order_by: ['-ESTIMATED_EARNINGS', '+COUNTRY_NAME'],
+        limit: 10,
+      }),
+    )
+    expect(mockGet.mock.calls[0][1]).toMatchObject({
+      orderBy: ['-ESTIMATED_EARNINGS', '+COUNTRY_NAME'],
+      limit: '10',
+    })
+  })
+
+  it('rejects a column that is not requested', async () => {
+    const result = await runAdsenseReport(
+      adsenseReportInputSchema.parse({
+        account: 'accounts/pub-1',
+        metrics: ['ESTIMATED_EARNINGS'],
+        order_by: ['-CLICKS'],
+      }),
+    )
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe(ErrorCode.INVALID_INPUT)
+      expect(result.error.message).toContain('CLICKS')
+    }
+    expect(mockGet).not.toHaveBeenCalled()
+  })
+
+  it('sends no orderBy when omitted', async () => {
+    mockGet.mockResolvedValueOnce(SAMPLE_REPORT as never)
+    await runAdsenseReport(adsenseReportInputSchema.parse({ account: 'accounts/pub-1' }))
+    expect((mockGet.mock.calls[0][1] as Record<string, unknown>).orderBy).toBeUndefined()
   })
 })
 

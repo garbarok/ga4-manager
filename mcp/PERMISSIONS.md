@@ -107,7 +107,7 @@ You will need this email to grant access in the sections below.
 
 ## Google Search Console (GSC)
 
-**Affects tools:** `gsc_traffic_compare`, `gsc_analytics_run`, `gsc_index_coverage`, `gsc_inspect_url`, `gsc_monitor_urls`, `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`
+**Affects tools:** `gsc_traffic_compare`, `gsc_analytics_run`, `gsc_index_coverage`, `gsc_inspect_url`, `gsc_monitor_urls`, `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`, `gsc_url_hygiene`, `gsc_hreflang`, `site_growth_brief`
 
 The Search Console API has no programmatic way to manage users — access must be granted through the UI.
 
@@ -130,7 +130,7 @@ Repeat for every Search Console property you want to query.
 
 ## Google Analytics 4 (GA4)
 
-**Affects tools:** `ga4_report`, `ga4_setup`, `ga4_cleanup`, `ga4_validate`, `ga4_link_list`, `ga4_link_create`, `ga4_link_remove`, `ga4_consent_health`
+**Affects tools:** `ga4_report`, `ga4_setup`, `ga4_cleanup`, `ga4_validate`, `ga4_link_list`, `ga4_link_create`, `ga4_link_remove`, `ga4_consent_health`, `ga4_traffic_report`, `site_growth_brief`
 
 ### Steps
 
@@ -139,11 +139,13 @@ Repeat for every Search Console property you want to query.
 3. Under the **Property** column, click **Property access management**.
 4. Click the **+** button in the top-right and select **Add users**.
 5. Enter the service account email.
-6. Assign the **Viewer** role (sufficient for reporting tools and `ga4_consent_health`).
+6. Assign the **Viewer** role (sufficient for reporting tools, `ga4_consent_health`, `ga4_traffic_report` and `site_growth_brief` — all use only the `analytics.readonly` scope).
    - Assign **Editor** or higher if using `ga4_setup` or `ga4_cleanup` to make changes.
 7. Click **Add**.
 
 Repeat for every GA4 property you want to manage.
+
+> **Ad revenue per page:** `ga4_traffic_report` and `site_growth_brief` read AdSense revenue from GA4 (`totalAdRevenue`, `publisherAdImpressions`), which is only populated when AdSense is linked to the property (GA4 Admin → Product links → AdSense links). Without the link these tools still work; revenue columns are 0 and they report `ad_revenue_unavailable`.
 
 > **Tip:** If you manage many properties, use the [Batch Onboarding](#batch-onboarding) script instead of repeating these steps manually.
 

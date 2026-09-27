@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `ga4 gsc url-hygiene` — URLs with search impressions that should not be indexed (malformed paths, fragments, framework asset routes, query duplicates, utility pages).
+- `ga4 gsc hreflang` — hreflang pair integrity and cross-language ranking; own-site HTTP probe (`internal/gsc/httpprobe`).
+- `ga4 gsc opportunities --granularity page` — page-level opportunities with `top_queries` and `anonymized_share`.
+- `ga4 config resolve --config <path> | --all --format json` — machine-readable property / GSC site / hreflang pairs for MCP native tools.
+- Config: optional `search_console.hreflang_pairs`.
+
 ### Planned
 - `ga4 doctor` subcommand — preflight checks for credentials, scopes, API enablement, and per-resource access
 - Priority filtering (`--priority high/medium/low`)

@@ -20,7 +20,7 @@ A CLI + MCP server for managing GA4 properties, Search Console sites, sitemaps, 
 - **SEO audits** — on-page audit with title/meta/canonical/schema/redirect checks plus optional Core Web Vitals
 - **Traffic diagnostics** — compare GSC traffic between two date ranges per URL to find biggest drops and gains
 - **Consent mode health** — report grant/deny rates and banner-bypass for GA4 sessions
-- **MCP server** — 16 tools surfaced to Claude Desktop, Claude CLI, VS Code, Cursor, Cline
+- **MCP server** — 29 tools surfaced to Claude Desktop, Claude CLI, VS Code, Cursor, Cline
 
 Define your analytics setup in YAML, apply with one command. Or talk to your assistant.
 

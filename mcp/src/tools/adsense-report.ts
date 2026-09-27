@@ -13,7 +13,10 @@ import {
 // Input Schema
 // ============================================================================
 
-const DATE_RANGES = [
+// The only presets the AdSense v2 ReportingDateRange accepts. LAST_MONTH,
+// LAST_3_MONTHS, LAST_6_MONTHS, LAST_12_MONTHS and LAST_YEAR look plausible but
+// the API rejects each with HTTP 400 — longer windows must use CUSTOM.
+export const DATE_RANGES = [
   'CUSTOM',
   'TODAY',
   'YESTERDAY',
@@ -21,11 +24,6 @@ const DATE_RANGES = [
   'YEAR_TO_DATE',
   'LAST_7_DAYS',
   'LAST_30_DAYS',
-  'LAST_MONTH',
-  'LAST_3_MONTHS',
-  'LAST_6_MONTHS',
-  'LAST_12_MONTHS',
-  'LAST_YEAR',
 ] as const
 
 // Defaults are chosen to answer the most common question — "how much did I earn
@@ -44,8 +42,11 @@ export const adsenseReportInputSchema = z.object({
     .string()
     .min(1, 'account is required')
     .describe('AdSense account name from adsense_accounts_list, e.g. "accounts/pub-1234567890123456"'),
+  // A plain string, not z.enum: an unsupported preset must come back as a
+  // structured INVALID_INPUT with a CUSTOM hint, which the handler produces —
+  // a zod parse failure would surface as an opaque dispatch error instead.
   date_range: z
-    .enum(DATE_RANGES)
+    .string()
     .optional()
     .default('LAST_7_DAYS')
     .describe('Preset range (default LAST_7_DAYS). Use "CUSTOM" with start_date/end_date for an explicit window.'),
@@ -66,6 +67,12 @@ export const adsenseReportInputSchema = z.object({
     .describe(
       'AdSense dimension enum names to break down by (default: DATE). ' +
         'Others: MONTH, WEEK, DOMAIN_NAME, COUNTRY_NAME, AD_UNIT_NAME, PLATFORM_TYPE_NAME, AD_FORMAT_NAME.',
+    ),
+  order_by: z
+    .array(z.string().min(1))
+    .optional()
+    .describe(
+      'Columns to sort by, each a requested metric or dimension optionally prefixed "+" (asc) or "-" (desc), e.g. ["-ESTIMATED_EARNINGS"]. Sorting happens before limit.',
     ),
   currency_code: z
     .string()
@@ -157,7 +164,15 @@ function formatDate(d?: { year: number; month: number; day: number }): string | 
 // ============================================================================
 
 export async function runAdsenseReport(input: AdsenseReportInput): Promise<AdsenseReportResult> {
-  const { account, date_range, start_date, end_date, metrics, dimensions, currency_code, limit } = input
+  const { account, date_range, start_date, end_date, metrics, dimensions, order_by, currency_code, limit } = input
+
+  if (!(DATE_RANGES as readonly string[]).includes(date_range)) {
+    return errorResult(
+      ErrorCode.INVALID_INPUT,
+      `Unsupported date_range "${date_range}". Valid presets: ${DATE_RANGES.join(', ')}.`,
+      'For longer windows (e.g. last 3 months) use date_range "CUSTOM" with start_date and end_date.',
+    )
+  }
 
   // CUSTOM requires an explicit window; presets must NOT carry one (AdSense
   // rejects start/end dates alongside a named range).
@@ -188,12 +203,23 @@ export async function runAdsenseReport(input: AdsenseReportInput): Promise<Adsen
     return errorResult(ErrorCode.INVALID_INPUT, 'At least one metric is required.')
   }
 
+  const columns = new Set([...metrics, ...dimensions])
+  const unknownOrder = (order_by ?? []).filter((o) => !columns.has(o.replace(/^[+-]/, '')))
+  if (unknownOrder.length > 0) {
+    return errorResult(
+      ErrorCode.INVALID_INPUT,
+      `order_by column(s) not in the requested metrics/dimensions: ${unknownOrder.join(', ')}.`,
+      'Add the column to metrics or dimensions, or drop it from order_by.',
+    )
+  }
+
   const accountPath = account.startsWith('accounts/') ? account : `accounts/${account}`
 
   const query: Record<string, string | string[] | undefined> = {
     dateRange: date_range,
     metrics,
     dimensions: dimensions.length > 0 ? dimensions : undefined,
+    orderBy: order_by && order_by.length > 0 ? order_by : undefined,
     currencyCode: currency_code,
     limit: String(limit),
     ...(date_range === 'CUSTOM'
@@ -235,7 +261,8 @@ export const adsenseReportTool = {
     'Generates an AdSense Management API report for one account. ' +
     'Get the account name from adsense_accounts_list first. ' +
     'Defaults: last 7 days, metrics [ESTIMATED_EARNINGS, PAGE_VIEWS, IMPRESSIONS, CLICKS, IMPRESSIONS_RPM], broken down by DATE. ' +
-    'Use date_range="CUSTOM" with start_date/end_date for an explicit window. ' +
+    'Use date_range="CUSTOM" with start_date/end_date for an explicit window (required for anything longer than 30 days). ' +
+    'Use order_by (e.g. ["-ESTIMATED_EARNINGS"]) with limit for top-N breakdowns. ' +
     'Returns rows as name→value maps plus totals. Read-only.',
   inputSchema: {
     type: 'object',
@@ -265,6 +292,12 @@ export const adsenseReportTool = {
         items: { type: 'string' },
         description: 'Dimensions to break down by (default: ["DATE"]). e.g. DOMAIN_NAME, COUNTRY_NAME, AD_UNIT_NAME',
         default: DEFAULT_DIMENSIONS,
+      },
+      order_by: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Sort columns (requested metrics/dimensions), "-" prefix for descending, e.g. ["-ESTIMATED_EARNINGS"]. Use with limit to get the top N.',
       },
       currency_code: {
         type: 'string',

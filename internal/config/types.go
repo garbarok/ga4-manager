@@ -1,5 +1,10 @@
 package config
 
+import (
+	"net/url"
+	"strings"
+)
+
 // ProjectConfig represents a project configuration loaded from YAML
 // Supports GA4-only, GSC-only, or combined configurations
 type ProjectConfig struct {
@@ -94,6 +99,39 @@ type SearchConsoleConfig struct {
 
 	// Search analytics configuration
 	SearchAnalytics *SearchAnalyticsConfig `yaml:"search_analytics,omitempty"`
+
+	// HreflangPairs declares translated page sets checked by `gsc hreflang`.
+	// Each entry maps a language code (e.g. "en", "es") to an absolute URL on
+	// the site. When absent, the hreflang diagnostic discovers pairs itself.
+	HreflangPairs []map[string]string `yaml:"hreflang_pairs,omitempty"`
+}
+
+// SiteHost returns the host a GSC site identifier covers: the bare domain for
+// sc-domain: properties, or the prefix URL's host for URL-prefix properties.
+func (sc *SearchConsoleConfig) SiteHost() string {
+	if strings.HasPrefix(sc.SiteURL, "sc-domain:") {
+		return strings.ToLower(strings.TrimPrefix(sc.SiteURL, "sc-domain:"))
+	}
+	u, err := url.Parse(sc.SiteURL)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+// CoversHost reports whether host belongs to the GSC site. A domain property
+// covers the domain and every subdomain (www., m., …); a URL-prefix property
+// covers only its exact host.
+func (sc *SearchConsoleConfig) CoversHost(host string) bool {
+	site := sc.SiteHost()
+	host = strings.ToLower(host)
+	if site == "" || host == "" {
+		return false
+	}
+	if strings.HasPrefix(sc.SiteURL, "sc-domain:") {
+		return host == site || strings.HasSuffix(host, "."+site)
+	}
+	return host == site
 }
 
 // SitemapConfig defines a sitemap to submit to GSC

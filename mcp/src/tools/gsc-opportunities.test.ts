@@ -58,7 +58,53 @@ describe('buildOpportunitiesArgs', () => {
   })
 })
 
+describe('buildOpportunitiesArgs granularity', () => {
+  it('appends --granularity page only in page mode', () => {
+    const page = buildOpportunitiesArgs(
+      gscOpportunitiesInputSchema.parse({ config: 'c.yaml', granularity: 'page' }),
+    )
+    expect(page.slice(-2)).toEqual(['--granularity', 'page'])
+    const query = buildOpportunitiesArgs(gscOpportunitiesInputSchema.parse({ config: 'c.yaml' }))
+    expect(query).not.toContain('--granularity')
+  })
+
+  it('rejects an unknown granularity', () => {
+    expect(gscOpportunitiesInputSchema.safeParse({ config: 'c.yaml', granularity: 'site' }).success).toBe(false)
+  })
+})
+
 describe('parseOpportunitiesOutput', () => {
+  it('keeps page-mode fields', () => {
+    const out = parseOpportunitiesOutput(
+      JSON.stringify({
+        command: 'gsc_opportunities',
+        site: 'sc-domain:x.app',
+        generated_at: '2026-09-27T12:00:00Z',
+        results: [
+          {
+            query: '',
+            page: 'https://www.x.app/calculator/mortgage-calculator',
+            position: 8.8,
+            clicks: 500,
+            impressions: 100000,
+            ctr: 0.005,
+            bucket: 9,
+            category_median_ctr: 0.035,
+            median_source: 'baseline',
+            ctr_gap: 0.0292,
+            potential_clicks: 3000,
+            top_queries: [{ query: 'mortgage calculator', impressions: 10000, clicks: 50, position: 9.7 }],
+            anonymized_share: 0.85,
+          },
+        ],
+        quota_used: 2,
+      }),
+    )
+    expect(out.results[0].anonymized_share).toBe(0.85)
+    expect(out.results[0].top_queries?.[0].query).toBe('mortgage calculator')
+    expect(out.quota_used).toBe(2)
+  })
+
   it('parses a valid CLI envelope', () => {
     const stdout = JSON.stringify({
       command: 'gsc_opportunities',
@@ -111,12 +157,13 @@ describe('gscOpportunitiesTool definition', () => {
     expect(gscOpportunitiesTool.inputSchema.required).toContain('config')
   })
 
-  it('declares all four args', () => {
+  it('declares all five args', () => {
     const props = gscOpportunitiesTool.inputSchema.properties as Record<string, unknown>
     expect(props.config).toBeDefined()
     expect(props.days).toBeDefined()
     expect(props.min_impressions).toBeDefined()
     expect(props.min_potential_clicks).toBeDefined()
+    expect(props.granularity).toBeDefined()
   })
 
   it('mentions potential_clicks in its description so consumers know the ranking key', () => {

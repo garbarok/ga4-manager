@@ -66,13 +66,13 @@ Avoid: "GSC property", "Search Console account".
 Google's credential discovery chain. Supports both user credentials (via `gcloud auth application-default login`) and service account keys (via `GOOGLE_APPLICATION_CREDENTIALS` env var). The project uses ADC for all API calls.
 
 ### MCP tool
-One of the 16 structured operations exposed by the MCP server in `mcp/` to AI assistants. Each tool maps to either a CLI command (spawned as a subprocess) or a native TypeScript implementation.
+One of the structured operations exposed by the MCP server in `mcp/` to AI assistants. Each tool maps to either a CLI command (spawned as a subprocess) or a native TypeScript implementation. The tool registry is the authoritative list; documentation should not hard-code a count.
 
 ---
 
 ## SEO Diagnostics
 
-The four canonical signals the GSC analysis commands report. Each is a strict, mutually-exclusive predicate over a query×page row, defined so that a given comparison window classifies a page into at most one of decay/CTR anomaly. Opportunity and cannibalisation are orthogonal — a page may simultaneously be an opportunity and a cannibalisation participant.
+The four canonical signals the GSC analysis commands report (decay, CTR anomaly, opportunity, cannibalisation), followed by the supporting diagnostic terms. Each is a strict, mutually-exclusive predicate over a query×page row, defined so that a given comparison window classifies a page into at most one of decay/CTR anomaly. Opportunity and cannibalisation are orthogonal — a page may simultaneously be an opportunity and a cannibalisation participant.
 
 ### Decay
 A page slipping in ranking, with downstream traffic loss. Position-driven.
@@ -101,7 +101,14 @@ opportunity ≔ position ∈ [5, 20] AND ctr < category_median_ctr
 
 **Category (v1):** the position bucket. For a row at position *p*, `category_median_ctr` is the median CTR of all rows in the same site/window at `round(p)`. This is the industry-standard position-CTR-curve approach and requires zero config. The term *category* is intentionally left abstract so it can later graduate to a page-template clustering (e.g. `/calculator/*` vs `/blog/*`) without renaming the concept.
 
+**Granularity:** an opportunity is evaluated either per query × page (the default) or per **page**. At page granularity the peer group is other pages in the same position bucket, and the published baseline position-CTR curve is a floor on the expected CTR: a page is never excused because its neighbours also under-convert.
+
 Avoid: "easy win", "low-hanging fruit".
+
+### Anonymized share
+The fraction of a page's search impressions that Search Console does not attribute to any disclosed query (privacy-filtered and rare queries). A high anonymized share means an opportunity lives in a long tail the Operator cannot inspect query by query.
+
+Avoid: "hidden queries", "(not provided)".
 
 ### Cannibalisation
 Two or more pages on the same site ranking for the same query, splitting authority.
@@ -116,6 +123,28 @@ The `canonical_candidate` field on a cannibalisation result is a heuristic: it i
 - `consolidating` — at least one page is `Page with redirect`; the migration is mid-flight and the finding will decay out of the GSC attribution window on its own.
 
 Avoid: "duplicate ranking", "query overlap".
+
+### Cross-language ranking
+A query written in one language of a translation pair earning impressions on the pair's page in the other language. Distinct from cannibalisation: the two pages are intended equivalents, and the fix is hreflang wiring, not consolidation.
+
+Avoid: "wrong-language cannibalisation".
+
+### URL hygiene issue
+A URL that earns search impressions but should never be a standalone search result: a malformed path, an in-page fragment, a framework asset route, a query-string duplicate of an indexed URL, or (informational only) a legal/utility page.
+
+Avoid: "junk URL", "index bloat" (index bloat is the aggregate effect, not the per-URL finding).
+
+---
+
+## Growth Planning
+
+### Growth brief
+The per-site, cross-source summary an Operator or assistant starts a growth plan from: search, traffic and ad-revenue KPIs with period-over-period deltas, top pages by revenue, the highest-impact diagnostic findings, and the data gaps that limit it. It reports facts; it does not prescribe the plan.
+
+Avoid: "report", "dashboard", "audit".
+
+### Data gap
+A source a growth brief could not use for a site — not configured, failed, or empty (e.g. no ad revenue attributed because AdSense is not linked to the property). A brief with data gaps is still a successful brief.
 
 ---
 
@@ -140,7 +169,7 @@ internal/ga4/  GA4 Admin API client (rate-limited, idempotent)
     ↓
 Google Analytics Admin API v1alpha
 
-mcp/           TypeScript MCP server (16 tools)
+mcp/           TypeScript MCP server
     ↓ (spawns or calls)
 cmd/ binary or native fetch
 ```

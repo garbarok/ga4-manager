@@ -5,6 +5,25 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-09-27
+
+### Added
+
+- **`site_growth_brief`** — one compact brief per site (≤ ~4 KB) for writing SEO / monetization plans: GSC + GA4 traffic + AdSense-in-GA4 revenue KPIs with period-over-period deltas, top pages joined across sources and ranked by revenue, the top 10 diagnostic findings ranked by estimated clicks, and `data_gaps` for any source that was missing or failed. `config` for one site or `all: true` for every `configs/*.yaml`.
+- **`ga4_traffic_report`** — GA4 Data API report by page / landing page / channel / source / country / device / date with sessions, engagement, page views and, when AdSense is linked to GA4, ad revenue, ad impressions, ad clicks and `revenue_per_1k_sessions`. Warns `ad_revenue_unavailable` when nothing is attributed.
+- **`gsc_url_hygiene`** — URLs earning impressions that should not be indexed: `malformed_path`, `fragment`, `asset_route`, `query_duplicate`, `utility_page` (info), each with a one-line fix.
+- **`gsc_hreflang`** — hreflang pair integrity (`missing_return_link`, `missing_self_reference`, `wrong_target`, `missing_x_default`) and `cross_language_ranking` detection. Pairs from `search_console.hreflang_pairs` or discovered from the site's own annotations.
+- **`gsc_opportunities` `granularity: "page"`** — ranks whole pages, with `top_queries` and `anonymized_share`. Catches high-impression pages whose traffic is spread over anonymized long-tail queries; the expected CTR is floored at the industry baseline so weak neighbouring pages cannot hide an opportunity.
+- **`adsense_report` `order_by`** — sort by any requested metric/dimension (`"-ESTIMATED_EARNINGS"`) before `limit`, for top-N breakdowns.
+
+### Changed
+
+- **BREAKING (never-working values only): `adsense_report` `date_range` no longer accepts `LAST_MONTH`, `LAST_3_MONTHS`, `LAST_6_MONTHS`, `LAST_12_MONTHS`, `LAST_YEAR`.** The AdSense v2 API rejects each with HTTP 400; the tool now returns `INVALID_INPUT` locally with a hint to use `CUSTOM` + `start_date`/`end_date`.
+
+### Fixed
+
+- AdSense and GA4 Data API HTTP 4xx errors (other than auth / not found / quota) were reported as `UPSTREAM_5XX`; they are now `INVALID_INPUT` with the upstream message. `ga4_consent_health` shares the new GA4 Data client and gets the same fix.
+
 ## [3.2.1] - 2026-07-16
 
 ### Fixed

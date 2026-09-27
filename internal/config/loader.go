@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -222,6 +223,29 @@ func validateSearchConsoleConfig(sc *SearchConsoleConfig) error {
 		}
 	}
 
-	return nil
+	return validateHreflangPairs(sc)
 }
 
+// validateHreflangPairs requires every pair to name at least two languages,
+// each pointing at an absolute http(s) URL on the configured site — the
+// hreflang diagnostic only ever fetches own-site pages.
+func validateHreflangPairs(sc *SearchConsoleConfig) error {
+	for i, pair := range sc.HreflangPairs {
+		if len(pair) < 2 {
+			return fmt.Errorf("hreflang_pairs[%d] must list at least two languages", i)
+		}
+		for lang, raw := range pair {
+			if lang == "" {
+				return fmt.Errorf("hreflang_pairs[%d] has an empty language code", i)
+			}
+			u, err := url.Parse(raw)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return fmt.Errorf("hreflang_pairs[%d].%s must be an absolute http(s) URL: %q", i, lang, raw)
+			}
+			if !sc.CoversHost(u.Hostname()) {
+				return fmt.Errorf("hreflang_pairs[%d].%s host %q is not covered by site_url %s", i, lang, u.Hostname(), sc.SiteURL)
+			}
+		}
+	}
+	return nil
+}

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
-import { getGoogleAuthHeaders } from '../utils/google-auth.js'
+import { runReport } from '../utils/ga4-data-client.js'
 import {
   ToolError,
   ErrorCode,
@@ -79,50 +79,11 @@ export type Ga4ConsentHealthResult =
 // Data API
 // ============================================================================
 
-interface DataApiResponse {
-  rows?: ConsentReportRow[]
-  error?: { code: number; message: string }
-}
-
 async function runDataApiReport(
   propertyId: string,
   body: Record<string, unknown>,
 ): Promise<ConsentReportRow[]> {
-  const authHeaders = await getGoogleAuthHeaders([
-    'https://www.googleapis.com/auth/analytics.readonly',
-  ])
-
-  const url = `https://analyticsdata.googleapis.com/v1beta/${propertyId}:runReport`
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { ...authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    if (response.status === 403) {
-      throw new ToolError(
-        ErrorCode.AUTH_DENIED,
-        `GA4 Data API access denied for ${propertyId} (HTTP 403)`,
-        'Grant the service account Viewer role on the GA4 property. See mcp/PERMISSIONS.md.',
-      )
-    }
-    if (response.status === 404) {
-      throw new ToolError(
-        ErrorCode.NOT_FOUND,
-        `GA4 property not found: ${propertyId}`,
-        'Verify the property ID in GA4 Admin → Property Settings.',
-      )
-    }
-    throw new ToolError(
-      ErrorCode.UPSTREAM_5XX,
-      `GA4 Data API error (HTTP ${response.status}): ${text}`,
-    )
-  }
-
-  const data = (await response.json()) as DataApiResponse
+  const data = await runReport(propertyId, body)
   return data.rows ?? []
 }
 

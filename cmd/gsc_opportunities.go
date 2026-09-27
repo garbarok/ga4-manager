@@ -20,6 +20,14 @@ const (
 	opportunitiesDaysMax     = 485
 	opportunitiesRowLimit    = 5000
 	opportunitiesCommandName = "gsc_opportunities"
+
+	// Page granularity pulls the full query×page breakdown so
+	// anonymized_share compares like with like (25k = one GSC page).
+	opportunitiesPageQueryRowLimit = 25000
+	opportunitiesTopQueries        = 5
+
+	granularityQuery = "query"
+	granularityPage  = "page"
 )
 
 var (
@@ -28,6 +36,7 @@ var (
 	gscOpportunitiesDays              int
 	gscOpportunitiesMinImpressions    int64
 	gscOpportunitiesMinPotentialClick int64
+	gscOpportunitiesGranularity       string
 )
 
 var gscOpportunitiesCmd = &cobra.Command{
@@ -50,6 +59,16 @@ Each result carries everything a title-rewrite agent needs:
 The current page title/meta are NOT in GSC data — fetch them from the
 site itself if you want to feed them to an LLM for rewriting.
 
+Granularity:
+  --granularity query      (default) one result per query × page
+  --granularity page       one result per page. Catches pages whose
+                           impressions sit in GSC's anonymized long tail,
+                           where no single query looks like an opportunity.
+                           A bucket needs 3 peer pages (after the impression
+                           floor) to use the site median; otherwise the
+                           baseline curve is used. Each result carries
+                           top_queries and anonymized_share. Costs 2 quota.
+
 Filter knobs:
   --min-impressions N      ignore queries below this monthly impression
                            threshold (default 20 — low-impression queries
@@ -68,7 +87,8 @@ Examples:
   ga4 gsc opportunities --config configs/mysite.yaml
   ga4 gsc opportunities --config configs/mysite.yaml --format json
   ga4 gsc opportunities --config configs/mysite.yaml --min-impressions 50
-  ga4 gsc opportunities --config configs/mysite.yaml --min-potential-clicks 10`,
+  ga4 gsc opportunities --config configs/mysite.yaml --min-potential-clicks 10
+  ga4 gsc opportunities --config configs/mysite.yaml --granularity page --days 90`,
 	RunE: opportunitiesRunE,
 }
 
@@ -78,6 +98,7 @@ func init() {
 	gscOpportunitiesCmd.Flags().StringVar(&gscOpportunitiesFormat, "format", diagcmd.FormatTable, "Output format: table or json")
 	gscOpportunitiesCmd.Flags().IntVar(&gscOpportunitiesDays, "days", opportunitiesDaysDefault, "Lookback window in days (1–485)")
 	gscOpportunitiesCmd.Flags().Int64Var(&gscOpportunitiesMinImpressions, "min-impressions", 5, "Minimum impressions for a query to be considered (drops noise; default 5 — small sites need a low floor)")
+	gscOpportunitiesCmd.Flags().StringVar(&gscOpportunitiesGranularity, "granularity", granularityQuery, "Result granularity: query (query × page) or page")
 	gscOpportunitiesCmd.Flags().Int64Var(&gscOpportunitiesMinPotentialClick, "min-potential-clicks", 1, "Drop opportunities below this projected click gain (default 1 — suppresses 0-click rounding-error findings)")
 }
 
@@ -106,6 +127,11 @@ type OpportunityResultRow struct {
 	MedianSource    string  `json:"median_source"`
 	CTRGap          float64 `json:"ctr_gap"`
 	PotentialClicks int64   `json:"potential_clicks"`
+	// TopQueries and AnonymizedShare are set only under --granularity page.
+	// Pointers so query mode omits them while page mode always emits them
+	// (an empty top_queries array included).
+	TopQueries      *[]diagnostics.PageQuery `json:"top_queries,omitempty"`
+	AnonymizedShare *float64                 `json:"anonymized_share,omitempty"`
 }
 
 // OpportunitiesOutput is the JSON envelope under --format json.
@@ -118,6 +144,7 @@ func opportunitiesRunE(_ *cobra.Command, _ []string) error {
 		Days:               gscOpportunitiesDays,
 		MinImpressions:     gscOpportunitiesMinImpressions,
 		MinPotentialClicks: gscOpportunitiesMinPotentialClick,
+		Granularity:        gscOpportunitiesGranularity,
 		Factory:            gscOpportunitiesClientFactory,
 		Stdout:             os.Stdout,
 		Stderr:             os.Stderr,
@@ -133,6 +160,7 @@ type opportunitiesParams struct {
 	Days               int
 	MinImpressions     int64
 	MinPotentialClicks int64
+	Granularity        string // "" is treated as query
 	Factory            func() (gsc.SearchAPI, func(), error)
 	Stdout             io.Writer
 	Stderr             io.Writer
@@ -146,6 +174,13 @@ func runOpportunitiesCommand(p opportunitiesParams) int {
 	if err := validateOpportunitiesDays(p.Days); err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
+	granularity := p.Granularity
+	if granularity == "" {
+		granularity = granularityQuery
+	}
+	if granularity != granularityQuery && granularity != granularityPage {
+		return diagcmd.FailWith(p.Stderr, "invalid --granularity %q: must be %q or %q", granularity, granularityQuery, granularityPage)
+	}
 
 	site, _, err := diagcmd.LoadSite(p.ConfigPath)
 	if err != nil {
@@ -158,7 +193,12 @@ func runOpportunitiesCommand(p opportunitiesParams) int {
 	}
 	defer cleanup()
 
-	env, err := buildOpportunitiesEnvelope(client, site, p.Days, p.MinImpressions, p.MinPotentialClicks, p.Now)
+	var env OpportunitiesOutput
+	if granularity == granularityPage {
+		env, err = buildPageOpportunitiesEnvelope(client, site, p.Days, p.MinImpressions, p.MinPotentialClicks, p.Now)
+	} else {
+		env, err = buildOpportunitiesEnvelope(client, site, p.Days, p.MinImpressions, p.MinPotentialClicks, p.Now)
+	}
 	if err != nil {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
@@ -207,22 +247,89 @@ func buildOpportunitiesEnvelope(client gsc.SearchAPI, site string, days int, min
 		if r.PotentialClicks < minPotentialClicks {
 			continue
 		}
-		rows = append(rows, OpportunityResultRow{
-			Query:             r.Query,
-			Page:              r.Page,
-			Position:          r.Position,
-			Clicks:            r.Clicks,
-			Impressions:       r.Impressions,
-			CTR:               r.CTR,
-			Bucket:            r.Bucket,
-			CategoryMedianCTR: r.CategoryMedianCTR,
-			MedianSource:      r.MedianSource,
-			CTRGap:            r.CTRGap,
-			PotentialClicks:   r.PotentialClicks,
-		})
+		rows = append(rows, toOpportunityResultRow(r))
 	}
 
 	return diagcmd.NewEnvelope(opportunitiesCommandName, site, now, rows, report.QuotaUsed), nil
+}
+
+// buildPageOpportunitiesEnvelope runs the opportunity predicate on page-level
+// rows. Two Search Analytics calls: the page dimension (accurate page totals,
+// including anonymized queries) and query×page (top_queries and the disclosed
+// share used for anonymized_share).
+func buildPageOpportunitiesEnvelope(client gsc.SearchAPI, site string, days int, minImpressions, minPotentialClicks int64, now time.Time) (OpportunitiesOutput, error) {
+	startDate, endDate := gsc.BuildDateRange(days)
+	pages, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
+		SiteURL:    site,
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Dimensions: []string{"page"},
+		RowLimit:   opportunitiesRowLimit,
+		DataState:  "final",
+	})
+	if err != nil {
+		return OpportunitiesOutput{}, fmt.Errorf("search analytics page query failed: %w", err)
+	}
+	queries, err := client.QuerySearchAnalytics(&gsc.SearchAnalyticsQuery{
+		SiteURL:    site,
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Dimensions: []string{"query", "page"},
+		RowLimit:   opportunitiesPageQueryRowLimit,
+		DataState:  "final",
+	})
+	if err != nil {
+		return OpportunitiesOutput{}, fmt.Errorf("search analytics query×page query failed: %w", err)
+	}
+
+	// The impression floor removes low-traffic pages (legal pages, stray
+	// asset URLs) before bucketing, so they neither become results nor
+	// count as peers.
+	filtered := make([]gsc.SearchAnalyticsRow, 0, len(pages.Rows))
+	for _, r := range pages.Rows {
+		if r.Impressions >= minImpressions {
+			filtered = append(filtered, r)
+		}
+	}
+
+	breakdown := diagnostics.BreakdownByPage(queries.Rows, opportunitiesTopQueries)
+	diag := diagnostics.OpportunityWith(filtered, diagnostics.OpportunityOptions{MinPeers: diagnostics.PageMinPeers, BaselineFloor: true})
+	rows := make([]OpportunityResultRow, 0, len(diag))
+	for _, r := range diag {
+		if r.PotentialClicks < minPotentialClicks {
+			continue
+		}
+		row := toOpportunityResultRow(r)
+		b := breakdown[r.Page]
+		share := diagnostics.AnonymizedShare(r.Impressions, b.DisclosedImpressions)
+		row.AnonymizedShare = &share
+		top := b.TopQueries
+		if top == nil {
+			top = []diagnostics.PageQuery{}
+		}
+		row.TopQueries = &top
+		rows = append(rows, row)
+	}
+
+	// QuotaUsed is the client's running total, so the last call's value
+	// already covers both requests.
+	return diagcmd.NewEnvelope(opportunitiesCommandName, site, now, rows, queries.QuotaUsed), nil
+}
+
+func toOpportunityResultRow(r diagnostics.OpportunityResult) OpportunityResultRow {
+	return OpportunityResultRow{
+		Query:             r.Query,
+		Page:              r.Page,
+		Position:          r.Position,
+		Clicks:            r.Clicks,
+		Impressions:       r.Impressions,
+		CTR:               r.CTR,
+		Bucket:            r.Bucket,
+		CategoryMedianCTR: r.CategoryMedianCTR,
+		MedianSource:      r.MedianSource,
+		CTRGap:            r.CTRGap,
+		PotentialClicks:   r.PotentialClicks,
+	}
 }
 
 var opportunitiesColumns = []string{

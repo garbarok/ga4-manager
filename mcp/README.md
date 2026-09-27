@@ -116,12 +116,12 @@ See **[CONFIGURATION.md](./CONFIGURATION.md)** for setup guides:
 **Claude Desktop:**
 - Restart Claude Desktop
 - Click 🔌 icon in bottom-left
-- Should show "ga4-manager" with 16 tools
+- Should show "ga4-manager" with 29 tools
 
 **Claude CLI:**
 ```bash
 claude mcp list
-# Should show: ga4-manager (25 tools)
+# Should show: ga4-manager (29 tools)
 ```
 
 **VS Code/Cursor:**
@@ -129,11 +129,14 @@ claude mcp list
 
 ---
 
-## Available Tools (25)
+## Available Tools (29)
 
 ### Tool Categories
 
-**GA4 Analytics (7 tools)** - Configuration and management
+**Growth planning (1 tool)** - Start here for SEO / monetization plans
+- `site_growth_brief` - One compact brief per site: GSC + GA4 traffic + AdSense-in-GA4 revenue KPIs with deltas, top pages by revenue, and the top 10 diagnostic findings ranked by estimated clicks
+
+**GA4 Analytics (8 tools)** - Configuration, management and traffic
 - `ga4_setup` - Create conversions, dimensions, metrics
 - `ga4_report` - View current configuration
 - `ga4_cleanup` - Remove unused resources
@@ -141,8 +144,9 @@ claude mcp list
 - `ga4_link_create` - Create a Search Console/BigQuery/Channels link
 - `ga4_link_remove` - Remove (unlink) a BigQuery/Channels link
 - `ga4_validate` - Configuration validation
+- `ga4_traffic_report` - Sessions, engagement, page views and ad revenue (when AdSense is linked) by page, landing page, channel, source, country, device or date
 
-**Search Console (12 tools)** - SEO and indexing
+**Search Console (14 tools)** - SEO and indexing
 - `gsc_sitemaps_list` - List all sitemaps
 - `gsc_sitemaps_submit` - Submit new sitemap
 - `gsc_sitemaps_delete` - Remove sitemap
@@ -152,9 +156,11 @@ claude mcp list
 - `gsc_monitor_urls` - Batch URL monitoring
 - `gsc_index_coverage` - Index coverage report
 - `gsc_cannibalization` - Detect keyword cannibalization across URLs
-- `gsc_opportunities` - Surface ranking/CTR improvement opportunities
+- `gsc_opportunities` - Surface ranking/CTR improvement opportunities (per query, or per page with `granularity: "page"`)
 - `gsc_ctr_anomaly` - Flag pages with anomalous CTR for their position
 - `gsc_health` - Search Console health overview
+- `gsc_url_hygiene` - URLs with impressions that should not be indexed (fragments, asset routes, malformed paths, query duplicates)
+- `gsc_hreflang` - hreflang pair integrity and cross-language ranking
 
 **Diagnostics & SEO (4 tools)** - Traffic analysis and page auditing
 - `gsc_traffic_compare` - Diff GSC traffic between two date ranges per URL
@@ -169,7 +175,7 @@ claude mcp list
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`
+- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`
 
 **Modifying (Use with caution):**
 - `ga4_setup`, `ga4_cleanup`, `ga4_link_create`, `ga4_link_remove`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
@@ -1102,12 +1108,16 @@ Generates an earnings report for one account, returning each row as a `header �
   account: string;        // Required: "accounts/pub-..." from adsense_accounts_list
   date_range?:            // Preset window (default "LAST_7_DAYS")
     | "CUSTOM" | "TODAY" | "YESTERDAY" | "MONTH_TO_DATE" | "YEAR_TO_DATE"
-    | "LAST_7_DAYS" | "LAST_30_DAYS" | "LAST_MONTH"
-    | "LAST_3_MONTHS" | "LAST_6_MONTHS" | "LAST_12_MONTHS" | "LAST_YEAR";
+    | "LAST_7_DAYS" | "LAST_30_DAYS";
+                          // Anything longer (e.g. last 3 months): use "CUSTOM".
+                          // The AdSense API rejects LAST_MONTH / LAST_3_MONTHS /
+                          // LAST_6_MONTHS / LAST_12_MONTHS / LAST_YEAR.
   start_date?: string;    // YYYY-MM-DD, required when date_range = "CUSTOM"
   end_date?: string;      // YYYY-MM-DD, required when date_range = "CUSTOM"
   metrics?: string[];     // default ESTIMATED_EARNINGS, PAGE_VIEWS, IMPRESSIONS, CLICKS, IMPRESSIONS_RPM
   dimensions?: string[];  // default ["DATE"]; e.g. DOMAIN_NAME, COUNTRY_NAME, AD_UNIT_NAME
+  order_by?: string[];    // sort before limit; requested metric/dimension, "-" = desc,
+                          // e.g. ["-ESTIMATED_EARNINGS"] for top earners first
   currency_code?: string; // ISO-4217, e.g. "USD" (defaults to account currency)
   limit?: number;         // max rows (default 100, max 1000)
 }
@@ -1129,6 +1139,59 @@ Generates an earnings report for one account, returning each row as a `header �
   "totals": { "ESTIMATED_EARNINGS": "9.81", "PAGE_VIEWS": "5894" },
   "warnings": []
 }
+```
+
+### Growth, Traffic & Index-Quality Tools
+
+#### `site_growth_brief` - Per-Site Growth Brief
+
+The starting point for an SEO or monetization plan. For one config (or every `configs/*.yaml` with `all: true`, examples excluded) it joins Search Console, GA4 traffic and AdSense-in-GA4 revenue into a compact brief (≤ ~4 KB per site):
+
+- `kpis` — GSC clicks, impressions, CTR, position; GA4 sessions, engagement rate; ad revenue and revenue per 1k sessions
+- `deltas` — % change vs the preceding window of the same length
+- `top_pages` — up to 10 pages joined on path (GSC clicks/impressions, sessions, ad revenue), ranked by revenue then clicks
+- `findings` — top 10 from page-level opportunities, CTR anomalies, URL-hygiene warnings and (when `hreflang_pairs` are configured) hreflang warnings, ranked by estimated clicks at stake
+- `data_gaps` — sources that were not configured or failed; the brief still returns the rest
+
+```typescript
+{ config?: string; all?: boolean; days?: number /* 7–240, default 28 */ }
+```
+
+Revenue is GA4-attributed (`totalAdRevenue`), so it needs AdSense linked to the GA4 property; use `adsense_report` for payout figures. The brief never calls URL Inspection or the AdSense API.
+
+#### `ga4_traffic_report` - GA4 Traffic & Ad Revenue
+
+GA4 Data API report by up to two of `pagePath`, `landingPage`, `sessionDefaultChannelGroup`, `sessionSource`, `country`, `deviceCategory`, `date`. Every row carries `sessions`, `engaged_sessions`, `engagement_rate`, `average_session_duration_s`, `page_views`, `ad_revenue`, `ad_impressions`, `ad_clicks` and `revenue_per_1k_sessions`, plus `totals`. The warning `ad_revenue_unavailable` means no AdSense impressions were attributed (not linked, or no ads served).
+
+```typescript
+{
+  property_id?: string;   // "123456789" or "properties/123456789"
+  config?: string;        // alternative: uses the config's ga4.property_id
+  days?: number;          // 1–365, default 28, ending yesterday
+  dimensions?: string[];  // default ["pagePath"]
+  order_by?: "sessions" | "page_views" | "ad_revenue" | "engagement_rate"; // desc, default sessions
+  limit?: number;         // 1–1000, default 50
+}
+```
+
+#### `gsc_opportunities` with `granularity: "page"`
+
+Page mode ranks whole pages instead of query × page rows. It catches high-impression pages whose traffic is spread over anonymized long-tail queries, where no single query looks like an opportunity. The expected CTR is the higher of the bucket's site median (≥3 peer pages above `min_impressions`) and the industry baseline, so weak neighbours never excuse a page. Each result adds `top_queries` (up to 5) and `anonymized_share` (0–1). Costs 2 Search Analytics calls.
+
+#### `gsc_url_hygiene` - Index-Polluting URLs
+
+Classifies every URL with impressions (default 90 days) into at most one of `malformed_path`, `fragment`, `asset_route`, `query_duplicate`, `utility_page` (info). Each result has a one-line `fix`. Exit 2 / `results` non-empty on any warning.
+
+#### `gsc_hreflang` - hreflang Integrity & Cross-Language Ranking
+
+Uses `search_console.hreflang_pairs` from the config, or discovers pairs by fetching the top `max_pages` pages (default 50) and reading their `<link rel="alternate" hreflang>` tags. Reports `missing_return_link`, `missing_self_reference`, `wrong_target`, `missing_x_default` (info), and `cross_language_ranking` (a query in one pair language getting ≥ `min_impressions` on the other language's page). Fetches only the configured site's host, as `ga4-manager/<version>`, max 4 at a time.
+
+```yaml
+search_console:
+  site_url: "sc-domain:example.com"
+  hreflang_pairs:
+    - en: "https://www.example.com/calculator"
+      es: "https://www.example.com/es/calculadora"
 ```
 
 ---

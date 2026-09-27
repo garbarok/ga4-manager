@@ -107,6 +107,8 @@
 ---
 
 ### BO-07 · Hreflang Cross-Validation
+
+> **Status: implemented** as `ga4 gsc hreflang` / MCP `gsc_hreflang` (OpenSpec change `close-growth-intelligence-gaps`). Pairs come from `search_console.hreflang_pairs` or are discovered from the top pages' own annotations; adds cross-language ranking detection.
 **Problem:** Multi-language sites declare hreflang pairs between equivalent pages. If one side is de-indexed, returns the wrong canonical, or is robots-blocked, Google silently ignores the entire hreflang signal — breaking geo-targeting without any error surfacing.
 
 **What it does:**
@@ -182,8 +184,8 @@ search_console:
 
 These were surfaced during the 2026-06-05 grilling session but not yet resolved. Recommended answers in parentheses.
 
-1. **BO-08 outbound HTTP probing scope.** The redirect chain validator wants to follow redirects via local HTTP. Does the tool probe only URLs declared in config, or follow chains into arbitrary destinations? What user-agent? Robots.txt respected? (*Recommendation:* probe only config-declared own-site URLs; identify as `ga4-manager/<version>`; do not honour robots.txt for own-site probes; `--max-concurrent` flag with default 4.)
+1. ~~**BO-08 outbound HTTP probing scope.**~~ **Resolved** (implemented for BO-07's page fetches in `internal/gsc/httpprobe`): own-site hosts only, `ga4-manager/<version>` user-agent, robots.txt not honoured for own-site probes, 4 concurrent, 5 redirect hops, 10 s timeout. BO-08 should reuse the same prober. The redirect chain validator wants to follow redirects via local HTTP. Does the tool probe only URLs declared in config, or follow chains into arbitrary destinations? What user-agent? Robots.txt respected? (*Recommendation:* probe only config-declared own-site URLs; identify as `ga4-manager/<version>`; do not honour robots.txt for own-site probes; `--max-concurrent` flag with default 4.)
 2. **BO-01 prior-period comparison.** The opportunity finder is currently single-window. Should `--compare-to-prior` be a separate flag, or always-on? (*Recommendation:* opt-in flag — single-window is the common case and avoids doubling the quota cost.)
 3. **BO-04 "impression waste" definition.** The metric used to rank cannibalisation severity needs a precise formula. (*Recommendation:* `sum(impressions across cannibalising pages) − max(impressions on single page)` — the impressions that would theoretically consolidate onto the canonical page.)
 4. **`internal/seo/webvitals.go` stub.** Constants for CWV thresholds exist but BO-09 defers CWV until CrUX traffic is available. Delete the stub, or keep it as a placeholder? (*Recommendation:* delete — per "no half-finished implementations" project guideline. Re-add when BO-09 is picked up.)
-5. **BO-07 hreflang config location.** The proposed `hreflang_pairs:` block lives under `search_console:` to keep all GSC-driven config nested together. Confirm? (*Recommendation:* yes.)
+5. ~~**BO-07 hreflang config location.**~~ **Resolved:** `search_console.hreflang_pairs`. The proposed `hreflang_pairs:` block lives under `search_console:` to keep all GSC-driven config nested together. Confirm? (*Recommendation:* yes.)

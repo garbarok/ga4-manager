@@ -303,3 +303,72 @@ func TestEnhancedMeasurementConfigValidation(t *testing.T) {
 func unmarshalYAML(data []byte, v any) error {
 	return yaml.Unmarshal(data, v)
 }
+
+// TestHreflangPairsValidation covers search_console.hreflang_pairs: every URL
+// must be absolute and on the configured site.
+func TestHreflangPairsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		siteURL string
+		pairs   []map[string]string
+		wantErr string
+	}{
+		{
+			name:    "valid pair on domain property subdomain",
+			siteURL: "sc-domain:example.com",
+			pairs: []map[string]string{{
+				"en": "https://www.example.com/calculator/mortgage-calculator",
+				"es": "https://www.example.com/calculator/calculadora-hipoteca",
+			}},
+		},
+		{
+			name:    "relative URL rejected",
+			siteURL: "sc-domain:example.com",
+			pairs:   []map[string]string{{"en": "/calculator/a", "es": "https://www.example.com/b"}},
+			wantErr: "absolute http(s) URL",
+		},
+		{
+			name:    "off-host URL rejected",
+			siteURL: "sc-domain:example.com",
+			pairs:   []map[string]string{{"en": "https://www.example.com/a", "es": "https://evil.example/b"}},
+			wantErr: "not covered by site_url",
+		},
+		{
+			name:    "URL-prefix property does not cover other subdomains",
+			siteURL: "https://www.example.com/",
+			pairs:   []map[string]string{{"en": "https://www.example.com/a", "es": "https://es.example.com/b"}},
+			wantErr: "not covered by site_url",
+		},
+		{
+			name:    "single-language pair rejected",
+			siteURL: "sc-domain:example.com",
+			pairs:   []map[string]string{{"en": "https://example.com/a"}},
+			wantErr: "at least two languages",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSearchConsoleConfig(&SearchConsoleConfig{SiteURL: tt.siteURL, HreflangPairs: tt.pairs})
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestHreflangPairsYAML(t *testing.T) {
+	var pc ProjectConfig
+	require.NoError(t, yaml.Unmarshal([]byte(`
+search_console:
+  site_url: "sc-domain:example.com"
+  hreflang_pairs:
+    - en: "https://example.com/en/a"
+      es: "https://example.com/es/a"
+`), &pc))
+	require.Len(t, pc.SearchConsole.HreflangPairs, 1)
+	assert.Equal(t, "https://example.com/es/a", pc.SearchConsole.HreflangPairs[0]["es"])
+}

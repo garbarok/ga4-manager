@@ -13,6 +13,19 @@ export enum ErrorCode {
   PARTIAL_FETCH_FAILED = 'PARTIAL_FETCH_FAILED',
 }
 
+/**
+ * Classify an upstream Google API HTTP failure. A 4xx that isn't auth, missing
+ * resource or quota means the request itself was rejected (bad argument), so it
+ * is the caller's input — not an upstream outage — and must not read as 5xx.
+ */
+export function errorCodeForStatus(status: number): ErrorCode {
+  if (status === 401 || status === 403) return ErrorCode.AUTH_DENIED
+  if (status === 404) return ErrorCode.NOT_FOUND
+  if (status === 429) return ErrorCode.QUOTA_EXCEEDED
+  if (status >= 400 && status < 500) return ErrorCode.INVALID_INPUT
+  return ErrorCode.UPSTREAM_5XX
+}
+
 export class ToolError extends Error {
   constructor(
     public readonly code: ErrorCode,

@@ -20,10 +20,14 @@ import { gscIndexCoverageSpec } from './tools/gsc-coverage.js'
 import { gscCannibalizationSpec } from './tools/gsc-cannibalization.js'
 import { gscOpportunitiesSpec } from './tools/gsc-opportunities.js'
 import { gscCTRAnomalySpec } from './tools/gsc-ctr-anomaly.js'
+import { gscUrlHygieneSpec } from './tools/gsc-url-hygiene.js'
+import { gscHreflangSpec } from './tools/gsc-hreflang.js'
 import { gscHealthSpec } from './tools/gsc-health.js'
 import { gscMonitorUrlsSpec } from './tools/gsc-monitor.js'
 import { gscTrafficCompareSpec } from './tools/gsc-traffic-compare.js'
 import { ga4ConsentHealthSpec } from './tools/ga4-consent-health.js'
+import { ga4TrafficReportSpec } from './tools/ga4-traffic-report.js'
+import { siteGrowthBriefSpec } from './tools/site-growth-brief.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
 import { adsenseAccountsListSpec } from './tools/adsense-accounts.js'
@@ -31,6 +35,8 @@ import { adsenseReportSpec } from './tools/adsense-report.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
+  // Cross-source entry point: the brief an assistant starts a growth plan from
+  siteGrowthBriefSpec,
   // GA4
   ga4SetupSpec,
   ga4ReportSpec,
@@ -50,11 +56,14 @@ export const SPECS: ToolSpec[] = [
   gscCannibalizationSpec,
   gscOpportunitiesSpec,
   gscCTRAnomalySpec,
+  gscUrlHygieneSpec,
+  gscHreflangSpec,
   gscHealthSpec,
   gscMonitorUrlsSpec,
   // Native (no CLI)
   gscTrafficCompareSpec,
   ga4ConsentHealthSpec,
+  ga4TrafficReportSpec,
   seoPageAuditSpec,
   seoAuditBatchSpec,
   // AdSense (publisher reporting — native, no CLI)

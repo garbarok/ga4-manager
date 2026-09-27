@@ -27,6 +27,13 @@ export const gscOpportunitiesInputSchema = z.object({
     .describe(
       'Minimum impressions for a query to be considered (drops long-tail noise from the bucket median calculation). Default: 20.',
     ),
+  granularity: z
+    .enum(['query', 'page'])
+    .optional()
+    .default('query')
+    .describe(
+      'query (default): one result per query × page. page: one result per page — catches pages whose impressions sit in GSC\'s anonymized long tail; adds top_queries and anonymized_share; costs 2 quota.',
+    ),
   min_potential_clicks: z
     .number()
     .int()
@@ -60,6 +67,13 @@ export interface OpportunityResultRow {
    * position bucket. Results are sorted by this descending.
    */
   potential_clicks: number
+  /** Page granularity only: up to 5 disclosed queries by impressions. */
+  top_queries?: { query: string; impressions: number; clicks: number; position: number }[]
+  /**
+   * Page granularity only: share of the page's impressions not attributed to
+   * any disclosed query (0–1). High → the rewrite targets an invisible long tail.
+   */
+  anonymized_share?: number
 }
 
 export interface OpportunitiesOutput {
@@ -87,6 +101,8 @@ export function buildOpportunitiesArgs(input: GscOpportunitiesInput): string[] {
     String(input.min_impressions),
     '--min-potential-clicks',
     String(input.min_potential_clicks),
+    // Query granularity is the CLI default; only page mode needs the flag.
+    ...(input.granularity === 'page' ? ['--granularity', 'page'] : []),
   ]
 }
 
@@ -113,7 +129,9 @@ export function parseOpportunitiesOutput(stdout: string): OpportunitiesOutput {
 export const gscOpportunitiesTool = {
   name: 'gsc_opportunities',
   description:
-    'Detect under-converting queries on page 1–2 of Google Search Console. For each query × page where the page already ranks at position 5–20 but the CTR is below the median for its position bucket, the result carries everything an LLM consumer needs to act: query, page, current position, clicks, impressions, ctr, bucket, category_median_ctr, ctr_gap, and potential_clicks (the extra monthly clicks the page would gain at the bucket median CTR). Results are sorted by potential_clicks descending so the biggest revenue wins come first. Stateless: one Search Analytics API call per run. The current page title and meta description are NOT in GSC data — fetch them from the site itself when feeding an LLM for rewriting.',
+    'Detect under-converting queries on page 1–2 of Google Search Console. For each query × page where the page already ranks at position 5–20 but the CTR is below the median for its position bucket, the result carries everything an LLM consumer needs to act: query, page, current position, clicks, impressions, ctr, bucket, category_median_ctr, ctr_gap, and potential_clicks (the extra monthly clicks the page would gain at the bucket median CTR). Results are sorted by potential_clicks descending so the biggest revenue wins come first. Stateless: one Search Analytics API call per run. The current page title and meta description are NOT in GSC data — fetch them from the site itself when feeding an LLM for rewriting. ' +
+    'Use granularity="page" to rank whole pages instead: it finds high-impression pages whose traffic is spread over anonymized long-tail queries (no single query stands out), and adds top_queries plus anonymized_share per page. Page mode costs 2 Search Analytics calls. ' +
+    'potential_clicks is an upper-bound estimate when median_source is "baseline" (industry curve, not vertical-specific).',
   inputSchema: {
     type: 'object',
     required: ['config'],
@@ -135,6 +153,13 @@ export const gscOpportunitiesTool = {
           'Minimum impressions for a query to be considered. Drops long-tail noise from the bucket median. Default: 20.',
         default: 20,
         minimum: 1,
+      },
+      granularity: {
+        type: 'string',
+        enum: ['query', 'page'],
+        default: 'query',
+        description:
+          'query (default): results per query × page. page: results per page, with top_queries and anonymized_share — use it to find big pages whose impressions are spread across anonymized long-tail queries.',
       },
       min_potential_clicks: {
         type: 'number',
