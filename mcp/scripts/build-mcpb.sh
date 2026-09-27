@@ -54,7 +54,11 @@ echo ">> tsc build" >&2
 echo ">> staging server/ via pnpm deploy (prod, hoisted)" >&2
 rm -rf "$STAGE" "$DEPLOY"
 mkdir -p "$STAGE/server" "$STAGE/bin"
-( cd "$MCP_DIR" && pnpm --filter ga4-manager-mcp deploy --prod --legacy \
+# NOTE: no --legacy here. This repo is a pnpm workspace, and pnpm@12.6's
+# legacy deploy implementation silently produces an empty node_modules for
+# workspace + hoisted-linker deploys (reports success, ships nothing) — the
+# root cause of the ERR_MODULE_NOT_FOUND crash in installed bundles.
+( cd "$MCP_DIR" && pnpm --filter ga4-manager-mcp deploy --prod \
     --config.node-linker=hoisted "$DEPLOY" >/dev/null 2>&1 )
 mv "$DEPLOY/node_modules" "$STAGE/server/node_modules"
 cp "$DEPLOY/package.json" "$STAGE/server/package.json"
@@ -62,10 +66,24 @@ cp -R "$MCP_DIR/dist" "$STAGE/server/dist"
 rm -rf "$STAGE/server/node_modules/.bin"   # dev CLI shims; the server needs none
 rm -rf "$DEPLOY"
 
+# `pnpm deploy` can fail silently into an empty node_modules (e.g. lockfile
+# drift, network hiccup) without tripping `set -e`, shipping a bundle that
+# crashes on startup with ERR_MODULE_NOT_FOUND. Fail loudly instead.
+if [ -z "$(ls -A "$STAGE/server/node_modules" 2>/dev/null)" ]; then
+  echo "!! server/node_modules is empty after pnpm deploy — aborting" >&2
+  exit 1
+fi
+if [ ! -d "$STAGE/server/node_modules/@modelcontextprotocol/sdk" ]; then
+  echo "!! @modelcontextprotocol/sdk missing from staged node_modules — aborting" >&2
+  exit 1
+fi
+
 # ---- 3. cross-compile the ga4 Go binary -----------------------------------
-echo ">> go build ga4 -> bin/$GA4_BIN" >&2
+GA4_VERSION="$(cd "$REPO_ROOT" && git describe --tags --always --dirty 2>/dev/null || echo "dev")"
+echo ">> go build ga4 $GA4_VERSION -> bin/$GA4_BIN" >&2
 ( cd "$REPO_ROOT" && GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 \
-    go build -trimpath -ldflags="-s -w" -o "$STAGE/bin/$GA4_BIN" . )
+    go build -trimpath -ldflags="-s -w -X 'github.com/garbarok/ga4-manager/cmd.Version=$GA4_VERSION'" \
+    -o "$STAGE/bin/$GA4_BIN" . )
 chmod +x "$STAGE/bin/$GA4_BIN" 2>/dev/null || true
 
 # ---- 4. stage the manifest (sync version, pin platform, handle icon) -------
