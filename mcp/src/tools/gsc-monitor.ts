@@ -10,7 +10,7 @@ import { mapCLIError } from '../utils/errors.js';
  * Input schema for gsc_monitor_urls tool
  * Supports two modes:
  * 1. Config-based: { config: string, dry_run?: boolean, format?: string }
- * 2. Direct URL array (NEW in v2.0.0): { site: string, urls: string[], dry_run?: boolean, format?: string }
+ * 2. Direct URL array: { site: string, urls: string[], dry_run?: boolean, format?: string }
  */
 export const gscMonitorUrlsInputSchema = z.union([
   // Existing config-based approach
@@ -22,7 +22,7 @@ export const gscMonitorUrlsInputSchema = z.union([
     /** Output format: json, table, or markdown */
     format: z.string().optional().default('json'),
   }),
-  // NEW: Direct URL array approach (v2.0.0)
+  // Direct URL array approach
   z.object({
     /** Site URL: domain property (sc-domain:example.com) or URL prefix (https://example.com/) */
     site: z.string().min(1, 'Site URL is required'),
@@ -614,7 +614,7 @@ export function parseMonitorUrlsOutput(output: string, input: GscMonitorUrlsInpu
  */
 export const gscMonitorUrlsTool = {
   name: 'gsc_monitor_urls',
-  description: 'Monitor multiple URLs for indexing issues. Supports two modes: 1) Config-based: Load URLs from YAML file, 2) Direct array (NEW v2.0.0): Pass URLs directly as array (max 50 URLs). Returns inspection results with index status, mobile usability, and any issues detected.',
+  description: 'Monitor multiple URLs for indexing issues. Supports two modes: 1) Config-based: Load URLs from YAML file, 2) Direct array: Pass URLs directly as array (max 50 URLs). Returns inspection results with index status, mobile usability, and any issues detected.',
   inputSchema: {
     type: 'object' as const,
     properties: {
