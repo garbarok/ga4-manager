@@ -108,7 +108,7 @@ describe('mapCLIError', () => {
     const result: CLIResult = {
       exitCode: 1,
       stdout: '',
-      stderr: 'Error: permission denied accessing property 513421535',
+      stderr: 'Error: permission denied accessing property 123456789',
       duration: 150
     };
 

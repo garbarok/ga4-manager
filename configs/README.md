@@ -50,9 +50,9 @@ Open `configs/my-project.yaml` and fill in:
 ```
 configs/
 ├── examples/              # Example configurations
-│   ├── snapcompress.yaml  # SnapCompress project example
-│   ├── personal.yaml      # Personal website example (coming soon)
-│   └── template.yaml      # Blank template to copy
+│   ├── basic-ecommerce.yaml  # E-commerce example
+│   ├── content-site.yaml     # Content/blog site example
+│   └── template.yaml         # Blank template to copy
 ├── README.md              # This file
 └── your-project.yaml      # Your custom configs go here
 ```

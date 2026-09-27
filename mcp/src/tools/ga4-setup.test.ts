@@ -93,7 +93,7 @@ describe('ga4_setup tool', () => {
 ───────────────────────────────────────────────
   ✓ Configuration loaded (configs/test.yaml)
   ✓ GA4 credentials valid
-  ✓ Property access verified (513421535)
+  ✓ Property access verified (123456789)
 
 [1/2] 📊 Google Analytics 4 Setup
 ───────────────────────────────────────────────
@@ -223,7 +223,7 @@ pre-flight validation failed: missing credentials
 📋 Pre-flight Validation
 ───────────────────────────────────────────────
   ✓ Configuration loaded (configs/test.yaml)
-  ✓ Property access verified (513421535)
+  ✓ Property access verified (123456789)
 
 [1/2] 📊 Google Analytics 4 Setup
 ───────────────────────────────────────────────
@@ -237,7 +237,7 @@ Setup completed successfully!
 
       const result = parseSetupOutput(output, false);
 
-      expect(result.project?.property_id).toBe('513421535');
+      expect(result.project?.property_id).toBe('123456789');
     });
 
     it('handles combined GA4 + GSC setup', () => {

@@ -13,10 +13,10 @@ Extended the `cleanup` command to support archiving custom metrics in addition t
 
 ```bash
 # Remove only custom metrics
-./ga4 cleanup --project snapcompress --type metrics
+./ga4 cleanup --project my-project --type metrics
 
 # Remove everything (conversions, dimensions, AND metrics)
-./ga4 cleanup --project snapcompress --type all
+./ga4 cleanup --project my-project --type all
 ```
 
 **Why This Matters:**
@@ -91,7 +91,7 @@ When you archive a custom dimension or metric in GA4, the **parameter name is pe
 
 - ✅ Build: Successful
 - ✅ Linter: 0 issues
-- ✅ Cleanup tested with SnapCompress property:
+- ✅ Cleanup tested against a production property:
   - Removed 28 conversions
   - Archived 38 custom metrics (**NEW**)
   - Archived 62 custom dimensions
@@ -103,13 +103,13 @@ When you archive a custom dimension or metric in GA4, the **parameter name is pe
 
 ```bash
 # Preview changes (recommended first step)
-./ga4 cleanup --project snapcompress --dry-run
+./ga4 cleanup --project my-project --dry-run
 
 # Remove only metrics
-./ga4 cleanup --project snapcompress --type metrics
+./ga4 cleanup --project my-project --type metrics
 
 # Remove everything
-./ga4 cleanup --project snapcompress --type all --yes
+./ga4 cleanup --project my-project --type all --yes
 ```
 
 ### With YAML Config

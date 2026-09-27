@@ -196,7 +196,7 @@ Cursor uses the same config format as VS Code:
         "GOOGLE_APPLICATION_CREDENTIALS": "/absolute/path/to/credentials.json",
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GA4_BINARY_PATH": "/absolute/path/to/ga4-manager/ga4",
-        "GA4_DEFAULT_PROPERTY_ID": "513421535"
+        "GA4_DEFAULT_PROPERTY_ID": "123456789"
       }
     }
   }
@@ -276,7 +276,7 @@ ga4_report({})
 {
   "env": {
     "GOOGLE_APPLICATION_CREDENTIALS": "/prod/credentials.json",
-    "GA4_DEFAULT_PROPERTY_ID": "513421535",
+    "GA4_DEFAULT_PROPERTY_ID": "123456789",
     "GSC_DEFAULT_SITE": "sc-domain:example.com"
   }
 }

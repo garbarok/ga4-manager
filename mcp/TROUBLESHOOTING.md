@@ -349,7 +349,7 @@ This affects every user who follows `scripts/setup.sh` exactly: the API enables 
 **Fix — create a free PSI API key:**
 
 1. Open [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
-2. Select your project (the same one used for `GCP_PROJECT` / quota project, e.g. `portfolio-blog-479009`).
+2. Select your project (the same one used for `GCP_PROJECT` / quota project, e.g. `my-gcp-project`).
 3. **+ Create Credentials** → **API key**.
 4. Click **Edit** on the new key:
    - **Application restrictions:** None (or HTTP referrers if calling from a browser).

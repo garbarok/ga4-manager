@@ -265,7 +265,7 @@ Cleanup complete!
 GA4 Manager - Cleanup
 ===============================================
 
-Project: SnapCompress (Property: 513421535)
+Project: Example (Property: 123456789)
 -----------------------------------------------
 No cleanup configured for this project
 

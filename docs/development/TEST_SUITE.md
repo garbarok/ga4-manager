@@ -236,16 +236,16 @@ Tests custom metric creation, listing, archival, and validation.
 
 **File**: `internal/config/projects_test.go`
 
-Tests project configuration structure and SnapCompress/PersonalWebsite projects.
+Tests project configuration structure and two example projects (an app and a content site).
 
 #### Tests Included:
 
-- `TestSnapCompressProject`
-- `TestPersonalWebsiteProject`
-- `TestSnapCompressConversions`
-- `TestSnapCompressDimensions`
-- `TestPersonalWebsiteConversions`
-- `TestPersonalWebsiteDimensions`
+- `TestExampleAppProject`
+- `TestExampleContentSiteProject`
+- `TestExampleAppConversions`
+- `TestExampleAppDimensions`
+- `TestExampleContentSiteConversions`
+- `TestExampleContentSiteDimensions`
 - `TestProjectProperties` (table-driven with 2 cases)
 - `TestConversionDuplicates` (table-driven with 2 cases)
 - `TestDimensionDuplicates` (table-driven with 2 cases)
@@ -254,8 +254,8 @@ Tests project configuration structure and SnapCompress/PersonalWebsite projects.
 - `TestDimensionParameterNaming`
 - `TestProjectMetrics` (table-driven with 2 cases)
 - `TestProjectAudiences` (table-driven with 2 cases)
-- `TestSnapCompressSpecificConversions`
-- `TestPersonalWebsiteSpecificConversions`
+- `TestExampleAppSpecificConversions`
+- `TestExampleContentSiteSpecificConversions`
 - `TestDimensionScopeDistribution` (table-driven with 2 cases)
 - `TestConversionCountingMethodDistribution` (table-driven with 2 cases)
 - `TestPropertyIDFormat` (table-driven with 2 cases)

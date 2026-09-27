@@ -193,7 +193,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 
 # Now run ga4 commands
-ga4 report --project snapcompress
+ga4 report --project my-project
 ```
 
 **Security Best Practices:**
@@ -212,7 +212,7 @@ ga4 --version
 ga4 --help
 
 # Test with dry-run
-ga4 setup --project snapcompress --dry-run
+ga4 setup --project my-project --dry-run
 ```
 
 ---
@@ -221,21 +221,21 @@ ga4 setup --project snapcompress --dry-run
 
 ```bash
 # View configuration reports
-ga4 report --project snapcompress
+ga4 report --project my-project
 ga4 report --project personal
 ga4 report --all
 
 # Setup GA4 properties (requires credentials)
-ga4 setup --project snapcompress --dry-run  # Preview changes
-ga4 setup --project snapcompress            # Apply changes
+ga4 setup --project my-project --dry-run  # Preview changes
+ga4 setup --project my-project            # Apply changes
 
 # Cleanup unused items
 ga4 cleanup --project personal --dry-run    # Preview cleanup
 ga4 cleanup --project personal              # Remove items
 
 # Link external services
-ga4 link status --project snapcompress
-ga4 link channels --project snapcompress
+ga4 link status --project my-project
+ga4 link channels --project my-project
 ```
 
 ---

@@ -196,7 +196,7 @@ Then run:
 # configs/prod.yaml
 project:
   name: "My Site (Production)"
-  property_id: "513421535"
+  property_id: "123456789"
 ```
 
 ### Development
@@ -283,7 +283,7 @@ dimensions:
 ### Config Validation Errors
 
 **Error:** `Invalid property ID format`
-- Property IDs must be numeric (e.g., "513421535")
+- Property IDs must be numeric (e.g., "123456789")
 - No "GA" prefix or dashes
 
 **Error:** `Reserved prefix detected`
