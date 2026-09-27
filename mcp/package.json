@@ -14,23 +14,23 @@
     "pack:mcpb": "bash scripts/build-mcpb.sh"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "bottleneck": "^2.19.5",
     "csv-parse": "^6.2.1",
     "node-html-parser": "^7.1.0",
     "robots-parser": "^3.0.1",
-    "tldts": "^7.4.4",
+    "tldts": "^7.4.11",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.9.4",
-    "@typescript-eslint/eslint-plugin": "^8.62.0",
-    "@typescript-eslint/parser": "^8.62.0",
-    "eslint": "^10.5.0",
-    "globals": "^17.7.0",
-    "tsx": "^4.22.4",
+    "@types/node": "^25.9.5",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }
