@@ -5,6 +5,16 @@ All notable changes to the GA4 Manager MCP Server will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`render_js` option on `seo_page_audit`/`seo_audit_batch`** — fetches the post-JavaScript DOM via Cloudflare Browser Rendering instead of a plain HTTP fetch, for auditing JS-rendered/SPA pages where a plain fetch misses content Google's own renderer sees. Needs `CF_ACCOUNT_ID`/`CF_API_TOKEN` (or per-call `cf_account_id`/`cf_api_token`); skips redirect-chain/status-code capture in this mode.
+- **`keyword_volume`** — search volume, CPC and competition for a list of keywords, via DataForSEO (needs `DATAFORSEO_USERNAME`/`DATAFORSEO_PASSWORD`).
+- **`keyword_serp_snapshot`** — ranked organic results for a keyword, via DataForSEO, for content-gap/competitive research.
+- **`keyword_rank_check`** — a domain's live Google rank for a keyword today, via ValueSERP (needs `VALUESERP_API_KEY`); distinct from GSC's impression-weighted historical average position already in `site_growth_brief`.
+- **`keyword_rank_check` AI Overview fallback (`check_ai_overview`, default true)** — when a domain misses classic organic results and Google shows an AI Overview for the query, checks whether the domain is cited there instead. A page can be exactly what Google surfaces for a query — and what GSC credits with a position — while being invisible to organic-only rank checks once an AI Overview has taken over the SERP. Costs one extra ValueSERP credit, only when the fallback actually triggers.
+
 ## [3.3.0] - 2026-09-27
 
 ### Added

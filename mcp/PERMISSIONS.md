@@ -12,6 +12,9 @@ This guide explains how to grant the access each tool in the GA4 Manager MCP ser
 - [Google Search Console (GSC)](#google-search-console-gsc)
 - [Google Analytics 4 (GA4)](#google-analytics-4-ga4)
 - [PageSpeed Insights (PSI)](#pagespeed-insights-psi)
+- [Cloudflare Browser Rendering](#cloudflare-browser-rendering)
+- [DataForSEO](#dataforseo)
+- [ValueSERP](#valueserp)
 - [AdSense](#adsense)
 - [Batch Onboarding](#batch-onboarding)
 - [Troubleshooting](#troubleshooting)
@@ -189,6 +192,56 @@ If you skip the API key, PSI calls will return:
 ```
 
 The tool surfaces this as a `psi_unavailable` warning and returns the HTML audit without `cwv` data. The `check_cwv: false` path continues to work unaffected.
+
+---
+
+## Cloudflare Browser Rendering
+
+**Affects tools:** `seo_page_audit`, `seo_audit_batch` (only when `render_js: true`)
+
+A hosted headless Chrome that executes a page's JavaScript before returning its DOM — used to audit JS-rendered/SPA pages, where a plain `fetch()` only sees the initial server-rendered shell and misses what Google's own renderer indexes. This is an unrelated, independent credential (not a Google API) and is billed by Cloudflare per render.
+
+### Steps
+
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com) and note your **Account ID** (right sidebar of any zone/account overview page) — this is `CF_ACCOUNT_ID`.
+2. Go to **My Profile → API Tokens → Create Token**.
+3. Use a custom token with the **Browser Rendering – Edit** permission scoped to your account.
+4. Copy the generated token — this is `CF_API_TOKEN`.
+5. Set both as env vars, or pass `cf_account_id`/`cf_api_token` per call.
+
+> **Cost:** Browser Rendering is billed per Cloudflare's pricing (a free tier exists but has limits). Leave `render_js` off (the default) for ordinary audits — only turn it on for pages you suspect are JS-rendered.
+
+---
+
+## DataForSEO
+
+**Affects tools:** `keyword_volume`, `keyword_serp_snapshot`
+
+A paid third-party SEO data API providing keyword search volume, CPC/competition, and live Google SERP snapshots — data Search Console itself doesn't expose (GSC only reports queries you already get impressions for).
+
+### Steps
+
+1. Create an account at [dataforseo.com](https://dataforseo.com).
+2. Open the [API Access dashboard](https://app.dataforseo.com/api-access) and copy your **Login** and **Password** (a generated API credential pair, not your account email/password).
+3. Set `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD` as env vars.
+
+> **Cost:** DataForSEO is pay-as-you-go per API call; check current pricing on their dashboard before running large keyword batches.
+
+---
+
+## ValueSERP
+
+**Affects tools:** `keyword_rank_check`
+
+Live Google search results, used here to check a domain's **actual rank today** for a keyword — a different signal from `site_growth_brief`'s GSC-derived `gsc_position`, which is an impression-weighted historical average, not a live rank.
+
+### Steps
+
+1. Create an account at [valueserp.com](https://www.valueserp.com).
+2. Copy your API key from the dashboard.
+3. Set `VALUESERP_API_KEY` as an env var, or pass `api_key` per call.
+
+> **Cost:** ValueSERP is billed per search request; each `keyword_rank_check` call counts as one search.
 
 ---
 

@@ -251,6 +251,13 @@ For Cline (VS Code extension), configure via Cline settings:
 | `GA4_CONFIG_DIR` | Directory for YAML configs | `./configs` | `/path/to/configs` |
 | `GA4_TIMEOUT` | CLI execution timeout (ms) | `30000` | `60000` |
 | `PSI_API_KEY` | PageSpeed Insights API key for Core Web Vitals in `seo_page_audit`/`seo_audit_batch`. Without it, keyless PSI is throttled and per-project quota is often 0. A per-call `psi_api_key` takes precedence. | None | `AIzaSy...` |
+| `CF_ACCOUNT_ID` | Cloudflare account ID, for `render_js: true` in `seo_page_audit`/`seo_audit_batch` (Browser Rendering — fetches the post-JavaScript DOM). Per-call `cf_account_id` takes precedence. | None | `a1b2c3...` |
+| `CF_API_TOKEN` | Cloudflare API token with Browser Rendering access, paired with `CF_ACCOUNT_ID`. Per-call `cf_api_token` takes precedence. | None | `abcdef...` |
+| `DATAFORSEO_USERNAME` | DataForSEO API login, for `keyword_volume` and `keyword_serp_snapshot`. | None | `you@example.com` |
+| `DATAFORSEO_PASSWORD` | DataForSEO API password, paired with `DATAFORSEO_USERNAME`. | None | `xxxxxxxx` |
+| `VALUESERP_API_KEY` | ValueSERP API key, for `keyword_rank_check` (live Google rank for a domain/keyword pair). Per-call `api_key` takes precedence. | None | `xxxxxxxx` |
+
+> **Keyword research providers are entirely optional.** `keyword_volume`, `keyword_serp_snapshot` and `keyword_rank_check` only fail (with a clear `AUTH_DENIED`) when called without their respective credentials — no other tool is affected. See [PERMISSIONS.md](./PERMISSIONS.md) for where to get each credential.
 
 ### Using Default Property ID
 

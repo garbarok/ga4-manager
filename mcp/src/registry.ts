@@ -32,6 +32,9 @@ import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
 import { adsenseAccountsListSpec } from './tools/adsense-accounts.js'
 import { adsenseReportSpec } from './tools/adsense-report.js'
+import { keywordVolumeSpec } from './tools/keyword-volume.js'
+import { keywordSerpSnapshotSpec } from './tools/keyword-serp.js'
+import { keywordRankCheckSpec } from './tools/keyword-rank-check.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
@@ -69,6 +72,10 @@ export const SPECS: ToolSpec[] = [
   // AdSense (publisher reporting — native, no CLI)
   adsenseAccountsListSpec,
   adsenseReportSpec,
+  // Keyword research (DataForSEO / ValueSERP)
+  keywordVolumeSpec,
+  keywordSerpSnapshotSpec,
+  keywordRankCheckSpec,
 ]
 
 /** Lookup by tool name for dispatch. */

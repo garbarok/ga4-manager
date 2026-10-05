@@ -7,6 +7,7 @@ import { fetchWithTrace, type RedirectHop } from '../utils/redirect-trace.js'
 import { ToolError } from '../utils/errors.js'
 import { isAllowed as robotsIsAllowed } from '../utils/robots-check.js'
 import { TTLCache } from '../utils/cache.js'
+import { renderHtml } from '../utils/cloudflare-render.js'
 
 // Re-export granular helpers so existing imports continue to work
 export {
@@ -75,6 +76,17 @@ export const seoPageAuditInputSchema = z.object({
     .optional()
     .default(false)
     .describe('Bypass the 5-minute PSI cache and fetch fresh Core Web Vitals data (default: false)'),
+  render_js: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'Fetch the page via Cloudflare Browser Rendering (post-JavaScript DOM) instead of a plain HTTP fetch. ' +
+        'Use for JS-rendered/SPA pages where a plain fetch misses content Google\'s renderer would see. ' +
+        'Needs CF_ACCOUNT_ID/CF_API_TOKEN (or cf_account_id/cf_api_token). Slower, billed per Cloudflare\'s pricing, and skips redirect-chain/status-code capture.',
+    ),
+  cf_account_id: z.string().optional().describe('Cloudflare account ID for render_js. Falls back to the CF_ACCOUNT_ID env var.'),
+  cf_api_token: z.string().optional().describe('Cloudflare API token for render_js. Falls back to the CF_API_TOKEN env var.'),
 })
 
 export type SeoPageAuditInput = z.infer<typeof seoPageAuditInputSchema>
@@ -239,7 +251,7 @@ const emptySignals: HtmlSignals = {
 }
 
 export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPageAuditOutput> {
-  const { url, check_cwv, psi_api_key, psi_strategy, respect_robots, as_googlebot, force_refresh } = input
+  const { url, check_cwv, psi_api_key, psi_strategy, respect_robots, as_googlebot, force_refresh, render_js, cf_account_id, cf_api_token } = input
   const effectiveUA = as_googlebot ? GOOGLEBOT_UA : input.user_agent
   const warnings: string[] = []
 
@@ -276,16 +288,27 @@ export async function runSeoPageAudit(input: SeoPageAuditInput): Promise<SeoPage
   let chain: RedirectHop[]
 
   try {
-    const traceResult = await limiter.schedule(() =>
-      fetchWithTrace(url, {
-        headers: { 'User-Agent': effectiveUA },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      }),
-    )
-    chain = traceResult.chain
-    finalUrl = traceResult.finalUrl
-    statusCode = traceResult.finalRes.status
-    html = await traceResult.finalRes.text()
+    if (render_js) {
+      // Cloudflare's /content endpoint executes JS and returns only the final HTML on
+      // success — it exposes no redirect chain or intermediate status codes, unlike
+      // fetchWithTrace below.
+      html = await limiter.schedule(() => renderHtml(url, { accountId: cf_account_id, apiToken: cf_api_token }))
+      finalUrl = url
+      statusCode = 200
+      chain = []
+      warnings.push('render_js: redirect-chain tracing and raw status-code capture are unavailable in this mode')
+    } else {
+      const traceResult = await limiter.schedule(() =>
+        fetchWithTrace(url, {
+          headers: { 'User-Agent': effectiveUA },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        }),
+      )
+      chain = traceResult.chain
+      finalUrl = traceResult.finalUrl
+      statusCode = traceResult.finalRes.status
+      html = await traceResult.finalRes.text()
+    }
   } catch (err) {
     if (err instanceof ToolError) {
       return {
@@ -383,7 +406,8 @@ export const seoPageAuditTool = {
     'Use when auditing a single page for SEO problems: missing title or description, bad canonical, noindex directives, missing OG image, heading structure issues, redirect chain problems. ' +
     'Fetches the given URL over HTTP with manual redirect tracing (max 5 hops), parses on-page signals (title, meta description, canonical, robots, Open Graph, Schema.org types, h1/h2 counts, hreflang). ' +
     'Returns a structured issues list with severity (error/warning/info) and the full redirect chain. ' +
-    'Optionally checks Core Web Vitals via PageSpeed Insights API.',
+    'Optionally checks Core Web Vitals via PageSpeed Insights API. ' +
+    'Set render_js: true to fetch the post-JavaScript DOM via Cloudflare Browser Rendering instead of a plain fetch — use for JS-rendered/SPA pages (needs CF_ACCOUNT_ID/CF_API_TOKEN); skips redirect-chain/status-code capture.',
   inputSchema: {
     type: 'object',
     required: ['url'],
@@ -426,6 +450,20 @@ export const seoPageAuditTool = {
         type: 'boolean',
         description: 'Bypass the 5-minute PSI cache and fetch fresh Core Web Vitals data (default: false)',
         default: false,
+      },
+      render_js: {
+        type: 'boolean',
+        description:
+          'Fetch via Cloudflare Browser Rendering (post-JS DOM) instead of a plain fetch. Needs CF_ACCOUNT_ID/CF_API_TOKEN. Skips redirect-chain/status-code capture (default: false)',
+        default: false,
+      },
+      cf_account_id: {
+        type: 'string',
+        description: 'Cloudflare account ID for render_js. Falls back to the CF_ACCOUNT_ID env var.',
+      },
+      cf_api_token: {
+        type: 'string',
+        description: 'Cloudflare API token for render_js. Falls back to the CF_API_TOKEN env var.',
       },
     },
   },

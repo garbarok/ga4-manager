@@ -58,6 +58,13 @@ export const seoAuditBatchInputSchema = z
       .optional()
       .default(true)
       .describe('Identify as Googlebot so CDNs that challenge unknown agents still answer (default true)'),
+    render_js: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Fetch each page via Cloudflare Browser Rendering instead of a plain fetch (needs CF_ACCOUNT_ID/CF_API_TOKEN; slower, billed per call)'),
+    cf_account_id: z.string().optional().describe('Cloudflare account ID for render_js. Falls back to the CF_ACCOUNT_ID env var.'),
+    cf_api_token: z.string().optional().describe('Cloudflare API token for render_js. Falls back to the CF_API_TOKEN env var.'),
   })
   .refine((d) => (d.urls && d.urls.length > 0) || d.sitemap, {
     message: 'provide either urls[] or sitemap',
@@ -210,6 +217,9 @@ export async function runSeoAuditBatch(
       psi_api_key: input.psi_api_key,
       respect_robots: input.respect_robots,
       as_googlebot: input.as_googlebot,
+      render_js: input.render_js,
+      cf_account_id: input.cf_account_id,
+      cf_api_token: input.cf_api_token,
     })
     return runSeoPageAudit(pageInput)
   })
@@ -257,7 +267,8 @@ export const seoAuditBatchTool = {
     'Audit many pages at once for SEO problems (missing title/description, bad canonical, noindex, redirect issues, HTTP errors). ' +
     'Provide an explicit urls[] list and/or a sitemap URL (sitemap-index files are followed and expanded). ' +
     'Runs the single-page auditor over each URL with bounded concurrency, fetching each supplied URL over HTTP, and returns per-URL results plus a summary. ' +
-    'Optionally fetches Core Web Vitals via PageSpeed Insights (needs a PSI key; set PSI_API_KEY or pass psi_api_key).',
+    'Optionally fetches Core Web Vitals via PageSpeed Insights (needs a PSI key; set PSI_API_KEY or pass psi_api_key). ' +
+    'Set render_js: true to fetch each page via Cloudflare Browser Rendering (post-JS DOM) instead of a plain fetch (needs CF_ACCOUNT_ID/CF_API_TOKEN).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -303,6 +314,19 @@ export const seoAuditBatchTool = {
         type: 'boolean',
         description: 'Identify as Googlebot so CDNs that challenge unknown agents still answer (default: true)',
         default: true,
+      },
+      render_js: {
+        type: 'boolean',
+        description: 'Fetch each page via Cloudflare Browser Rendering instead of a plain fetch (needs CF_ACCOUNT_ID/CF_API_TOKEN; slower, billed per call)',
+        default: false,
+      },
+      cf_account_id: {
+        type: 'string',
+        description: 'Cloudflare account ID for render_js. Falls back to the CF_ACCOUNT_ID env var.',
+      },
+      cf_api_token: {
+        type: 'string',
+        description: 'Cloudflare API token for render_js. Falls back to the CF_API_TOKEN env var.',
       },
     },
   },

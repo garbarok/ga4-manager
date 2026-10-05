@@ -165,17 +165,22 @@ claude mcp list
 **Diagnostics & SEO (4 tools)** - Traffic analysis and page auditing
 - `gsc_traffic_compare` - Diff GSC traffic between two date ranges per URL
 - `ga4_consent_health` - Consent banner grant/deny rates and health score
-- `seo_page_audit` - On-page SEO audit with optional Core Web Vitals
-- `seo_audit_batch` - Batch on-page SEO audit over a sitemap or URL list
+- `seo_page_audit` - On-page SEO audit with optional Core Web Vitals; `render_js: true` fetches the post-JavaScript DOM via Cloudflare Browser Rendering for JS-rendered/SPA pages
+- `seo_audit_batch` - Batch on-page SEO audit over a sitemap or URL list; supports `render_js` too
 
 **AdSense (2 tools)** - Publisher earnings reporting
 - `adsense_accounts_list` - List accessible AdSense publisher accounts
 - `adsense_report` - Earnings / page views / impressions / clicks / RPM by date, domain, country, ad unit
 
+**Keyword research (3 tools)** - DataForSEO / ValueSERP, opt-in third-party credentials
+- `keyword_volume` - Search volume, CPC and competition for a list of keywords (DataForSEO)
+- `keyword_serp_snapshot` - Who currently ranks for a keyword, for content-gap/competitive research (DataForSEO)
+- `keyword_rank_check` - A domain's live Google rank for a keyword today, distinct from GSC's historical average position (ValueSERP)
+
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`
+- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_rank_check`
 
 **Modifying (Use with caution):**
 - `ga4_setup`, `ga4_cleanup`, `ga4_link_create`, `ga4_link_remove`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`

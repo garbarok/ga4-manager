@@ -14,12 +14,20 @@ import {
   psiCache,
   SeoSignals,
 } from './seo-page-audit.js'
+import { renderHtml } from '../utils/cloudflare-render.js'
+import { ToolError, ErrorCode } from '../utils/errors.js'
 
 // Mock robots-check so tests don't hit network or depend on cache state.
 // clearAllMocks (used in beforeEach) preserves the implementation; resetAllMocks would clear it.
 vi.mock('../utils/robots-check.js', () => ({
   isAllowed: vi.fn().mockResolvedValue(true),
 }))
+
+vi.mock('../utils/cloudflare-render.js', () => ({
+  renderHtml: vi.fn(),
+}))
+
+const mockRenderHtml = vi.mocked(renderHtml)
 
 // ============================================================================
 // Input Schema Validation
@@ -584,6 +592,55 @@ describe('runSeoPageAudit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('fetch', vi.fn())
+  })
+
+  describe('render_js', () => {
+    const RENDERED_HTML = `
+<!DOCTYPE html>
+<html>
+<head><title>Rendered Title</title></head>
+<body><h1>Rendered Heading</h1></body>
+</html>
+`
+
+    it('fetches via renderHtml instead of plain fetch, and warns about tracing limits', async () => {
+      mockRenderHtml.mockResolvedValueOnce(RENDERED_HTML)
+      const plainFetch = vi.fn()
+      vi.stubGlobal('fetch', plainFetch)
+
+      const input = seoPageAuditInputSchema.parse({
+        url: 'https://example.com/spa',
+        render_js: true,
+      })
+      const result = await runSeoPageAudit(input)
+
+      expect(mockRenderHtml).toHaveBeenCalledWith('https://example.com/spa', {
+        accountId: undefined,
+        apiToken: undefined,
+      })
+      expect(plainFetch).not.toHaveBeenCalled()
+      expect(result.success).toBe(true)
+      expect(result.status_code).toBe(200)
+      expect(result.redirect_chain).toEqual([])
+      expect(result.signals?.title).toBe('Rendered Title')
+      expect(result.signals?.h1_count).toBe(1)
+      expect(result.warnings.some((w) => w.includes('render_js'))).toBe(true)
+    })
+
+    it('surfaces missing Cloudflare credentials as a failure', async () => {
+      mockRenderHtml.mockRejectedValueOnce(
+        new ToolError(ErrorCode.AUTH_DENIED, 'render_js requires Cloudflare Browser Rendering credentials.'),
+      )
+
+      const input = seoPageAuditInputSchema.parse({
+        url: 'https://example.com/spa',
+        render_js: true,
+      })
+      const result = await runSeoPageAudit(input)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Cloudflare Browser Rendering credentials')
+    })
   })
 
   const SAMPLE_HTML = `

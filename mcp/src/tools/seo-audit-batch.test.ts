@@ -54,6 +54,7 @@ describe('runSeoAuditBatch', () => {
       psi_strategy: 'mobile',
       respect_robots: true,
       as_googlebot: true,
+      render_js: false,
     })
 
     expect(out.success).toBe(true)
@@ -76,6 +77,7 @@ describe('runSeoAuditBatch', () => {
       psi_strategy: 'mobile',
       respect_robots: true,
       as_googlebot: true,
+      render_js: false,
     })
 
     expect(out.truncated).toBe(true)
@@ -95,6 +97,7 @@ describe('runSeoAuditBatch', () => {
       psi_strategy: 'mobile',
       respect_robots: true,
       as_googlebot: true,
+      render_js: false,
     })
 
     expect(out.summary.pages_with_errors).toBe(1)
