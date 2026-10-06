@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
-import { dataforseoPost } from '../utils/dataforseo-client.js'
+import { dataforseoRequest } from '../utils/dataforseo-client.js'
 import { ToolError, toolErrorToFailure, errorResult, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 
 // ============================================================================
@@ -29,7 +29,7 @@ export interface SerpOrganicRow {
 }
 
 export type KeywordSerpSnapshotResult =
-  | { success: true; keyword: string; results: SerpOrganicRow[] }
+  | { success: true; keyword: string; results: SerpOrganicRow[]; cost_usd: number | null }
   | ToolFailureResult
 
 // ============================================================================
@@ -56,11 +56,14 @@ interface SerpAdvancedResult {
 
 export async function runKeywordSerpSnapshot(input: KeywordSerpSnapshotInput): Promise<KeywordSerpSnapshotResult> {
   try {
-    const rows = await dataforseoPost<SerpAdvancedResult>('serp/google/organic/live/advanced', {
-      keyword: input.keyword,
-      location_name: input.location_name,
-      language_code: input.language_code,
-      depth: input.depth,
+    const { items: rows, cost } = await dataforseoRequest<SerpAdvancedResult>({
+      path: 'serp/google/organic/live/advanced',
+      task: {
+        keyword: input.keyword,
+        location_name: input.location_name,
+        language_code: input.language_code,
+        depth: input.depth,
+      },
     })
 
     const result = rows[0]
@@ -79,7 +82,7 @@ export async function runKeywordSerpSnapshot(input: KeywordSerpSnapshotInput): P
         description: item.description ?? null,
       }))
 
-    return { success: true, keyword: result.keyword, results: organic }
+    return { success: true, keyword: result.keyword, results: organic, cost_usd: cost }
   } catch (err) {
     if (err instanceof ToolError) return toolErrorToFailure(err)
     return errorResult(ErrorCode.UPSTREAM_5XX, err instanceof Error ? err.message : String(err))
@@ -95,7 +98,7 @@ export const keywordSerpSnapshotTool = {
   description:
     'Use when the user wants to see who currently ranks for a keyword (content-gap analysis, competitive research). ' +
     'Backed by the DataForSEO live Google organic SERP endpoint — needs DATAFORSEO_USERNAME/DATAFORSEO_PASSWORD. ' +
-    'Returns ranked organic results (position, url, domain, title, description). ' +
+    'Returns ranked organic results (position, url, domain, title, description), plus cost_usd (billed per call). ' +
     'Pair with keyword_volume for demand and gsc_opportunities for your own site\'s existing performance on the same query.',
   inputSchema: {
     type: 'object',

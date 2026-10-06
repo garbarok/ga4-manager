@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { dataforseoPost } from '../utils/dataforseo-client.js'
+import { dataforseoRequest } from '../utils/dataforseo-client.js'
 import { ToolError, ErrorCode } from '../utils/errors.js'
 import { keywordVolumeInputSchema, runKeywordVolume } from './keyword-volume.js'
 
 vi.mock('../utils/dataforseo-client.js', () => ({
-  dataforseoPost: vi.fn(),
+  dataforseoRequest: vi.fn(),
 }))
 
-const mockPost = vi.mocked(dataforseoPost)
+const mockPost = vi.mocked(dataforseoRequest)
 
 beforeEach(() => {
   mockPost.mockReset()
@@ -33,9 +33,9 @@ describe('keywordVolumeInputSchema', () => {
 
 describe('runKeywordVolume', () => {
   it('maps DataForSEO rows into the output shape', async () => {
-    mockPost.mockResolvedValueOnce([
+    mockPost.mockResolvedValueOnce({ items: [
       { keyword: 'seo tool', search_volume: 1000, cpc: 2.5, competition: 'HIGH', competition_index: 80 },
-    ] as never)
+    ], cost: 0.075 } as never)
 
     const result = await runKeywordVolume(keywordVolumeInputSchema.parse({ keywords: ['seo tool'] }))
 
@@ -45,15 +45,15 @@ describe('runKeywordVolume', () => {
         { keyword: 'seo tool', search_volume: 1000, cpc: 2.5, competition: 'HIGH', competition_index: 80 },
       ])
     }
-    expect(mockPost).toHaveBeenCalledWith('keywords_data/google_ads/search_volume/live', {
-      keywords: ['seo tool'],
-      location_name: 'United States',
-      language_code: 'en',
+    if (result.success) expect(result.cost_usd).toBe(0.075)
+    expect(mockPost).toHaveBeenCalledWith({
+      path: 'keywords_data/google_ads/search_volume/live',
+      task: { keywords: ['seo tool'], location_name: 'United States', language_code: 'en' },
     })
   })
 
   it('returns NOT_FOUND when DataForSEO returns no rows', async () => {
-    mockPost.mockResolvedValueOnce([] as never)
+    mockPost.mockResolvedValueOnce({ items: [], cost: 0.01 } as never)
     const result = await runKeywordVolume(keywordVolumeInputSchema.parse({ keywords: ['nonsense'] }))
     expect(result.success).toBe(false)
     if (!result.success) expect(result.error.code).toBe(ErrorCode.NOT_FOUND)

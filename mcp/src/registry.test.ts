@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { SPECS, SPEC_BY_NAME } from './registry.js';
 
 // These assertions exercise the registry seam directly — the wiring that used
 // to live inside index.ts and was only reachable at runtime. A miswired tool
 // (missing command, wrong kind, missing annotations) now fails here.
 describe('tool registry', () => {
-  it('registers 32 tools with unique names', () => {
+  it('registers 40 tools with unique names', () => {
     const names = SPECS.map((s) => s.tool.name);
-    expect(names).toHaveLength(32);
+    expect(names).toHaveLength(40);
     expect(new Set(names).size).toBe(names.length);
   });
 
@@ -56,5 +57,26 @@ describe('tool registry', () => {
       expect(spec?.kind, name).toBe('cli');
       if (spec?.kind === 'cli') expect(spec.command).toBe('link');
     }
+  });
+
+  it('DataForSEO list tools bound limit (default ≤100, reject 5000 before any request)', () => {
+    const required: Record<string, Record<string, unknown>> = {
+      llm_mentions: { domain: 'a.com', keywords: ['x'] },
+      keyword_gap: { domain: 'a.com', competitor: 'b.com' },
+      ranked_keywords: { domain: 'a.com' },
+      keyword_ideas: { keywords: ['x'] },
+      link_gap: { domain: 'a.com', competitors: ['b.com'] },
+    };
+    for (const [name, base] of Object.entries(required)) {
+      const schema = SPEC_BY_NAME.get(name)!.schema;
+      const parsed = schema.parse(base) as { limit: number };
+      expect(parsed.limit, `${name} default limit`).toBeLessThanOrEqual(100);
+      expect(schema.safeParse({ ...base, limit: 5000 }).success, `${name} limit 5000`).toBe(false);
+    }
+  });
+
+  it('manifest.json lists exactly the registered tools, in order', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8')) as { tools: { name: string }[] };
+    expect(manifest.tools.map((t) => t.name)).toEqual(SPECS.map((s) => s.tool.name));
   });
 });

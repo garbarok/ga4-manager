@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DataForSEO growth tools** — `llm_mentions` (does Google AI / ChatGPT cite a domain for given queries, and who it cites instead), `keyword_gap` (keywords a competitor ranks for and you don't), `ranked_keywords` (any domain's ranking keywords), `keyword_ideas` (ideas with keyword difficulty and search intent), `google_trends` (interest over time for up to 5 terms, with trend and peak), `backlinks_overview` (domain rank / backlinks / referring domains side by side), `link_gap` (domains linking to competitors but not you) and `dataforseo_balance` (free balance check).
+- **`cost_usd` on every DataForSEO result** — including `keyword_volume` and `keyword_serp_snapshot` — so spend per call is visible. List tools default to 100 rows, max 1000.
 - **`render_js` option on `seo_page_audit`/`seo_audit_batch`** — fetches the post-JavaScript DOM via Cloudflare Browser Rendering instead of a plain HTTP fetch, for auditing JS-rendered/SPA pages where a plain fetch misses content Google's own renderer sees. Needs `CF_ACCOUNT_ID`/`CF_API_TOKEN` (or per-call `cf_account_id`/`cf_api_token`); skips redirect-chain/status-code capture in this mode.
 - **`keyword_volume`** — search volume, CPC and competition for a list of keywords, via DataForSEO (needs `DATAFORSEO_USERNAME`/`DATAFORSEO_PASSWORD`).
 - **`keyword_serp_snapshot`** — ranked organic results for a keyword, via DataForSEO, for content-gap/competitive research.

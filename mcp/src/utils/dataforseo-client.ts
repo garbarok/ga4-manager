@@ -18,13 +18,21 @@ export interface DataforseoCredentials {
 interface DataforseoTask<R> {
   status_code: number
   status_message: string
+  cost?: number | null
   result?: R[] | null
 }
 
 interface DataforseoResponse<R> {
   status_code: number
   status_message: string
+  cost?: number | null
   tasks?: DataforseoTask<R>[] | null
+}
+
+/** A task's result items plus the USD cost DataForSEO billed for the request (null when not reported). */
+export interface DataforseoResult<R> {
+  items: R[]
+  cost: number | null
 }
 
 function resolveCredentials(creds: DataforseoCredentials): { username: string; password: string } {
@@ -41,26 +49,40 @@ function resolveCredentials(creds: DataforseoCredentials): { username: string; p
 }
 
 /**
- * POST one task to a DataForSEO "live" endpoint and return its first result array.
- * `path` is the part after `/v3/`, e.g. "keywords_data/google_ads/search_volume/live".
- * `task` is the single task object DataForSEO expects wrapped in an array body.
+ * Lowercase host of a domain or URL, without scheme, leading `www.`, port or path:
+ * `https://www.Example.com/calc` → `example.com`.
  */
-export async function dataforseoPost<R>(
-  path: string,
-  task: Record<string, unknown>,
+export function normalizeDomain(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+    .replace(/[/?#].*$/, '')
+    .replace(/:\d+$/, '')
+    .replace(/^www\./, '')
+}
+
+/**
+ * Call one DataForSEO endpoint and return its first task's result array plus the call cost.
+ * `path` is the part after `/v3/`, e.g. "keywords_data/google_ads/search_volume/live".
+ * POST wraps `task` in the array body DataForSEO expects; GET (e.g. "appendix/user_data") sends no body.
+ */
+export async function dataforseoRequest<R>(
+  req: { method?: 'GET' | 'POST'; path: string; task?: Record<string, unknown>; timeoutMs?: number },
   creds: DataforseoCredentials = {},
-): Promise<R[]> {
+): Promise<DataforseoResult<R>> {
   const { username, password } = resolveCredentials(creds)
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
+  const method = req.method ?? 'POST'
 
-  const response = await fetch(`${DATAFORSEO_BASE}/${path}`, {
-    method: 'POST',
+  const response = await fetch(`${DATAFORSEO_BASE}/${req.path}`, {
+    method,
     headers: {
       Authorization: `Basic ${auth}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify([task]),
-    signal: AbortSignal.timeout(30_000),
+    ...(method === 'POST' ? { body: JSON.stringify([req.task ?? {}]) } : {}),
+    signal: AbortSignal.timeout(req.timeoutMs ?? 30_000),
   })
 
   if (!response.ok) {
@@ -83,5 +105,22 @@ export async function dataforseoPost<R>(
     throw new ToolError(ErrorCode.INVALID_INPUT, `DataForSEO task failed: ${task0.status_message}`)
   }
 
-  return task0.result ?? []
+  const cost = typeof task0.cost === 'number' ? task0.cost : typeof data.cost === 'number' ? data.cost : null
+  return { items: task0.result ?? [], cost }
+}
+
+/** POST one task to a DataForSEO "live" endpoint and return its first result array (cost discarded). */
+export async function dataforseoPost<R>(
+  path: string,
+  task: Record<string, unknown>,
+  creds: DataforseoCredentials = {},
+): Promise<R[]> {
+  return (await dataforseoRequest<R>({ method: 'POST', path, task }, creds)).items
+}
+
+/** Sum call costs; null only when every cost is unknown. Rounded to avoid float noise (0.1 + 0.2). */
+export function sumCosts(costs: (number | null)[]): number | null {
+  const known = costs.filter((c): c is number => c !== null)
+  if (known.length === 0) return null
+  return Math.round(known.reduce((a, b) => a + b, 0) * 1e6) / 1e6
 }

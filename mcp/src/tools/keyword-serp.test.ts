@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { dataforseoPost } from '../utils/dataforseo-client.js'
+import { dataforseoRequest } from '../utils/dataforseo-client.js'
 import { ToolError, ErrorCode } from '../utils/errors.js'
 import { keywordSerpSnapshotInputSchema, runKeywordSerpSnapshot } from './keyword-serp.js'
 
 vi.mock('../utils/dataforseo-client.js', () => ({
-  dataforseoPost: vi.fn(),
+  dataforseoRequest: vi.fn(),
 }))
 
-const mockPost = vi.mocked(dataforseoPost)
+const mockPost = vi.mocked(dataforseoRequest)
 
 beforeEach(() => {
   mockPost.mockReset()
@@ -29,7 +29,7 @@ describe('keywordSerpSnapshotInputSchema', () => {
 
 describe('runKeywordSerpSnapshot', () => {
   it('filters to organic items and maps them, respecting depth', async () => {
-    mockPost.mockResolvedValueOnce([
+    mockPost.mockResolvedValueOnce({ items: [
       {
         keyword: 'best crm',
         items: [
@@ -38,7 +38,7 @@ describe('runKeywordSerpSnapshot', () => {
           { type: 'organic', rank_absolute: 2, url: 'https://b.com/', domain: 'b.com', title: 'B', description: 'desc b' },
         ],
       },
-    ] as never)
+    ], cost: 0.075 } as never)
 
     const result = await runKeywordSerpSnapshot(keywordSerpSnapshotInputSchema.parse({ keyword: 'best crm', depth: 5 }))
 
@@ -48,11 +48,12 @@ describe('runKeywordSerpSnapshot', () => {
         { position: 1, url: 'https://a.com/', domain: 'a.com', title: 'A', description: 'desc a' },
         { position: 2, url: 'https://b.com/', domain: 'b.com', title: 'B', description: 'desc b' },
       ])
+      expect(result.cost_usd).toBe(0.075)
     }
   })
 
   it('returns NOT_FOUND when DataForSEO returns no result', async () => {
-    mockPost.mockResolvedValueOnce([] as never)
+    mockPost.mockResolvedValueOnce({ items: [], cost: 0.01 } as never)
     const result = await runKeywordSerpSnapshot(keywordSerpSnapshotInputSchema.parse({ keyword: 'x' }))
     expect(result.success).toBe(false)
     if (!result.success) expect(result.error.code).toBe(ErrorCode.NOT_FOUND)

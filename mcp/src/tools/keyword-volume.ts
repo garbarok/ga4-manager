@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
-import { dataforseoPost } from '../utils/dataforseo-client.js'
+import { dataforseoRequest } from '../utils/dataforseo-client.js'
 import { ToolError, toolErrorToFailure, errorResult, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 
 // ============================================================================
@@ -36,7 +36,7 @@ export interface KeywordVolumeRow {
 }
 
 export type KeywordVolumeResult =
-  | { success: true; results: KeywordVolumeRow[] }
+  | { success: true; results: KeywordVolumeRow[]; cost_usd: number | null }
   | ToolFailureResult
 
 // ============================================================================
@@ -57,10 +57,13 @@ interface SearchVolumeResult {
 
 export async function runKeywordVolume(input: KeywordVolumeInput): Promise<KeywordVolumeResult> {
   try {
-    const rows = await dataforseoPost<SearchVolumeResult>('keywords_data/google_ads/search_volume/live', {
-      keywords: input.keywords,
-      location_name: input.location_name,
-      language_code: input.language_code,
+    const { items: rows, cost } = await dataforseoRequest<SearchVolumeResult>({
+      path: 'keywords_data/google_ads/search_volume/live',
+      task: {
+        keywords: input.keywords,
+        location_name: input.location_name,
+        language_code: input.language_code,
+      },
     })
 
     if (rows.length === 0) {
@@ -76,6 +79,7 @@ export async function runKeywordVolume(input: KeywordVolumeInput): Promise<Keywo
         competition: r.competition ?? null,
         competition_index: r.competition_index ?? null,
       })),
+      cost_usd: cost,
     }
   } catch (err) {
     if (err instanceof ToolError) return toolErrorToFailure(err)
@@ -92,7 +96,7 @@ export const keywordVolumeTool = {
   description:
     'Use when the user wants monthly search volume, CPC, or competition for a list of keywords (keyword research, content planning). ' +
     'Backed by the DataForSEO Google Ads search-volume endpoint — needs DATAFORSEO_USERNAME/DATAFORSEO_PASSWORD. ' +
-    'Returns per-keyword search_volume, cpc, competition and competition_index. ' +
+    'Returns per-keyword search_volume, cpc, competition and competition_index, plus cost_usd (billed per call, ~$0.075). ' +
     'Complements gsc_opportunities (which reports actual clicks/impressions) with pre-ranking demand estimates for keywords you do not yet rank for.',
   inputSchema: {
     type: 'object',

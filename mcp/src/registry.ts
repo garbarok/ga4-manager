@@ -35,6 +35,14 @@ import { adsenseReportSpec } from './tools/adsense-report.js'
 import { keywordVolumeSpec } from './tools/keyword-volume.js'
 import { keywordSerpSnapshotSpec } from './tools/keyword-serp.js'
 import { keywordRankCheckSpec } from './tools/keyword-rank-check.js'
+import { dataforseoBalanceSpec } from './tools/dataforseo-balance.js'
+import { llmMentionsSpec } from './tools/llm-mentions.js'
+import { keywordGapSpec } from './tools/keyword-gap.js'
+import { rankedKeywordsSpec } from './tools/ranked-keywords.js'
+import { keywordIdeasSpec } from './tools/keyword-ideas.js'
+import { backlinksOverviewSpec } from './tools/backlinks-overview.js'
+import { linkGapSpec } from './tools/link-gap.js'
+import { googleTrendsSpec } from './tools/google-trends.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
@@ -76,6 +84,15 @@ export const SPECS: ToolSpec[] = [
   keywordVolumeSpec,
   keywordSerpSnapshotSpec,
   keywordRankCheckSpec,
+  // Competitive & AI-visibility research (DataForSEO)
+  dataforseoBalanceSpec,
+  llmMentionsSpec,
+  keywordGapSpec,
+  rankedKeywordsSpec,
+  keywordIdeasSpec,
+  googleTrendsSpec,
+  backlinksOverviewSpec,
+  linkGapSpec,
 ]
 
 /** Lookup by tool name for dispatch. */

@@ -215,9 +215,9 @@ A hosted headless Chrome that executes a page's JavaScript before returning its 
 
 ## DataForSEO
 
-**Affects tools:** `keyword_volume`, `keyword_serp_snapshot`
+**Affects tools:** `keyword_volume`, `keyword_serp_snapshot`, `dataforseo_balance`, `llm_mentions`, `keyword_gap`, `ranked_keywords`, `keyword_ideas`, `google_trends`, `backlinks_overview`, `link_gap`
 
-A paid third-party SEO data API providing keyword search volume, CPC/competition, and live Google SERP snapshots — data Search Console itself doesn't expose (GSC only reports queries you already get impressions for).
+A paid third-party SEO data API providing keyword search volume, CPC/competition, live Google SERP snapshots, competitor keyword data, backlinks and AI-answer (LLM) mentions — data Search Console itself doesn't expose (GSC only reports queries you already get impressions for, on your own site).
 
 ### Steps
 
@@ -225,7 +225,22 @@ A paid third-party SEO data API providing keyword search volume, CPC/competition
 2. Open the [API Access dashboard](https://app.dataforseo.com/api-access) and copy your **Login** and **Password** (a generated API credential pair, not your account email/password).
 3. Set `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD` as env vars.
 
-> **Cost:** DataForSEO is pay-as-you-go per API call; check current pricing on their dashboard before running large keyword batches.
+> **Cost:** DataForSEO is pay-as-you-go per API call. Every DataForSEO tool returns `cost_usd` — what DataForSEO billed for that call — and `dataforseo_balance` (free) shows what's left. List tools default to 100 rows and cap at 1000.
+
+| Tool | DataForSEO API (subscription needed) | Approx. cost per call |
+|---|---|---|
+| `dataforseo_balance` | Appendix → user_data | Free |
+| `keyword_volume` | Keywords Data → Google Ads | ~$0.075 |
+| `keyword_serp_snapshot` | SERP → Google organic | ~$0.002 |
+| `llm_mentions` | AI Optimization → LLM Mentions | ~$0.10 per keyword |
+| `keyword_gap` | DataForSEO Labs → domain_intersection | ~$0.01 + $0.0001/row |
+| `ranked_keywords` | DataForSEO Labs → ranked_keywords | ~$0.01 + $0.0001/row |
+| `keyword_ideas` | DataForSEO Labs → keyword_ideas | ~$0.01 + $0.0001/row |
+| `google_trends` | Keywords Data → Google Trends | ~$0.011 |
+| `backlinks_overview` | Backlinks → summary | ~$0.02 per domain |
+| `link_gap` | Backlinks → domain_intersection | ~$0.02 + per-row, per competitor |
+
+Calling an endpoint your DataForSEO plan doesn't include fails with DataForSEO's own status message (e.g. access denied / insufficient funds).
 
 ---
 

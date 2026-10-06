@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { dataforseoPost } from './dataforseo-client.js'
+import { dataforseoPost, dataforseoRequest, normalizeDomain, sumCosts } from './dataforseo-client.js'
 import { ErrorCode } from './errors.js'
 
 describe('dataforseoPost', () => {
@@ -87,5 +87,61 @@ describe('dataforseoPost', () => {
     await expect(
       dataforseoPost('keywords_data/google_ads/search_volume/live', { keywords: ['x'] }, { username: 'u', password: 'p' }),
     ).rejects.toMatchObject({ code: ErrorCode.INVALID_INPUT })
+  })
+})
+
+describe('dataforseoRequest', () => {
+  const creds = { username: 'u', password: 'p' }
+  const okResponse = (body: unknown) => vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('returns items with the task-level cost', async () => {
+    vi.stubGlobal(
+      'fetch',
+      okResponse({ status_code: 20000, status_message: 'Ok.', cost: 0.5, tasks: [{ status_code: 20000, status_message: 'Ok.', cost: 0.075, result: [{ a: 1 }] }] }),
+    )
+    const res = await dataforseoRequest({ path: 'x/live', task: {} }, creds)
+    expect(res).toEqual({ items: [{ a: 1 }], cost: 0.075 })
+  })
+
+  it('falls back to the response-level cost when the task has none', async () => {
+    vi.stubGlobal('fetch', okResponse({ status_code: 20000, status_message: 'Ok.', cost: 0.02, tasks: [{ status_code: 20000, status_message: 'Ok.', result: [] }] }))
+    expect((await dataforseoRequest({ path: 'x/live', task: {} }, creds)).cost).toBe(0.02)
+  })
+
+  it('reports null cost when DataForSEO omits it', async () => {
+    vi.stubGlobal('fetch', okResponse({ status_code: 20000, status_message: 'Ok.', tasks: [{ status_code: 20000, status_message: 'Ok.', result: [] }] }))
+    expect((await dataforseoRequest({ path: 'x/live', task: {} }, creds)).cost).toBeNull()
+  })
+
+  it('sends GET requests without a body', async () => {
+    const mockFetch = okResponse({ status_code: 20000, status_message: 'Ok.', cost: 0, tasks: [{ status_code: 20000, status_message: 'Ok.', result: [{ login: 'u' }] }] })
+    vi.stubGlobal('fetch', mockFetch)
+    await dataforseoRequest({ method: 'GET', path: 'appendix/user_data' }, creds)
+    const [url, init] = mockFetch.mock.calls[0]
+    expect(url).toBe('https://api.dataforseo.com/v3/appendix/user_data')
+    expect(init.method).toBe('GET')
+    expect(init.body).toBeUndefined()
+  })
+})
+
+describe('normalizeDomain', () => {
+  it.each([
+    ['https://www.Example.com/calc', 'example.com'],
+    ['example.com', 'example.com'],
+    ['WWW.example.com:443/', 'example.com'],
+    ['http://sub.example.com?q=1', 'sub.example.com'],
+  ])('%s → %s', (input, expected) => {
+    expect(normalizeDomain(input)).toBe(expected)
+  })
+})
+
+describe('sumCosts', () => {
+  it('sums known costs and ignores nulls', () => {
+    expect(sumCosts([0.02, null, 0.03])).toBe(0.05)
+  })
+  it('is null when every cost is unknown', () => {
+    expect(sumCosts([null, null])).toBeNull()
   })
 })

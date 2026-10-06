@@ -177,10 +177,20 @@ claude mcp list
 - `keyword_serp_snapshot` - Who currently ranks for a keyword, for content-gap/competitive research (DataForSEO)
 - `keyword_rank_check` - A domain's live Google rank for a keyword today, distinct from GSC's historical average position (ValueSERP)
 
+**Competitive & AI-visibility research (8 tools)** - DataForSEO, opt-in; every result reports `cost_usd`
+- `dataforseo_balance` - Remaining DataForSEO balance (free)
+- `llm_mentions` - Whether Google AI answers / ChatGPT mention or cite a domain for given queries, and who they cite instead
+- `keyword_gap` - Keywords a competitor ranks for that you don't, with volume and difficulty
+- `ranked_keywords` - Every keyword and position for any domain, competitors included
+- `keyword_ideas` - Keyword ideas with volume, difficulty (KD) and search intent
+- `google_trends` - Interest over time (0–100) for up to 5 terms: rising/falling, seasonality, peak date
+- `backlinks_overview` - Domain rank, backlinks and referring domains, side by side
+- `link_gap` - Referring domains that link to competitors but not to you (outreach targets)
+
 ### Tool Operation Types
 
 **Read-Only (Safe):**
-- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_rank_check`
+- `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_rank_check`, `dataforseo_balance`, `llm_mentions`, `keyword_gap`, `ranked_keywords`, `keyword_ideas`, `google_trends`, `backlinks_overview`, `link_gap`
 
 **Modifying (Use with caution):**
 - `ga4_setup`, `ga4_cleanup`, `ga4_link_create`, `ga4_link_remove`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`
