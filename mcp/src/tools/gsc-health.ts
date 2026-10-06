@@ -131,4 +131,7 @@ export const gscHealthSpec = cli({
   command: 'gsc',
   buildArgs: buildHealthArgs,
   parse: (out) => parseHealthOutput(out),
+  // One URL Inspection call per priority URL, a few seconds each: a 40-URL
+  // site blew through the 30s default even with parallel inspection.
+  timeoutMs: 300_000,
 })

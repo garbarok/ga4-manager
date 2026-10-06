@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -109,11 +110,11 @@ var gscHealthClientFactory = func() (gsc.InspectAPI, func(), error) {
 // healthURLState is the per-URL payload persisted to disk and surfaced as
 // the `current_state` of each result.
 type healthURLState struct {
-	CoverageState     string `json:"coverage_state"`
-	GoogleCanonical   string `json:"google_canonical"`
-	UserCanonical     string `json:"user_canonical"`
-	RobotsBlocked   bool `json:"robots_blocked"`
-	IndexingAllowed bool `json:"indexing_allowed"`
+	CoverageState   string `json:"coverage_state"`
+	GoogleCanonical string `json:"google_canonical"`
+	UserCanonical   string `json:"user_canonical"`
+	RobotsBlocked   bool   `json:"robots_blocked"`
+	IndexingAllowed bool   `json:"indexing_allowed"`
 	// MobileUsable / MobileUsabilityChecked: Google deprecated the Mobile
 	// Usability signal (Dec 2023). It is recorded for transparency but NOT
 	// diffed for regressions — an absent verdict must not look like a failure.
@@ -257,6 +258,9 @@ func writeHealthSnapshot(store *gscstate.Store, site string, urls map[string]hea
 	return store.Write(context.Background(), healthCommandName, site, payload)
 }
 
+// healthInspectConcurrency bounds parallel URL Inspection calls per run.
+const healthInspectConcurrency = 5
+
 func inspectAllHealth(client gsc.InspectAPI, site string, urls []string) (map[string]healthURLState, int, error) {
 	// Deduplicate within this run, in case the config repeats a URL.
 	seen := make(map[string]struct{}, len(urls))
@@ -269,18 +273,40 @@ func inspectAllHealth(client gsc.InspectAPI, site string, urls []string) (map[st
 		ordered = append(ordered, u)
 	}
 
+	// Inspections are independent and each one takes seconds of API latency,
+	// so run a few at a time. The client's rate limiter (10 RPS) and quota
+	// tracker still gate every call; this only stops them queueing serially.
+	type inspected struct {
+		r   *gsc.URLInspectionResult
+		err error
+	}
+	results := make([]inspected, len(ordered))
+	sem := make(chan struct{}, healthInspectConcurrency)
+	var wg sync.WaitGroup
+	for i, u := range ordered {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, u string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r, err := client.InspectURL(site, u)
+			results[i] = inspected{r: r, err: err}
+		}(i, u)
+	}
+	wg.Wait()
+
 	state := make(map[string]healthURLState, len(ordered))
-	for _, u := range ordered {
-		r, err := client.InspectURL(site, u)
+	for i, u := range ordered {
+		r, err := results[i].r, results[i].err
 		if err != nil {
 			return nil, 0, fmt.Errorf("inspect %s: %w", u, err)
 		}
 		state[u] = healthURLState{
-			CoverageState:     r.CoverageState,
-			GoogleCanonical:   r.GoogleCanonical,
-			UserCanonical:     r.UserCanonical,
-			RobotsBlocked:     r.RobotsBlocked,
-			IndexingAllowed:   r.IndexingAllowed,
+			CoverageState:          r.CoverageState,
+			GoogleCanonical:        r.GoogleCanonical,
+			UserCanonical:          r.UserCanonical,
+			RobotsBlocked:          r.RobotsBlocked,
+			IndexingAllowed:        r.IndexingAllowed,
 			MobileUsable:           r.MobileUsable,
 			MobileUsabilityChecked: r.MobileUsabilityChecked,
 			RichResultsStatus:      r.RichResultsStatus,
@@ -412,10 +438,13 @@ func anyChangeIsBad(changes []healthFieldChange, before, after healthURLState) b
 				return true
 			}
 		case "google_canonical":
-			// Any canonical change is worth surfacing — could be Google
-			// re-canonicalising to a different page than the operator
-			// declared.
-			return true
+			// Google re-canonicalising an existing canonical (or dropping it)
+			// is worth surfacing. Gaining one where there was none is what
+			// happens when a page gets indexed, so that alone is not a
+			// regression; coverage_state decides the direction.
+			if before.GoogleCanonical != "" {
+				return true
+			}
 		}
 	}
 	return false

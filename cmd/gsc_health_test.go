@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,12 +16,15 @@ import (
 )
 
 type fakeHealthClient struct {
+	mu           sync.Mutex
 	results      map[string]gsc.URLInspectionResult
 	err          error
 	inspectCalls int
 }
 
 func (f *fakeHealthClient) InspectURL(_, url string) (*gsc.URLInspectionResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.inspectCalls++
 	if f.err != nil {
 		return nil, f.err
@@ -287,4 +291,67 @@ func containsField(list []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestRunHealthCommand_GainingCanonicalOnIndexingIsRecovery(t *testing.T) {
+	urls := []string{"https://example.com/a"}
+
+	// First run: discovered, not indexed, so Google has no canonical yet.
+	fake1 := &fakeHealthClient{results: map[string]gsc.URLInspectionResult{
+		"https://example.com/a": {
+			URL:           "https://example.com/a",
+			CoverageState: "Discovered - currently not indexed",
+		},
+	}}
+	params, _, _ := newHealthParams(t, fake1, urls, diagcmd.FormatJSON)
+	runHealthCommand(params)
+
+	// Second run: indexed, and Google now reports a canonical.
+	fake2 := &fakeHealthClient{results: map[string]gsc.URLInspectionResult{
+		"https://example.com/a": {
+			URL:               "https://example.com/a",
+			CoverageState:     "Submitted and indexed",
+			GoogleCanonical:   "https://example.com/a",
+			IndexingAllowed:   true,
+			RichResultsStatus: "PASS",
+		},
+	}}
+	params2 := params
+	params2.Factory = func() (gsc.InspectAPI, func(), error) { return fake2, func() {}, nil }
+	stdout := &bytes.Buffer{}
+	params2.Stdout = stdout
+	if status := runHealthCommand(params2); status != diagcmd.ExitClean {
+		t.Fatalf("status = %d, want clean (gaining a canonical on indexing is a recovery)", status)
+	}
+	var got HealthOutput
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if len(got.Results) != 1 || got.Results[0].Change != healthChangeRecovery {
+		t.Errorf("expected one recovery row, got %+v", got.Results)
+	}
+}
+
+func TestClassifyHealthChanges_CanonicalMovedIsRegression(t *testing.T) {
+	before := healthURLState{CoverageState: healthCoverageStateIndexed, GoogleCanonical: "https://example.com/a"}
+	after := healthURLState{CoverageState: healthCoverageStateIndexed, GoogleCanonical: "https://example.com/b"}
+	if got := classifyHealthChanges(compareHealthStates(before, after), before, after); got != healthChangeRegression {
+		t.Errorf("canonical moved to another page: got %q, want regression", got)
+	}
+}
+
+func TestInspectAllHealth_InspectsEveryURLOnceInOrder(t *testing.T) {
+	urls := make([]string, 0, 23)
+	for i := 0; i < 23; i++ {
+		urls = append(urls, "https://example.com/p"+string(rune('a'+i)))
+	}
+	urls = append(urls, urls[0]) // duplicate is inspected once
+	fake := &fakeHealthClient{}
+	state, n, err := inspectAllHealth(fake, "sc-domain:example.com", urls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 23 || len(state) != 23 || fake.inspectCalls != 23 {
+		t.Errorf("n=%d state=%d calls=%d, want 23 each", n, len(state), fake.inspectCalls)
+	}
 }

@@ -127,6 +127,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const result = await executor.execute({
       command: spec.command,
       args: spec.buildArgs(input),
+      timeout: spec.timeoutMs,
     })
     if (!isSuccessExit(result.exitCode)) {
       return jsonContent(mapCLIError(result, name), true)

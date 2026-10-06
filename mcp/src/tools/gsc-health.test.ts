@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   gscHealthInputSchema,
   gscHealthTool,
+  gscHealthSpec,
   buildHealthArgs,
   parseHealthOutput,
   GscHealthInput,
@@ -106,5 +107,9 @@ describe('gscHealthTool definition', () => {
 
   it('marks config as required', () => {
     expect(gscHealthTool.inputSchema.required).toContain('config')
+  })
+
+  it('overrides the 30s executor default, since it inspects every priority URL', () => {
+    expect(gscHealthSpec.timeoutMs).toBeGreaterThan(30_000)
   })
 })

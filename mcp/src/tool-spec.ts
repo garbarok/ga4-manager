@@ -40,6 +40,8 @@ export interface CliToolSpec {
   command: string
   buildArgs: (input: never) => string[]
   parse: (stdout: string, input: never) => unknown
+  /** Override the executor's 30s default for commands that legitimately run longer. */
+  timeoutMs?: number
 }
 
 /**
@@ -62,6 +64,7 @@ export function cli<S extends z.ZodType>(def: {
   command: string
   buildArgs: (input: z.infer<S>) => string[]
   parse: (stdout: string, input: z.infer<S>) => unknown
+  timeoutMs?: number
 }): CliToolSpec {
   return { kind: 'cli', ...def } as CliToolSpec
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -16,11 +17,12 @@ import (
 
 // QuotaTracker tracks daily API quota usage
 type QuotaTracker struct {
-	currentDate       time.Time // Date of current quota period
-	inspectionCount   int       // Number of inspections today
-	dailyLimit        int       // Maximum inspections per day (2,000 for GSC)
-	warningThreshold  int       // Warn at this count (1,500 = 75%)
-	criticalThreshold int       // Error at this count (1,900 = 95%)
+	mu                sync.Mutex // guards the counters: callers may inspect concurrently
+	currentDate       time.Time  // Date of current quota period
+	inspectionCount   int        // Number of inspections today
+	dailyLimit        int        // Maximum inspections per day (2,000 for GSC)
+	warningThreshold  int        // Warn at this count (1,500 = 75%)
+	criticalThreshold int        // Error at this count (1,900 = 95%)
 }
 
 // Client wraps the Google Search Console API service with rate limiting and logging
@@ -203,6 +205,9 @@ func (c *Client) Context() context.Context {
 // prevents the operation from proceeding. A warning is logged (but no error
 // returned) when the warning threshold (75 %) is crossed.
 func (c *Client) useQuota() error {
+	c.quotaTracker.mu.Lock()
+	defer c.quotaTracker.mu.Unlock()
+
 	// Reset counter when the calendar day rolls over.
 	now := time.Now()
 	if !isSameDay(c.quotaTracker.currentDate, now) {
