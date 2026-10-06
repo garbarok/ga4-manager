@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-10-06
+
 ### Added
 
 - **DataForSEO growth tools** — `llm_mentions` (does Google AI / ChatGPT cite a domain for given queries, and who it cites instead), `keyword_gap` (keywords a competitor ranks for and you don't), `ranked_keywords` (any domain's ranking keywords), `keyword_ideas` (ideas with keyword difficulty and search intent), `google_trends` (interest over time for up to 5 terms, with trend and peak), `backlinks_overview` (domain rank / backlinks / referring domains side by side), `link_gap` (domains linking to competitors but not you) and `dataforseo_balance` (free balance check).
@@ -16,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`keyword_serp_snapshot`** — ranked organic results for a keyword, via DataForSEO, for content-gap/competitive research.
 - **`keyword_rank_check`** — a domain's live Google rank for a keyword today, via ValueSERP (needs `VALUESERP_API_KEY`); distinct from GSC's impression-weighted historical average position already in `site_growth_brief`.
 - **`keyword_rank_check` AI Overview fallback (`check_ai_overview`, default true)** — when a domain misses classic organic results and Google shows an AI Overview for the query, checks whether the domain is cited there instead. A page can be exactly what Google surfaces for a query — and what GSC credits with a position — while being invisible to organic-only rank checks once an AI Overview has taken over the SERP. Costs one extra ValueSERP credit, only when the fallback actually triggers.
+
+### Fixed
+
+- **`gsc_health` no longer times out over MCP.** Priority URLs are inspected 5 at a time instead of serially (38 URLs: ~4.5 min → 54 s on a real site), the quota tracker is mutex-guarded for concurrent inspections, and CLI-backed tools can now override the executor's 30 s default (`gsc_health` uses 300 s).
+- **`gsc_health` no longer reports a page as a regression just because Google gained a canonical for it.** Going from no canonical to one is what indexing looks like; it made a "Discovered" → indexed page show up as a regression. A canonical that moves from one URL to another is still a regression.
 
 ## [3.3.0] - 2026-09-27
 
