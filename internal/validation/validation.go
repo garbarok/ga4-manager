@@ -111,7 +111,7 @@ func ValidateDisplayName(displayName string) error {
 	// GA4 only accepts alphanumerics, underscores and spaces in custom
 	// dimension/metric display names; anything else is rejected by the API.
 	for _, r := range displayName {
-		if !(r == ' ' || r == '_' || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') || ('0' <= r && r <= '9')) {
+		if r != ' ' && r != '_' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
 			return fmt.Errorf("display name %q contains invalid character %q (only letters, digits, underscores and spaces allowed)", displayName, r)
 		}
 	}

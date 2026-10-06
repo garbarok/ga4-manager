@@ -98,7 +98,7 @@ func writeResolvedConfigs(stdout, stderr io.Writer, paths []string, strict bool)
 			if strict {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-			fmt.Fprintf(stderr, "warning: skipping %s: %v\n", p, err)
+			_, _ = fmt.Fprintf(stderr, "warning: skipping %s: %v\n", p, err)
 			continue
 		}
 		out = append(out, resolveConfig(p, cfg))
