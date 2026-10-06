@@ -405,7 +405,7 @@ Closes #123
 
 ## Release Process
 
-Releases are automated via GitHub Actions. Only maintainers can create releases.
+There is no CI: tests, lint and releases all run from the maintainer's machine. Only maintainers can create releases.
 
 ### Version Numbering
 
@@ -417,71 +417,31 @@ We use [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):
 
 ### Creating a Release (Maintainers)
 
-#### Step 1: Prepare Release
+1. **Prepare**: bump `mcp/package.json` and `mcp/manifest.json`, add the version to `mcp/CHANGELOG.md`, and commit on a clean `main`.
 
-1. **Update version-specific code** (if needed):
-   - Update `CHANGELOG.md` (or rely on auto-generated notes)
-   - Update documentation with new features
-
-2. **Test locally**:
+2. **Check locally** (the MCP suite is not covered by `make`):
    ```bash
-   make build
    make test
    make lint
+   (cd mcp && npm test -- --run && npm run lint && npx tsc --noEmit)
    ```
 
-3. **Ensure `main` branch is clean**:
+3. **Tag and push**:
    ```bash
-   git checkout main
-   git pull upstream main
+   git tag -a v1.2.0 -m "v1.2.0 — short summary"
+   git push origin main v1.2.0
    ```
 
-#### Step 2: Create and Push Tag
-
-**Option A: Using GitHub CLI** (Recommended):
-```bash
-# Create release with auto-generated notes
-gh release create v1.2.0 --generate-notes
-
-# Or with custom notes
-gh release create v1.2.0 --title "v1.2.0 - Feature Release" --notes "Custom release notes"
-```
-
-**Option B: Using Git Tags**:
-```bash
-# Create tag
-git tag v1.2.0
-
-# Push tag (triggers release workflow)
-git push upstream v1.2.0
-```
-
-#### Step 3: Verify Release Workflow
-
-1. **Monitor workflow**:
+4. **Publish with GoReleaser** (needs `gh auth login`; `make release` re-runs tests and lint first):
    ```bash
-   gh run list --workflow=release.yml --limit 1
-   gh run watch
+   make release
    ```
 
-2. **Check release**:
+5. **Verify**:
    ```bash
    gh release view v1.2.0
-   ```
-
-3. **Download and test binary**:
-   ```bash
    gh release download v1.2.0 -p '*darwin-arm64*'
-   tar -xzf ga4-darwin-arm64.tar.gz
-   ./ga4-darwin-arm64 --version
    ```
-
-#### Step 4: Verify Release Assets
-
-Each release should include:
-- ✅ Binary archives for all platforms (5 total)
-- ✅ Release notes (auto-generated or custom)
-- ✅ Checksums (if using GoReleaser)
 
 ### Release Artifacts
 

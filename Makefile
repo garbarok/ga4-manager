@@ -1,4 +1,4 @@
-.PHONY: build install run clean test lint
+.PHONY: build install run clean test lint release
 
 # Binary name
 BINARY=ga4
@@ -45,10 +45,18 @@ test:
 	@go test -v ./...
 
 # Run linter
+# Pinned so local runs match; v2.14+ is needed for Go 1.27 toolchains.
+GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+GORELEASER ?= go run github.com/goreleaser/goreleaser/v2@latest
+
 lint:
 	@echo "Running linter..."
-	@golangci-lint run
+	@$(GOLANGCI_LINT) run --timeout=5m
 	@echo "✓ Linting passed"
+
+# Release from this machine (no CI). Tag first: git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z
+release: test lint
+	@GITHUB_TOKEN=$$(gh auth token) $(GORELEASER) release --clean
 
 # Help
 help:
@@ -64,6 +72,7 @@ help:
 	@echo "  make deps           - Download dependencies"
 	@echo "  make test           - Run tests"
 	@echo "  make lint           - Run golangci-lint"
+	@echo "  make release        - Test, lint and publish the current tag with GoReleaser"
 	@echo ""
 	@echo "Usage Examples:"
 	@echo "  ./ga4 setup --config configs/my-project.yaml"

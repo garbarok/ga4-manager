@@ -38,7 +38,7 @@ func (c *Client) UnlinkService(propertyID, service string) ([]string, error) {
 			return nil, fmt.Errorf("could not list BigQuery links to unlink: %w", err)
 		}
 		for _, link := range links {
-			if err := c.DeleteBigQueryLink(link.Name); err != nil {
+			if err := c.DeleteBigQueryLink(link.Name); err != nil { //nolint:staticcheck // SA4023: the Admin API can't delete BigQuery links, so the stub always errors on purpose
 				return deleted, fmt.Errorf("failed to delete BigQuery link %s: %w", link.Name, err)
 			}
 			deleted = append(deleted, link.Name)
