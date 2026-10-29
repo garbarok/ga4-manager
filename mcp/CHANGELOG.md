@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-10-29
+
 ### Fixed
 
 - **`ga4` no longer scaffolds `configs/` or prints a welcome banner on every run.** Any command, `--version` included, created `configs/` in the working directory and wrote the banner to stdout, which corrupts the JSON CLI-backed MCP tools parse when they run from a folder without `configs/`. Only interactive mode scaffolds now, and `--version`, `help` and completion skip the credentials warning.
