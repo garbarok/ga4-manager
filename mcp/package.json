@@ -1,0 +1,77 @@
+{
+  "name": "ga4-manager-mcp",
+  "version": "4.0.0",
+  "description": "MCP server for organic growth: Google Analytics 4, Search Console, AdSense, on-page SEO audits and DataForSEO, built for AI agents",
+  "mcpName": "io.github.garbarok/ga4-manager",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "ga4-manager-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/__fixtures__",
+    "README.md",
+    "CHANGELOG.md",
+    "CONFIGURATION.md",
+    "PERMISSIONS.md",
+    "TROUBLESHOOTING.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "google-analytics",
+    "ga4",
+    "search-console",
+    "seo",
+    "adsense",
+    "dataforseo",
+    "claude"
+  ],
+  "license": "MIT",
+  "author": "Oscar Gallego",
+  "homepage": "https://github.com/garbarok/ga4-manager/tree/main/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garbarok/ga4-manager.git",
+    "directory": "mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/garbarok/ga4-manager/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src/",
+    "pack:mcpb": "bash scripts/build-mcpb.sh",
+    "prepublishOnly": "pnpm run lint && pnpm exec tsc --noEmit && pnpm run test:run && pnpm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "bottleneck": "^2.19.5",
+    "csv-parse": "^6.2.1",
+    "node-html-parser": "^7.1.0",
+    "robots-parser": "^3.0.1",
+    "tldts": "^7.4.16",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.8",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.70.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

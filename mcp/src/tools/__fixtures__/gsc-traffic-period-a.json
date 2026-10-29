@@ -1,0 +1,94 @@
+{
+  "rows": [
+    {
+      "keys": [
+        "https://example.com/blog/how-to-invest"
+      ],
+      "clicks": 342,
+      "impressions": 8420,
+      "ctr": 0.04062,
+      "position": 4.7
+    },
+    {
+      "keys": [
+        "https://example.com/blog/etf-guide"
+      ],
+      "clicks": 210,
+      "impressions": 5100,
+      "ctr": 0.04118,
+      "position": 6.2
+    },
+    {
+      "keys": [
+        "https://example.com/products/savings-account"
+      ],
+      "clicks": 178,
+      "impressions": 3200,
+      "ctr": 0.05563,
+      "position": 3.1
+    },
+    {
+      "keys": [
+        "https://example.com/blog/tax-loss-harvesting"
+      ],
+      "clicks": 95,
+      "impressions": 2100,
+      "ctr": 0.04524,
+      "position": 8.4
+    },
+    {
+      "keys": [
+        "https://example.com/"
+      ],
+      "clicks": 88,
+      "impressions": 1850,
+      "ctr": 0.04757,
+      "position": 5.9
+    },
+    {
+      "keys": [
+        "https://example.com/blog/compound-interest"
+      ],
+      "clicks": 67,
+      "impressions": 1400,
+      "ctr": 0.04786,
+      "position": 7.3
+    },
+    {
+      "keys": [
+        "https://example.com/faq"
+      ],
+      "clicks": 42,
+      "impressions": 980,
+      "ctr": 0.04286,
+      "position": 9.1
+    },
+    {
+      "keys": [
+        "https://example.com/blog/rrsp-vs-tfsa"
+      ],
+      "clicks": 38,
+      "impressions": 820,
+      "ctr": 0.04634,
+      "position": 6.8
+    },
+    {
+      "keys": [
+        "https://example.com/blog/dividend-investing"
+      ],
+      "clicks": 29,
+      "impressions": 710,
+      "ctr": 0.04085,
+      "position": 11.2
+    },
+    {
+      "keys": [
+        "https://example.com/pricing"
+      ],
+      "clicks": 18,
+      "impressions": 560,
+      "ctr": 0.03214,
+      "position": 14.5
+    }
+  ]
+}

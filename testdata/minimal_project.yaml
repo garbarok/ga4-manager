@@ -1,0 +1,5 @@
+project:
+  name: Minimal Project
+
+ga4:
+  property_id: "987654321"

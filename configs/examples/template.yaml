@@ -1,0 +1,97 @@
+# GA4 Manager Configuration Template
+# Copy this file and customize for your project
+
+project:
+  name: My Project Name
+  description: Brief description of your project
+  version: "1.0"
+
+ga4:
+  property_id: "YOUR_PROPERTY_ID_HERE"  # Find in GA4 Admin > Property Settings
+  measurement_id: G-XXXXXXXXXX          # Optional: Your measurement ID
+  # data_stream_id: ""                  # Optional: Auto-detected if not specified
+
+# Define conversion events you want to track
+conversions:
+  - name: example_conversion
+    counting_method: ONCE_PER_EVENT  # ONCE_PER_EVENT or ONCE_PER_SESSION
+    description: Description of what this conversion tracks
+
+  # Add more conversions here
+  # - name: another_conversion
+  #   counting_method: ONCE_PER_SESSION
+  #   description: Another conversion event
+
+# Define custom dimensions to capture contextual data
+dimensions:
+  - parameter: example_param        # Parameter name sent from your tracking code
+    display_name: Example Dimension # Name shown in GA4 UI
+    description: What this dimension captures
+    scope: EVENT                    # EVENT or USER
+
+  # Add more dimensions here
+  # - parameter: user_tier
+  #   display_name: User Tier
+  #   description: User's subscription tier (free/pro/enterprise)
+  #   scope: USER
+
+# Define custom metrics to measure quantitative data
+metrics:
+  - parameter: example_value
+    display_name: Example Metric
+    description: What this metric measures
+    unit: STANDARD  # STANDARD, CURRENCY, SECONDS, MINUTES, etc.
+    scope: EVENT
+
+  # Add more metrics here
+  # - parameter: processing_time
+  #   display_name: Processing Time
+  #   description: Time to process request
+  #   unit: SECONDS
+  #   scope: EVENT
+
+# Define calculated metrics (formulas using GA4 metrics)
+calculated_metrics:
+  - name: Conversion Rate
+    formula: conversions / sessions
+    description: Percentage of sessions with conversions
+
+  # Add more calculated metrics here
+
+# Define audiences (these cannot be created via API - manual setup required)
+audiences:
+  - name: Power Users
+    description: Users with high engagement
+    duration: 30
+    conditions:
+      - Define conditions manually in GA4 UI
+
+# Cleanup: Remove events/dimensions not in your tracking code
+cleanup:
+  conversions_to_remove:
+    # List event names to delete
+    # - old_event_name
+    # - deprecated_event
+
+  dimensions_to_remove:
+    # List parameter names to archive
+    # - old_parameter
+    # - unused_dimension
+
+  reason: Optional explanation of why these are being removed
+
+# Data retention settings (optional)
+data_retention:
+  event_data_retention: TWO_MONTHS  # TWO_MONTHS, FOURTEEN_MONTHS, etc.
+  reset_user_data_on_new_activity: true
+
+# Enhanced measurement - automatic event collection (optional)
+enhanced_measurement:
+  page_views: true
+  scrolls: true
+  outbound_clicks: true
+  site_search: true
+  video_engagement: false
+  file_downloads: true
+  page_changes: true       # For Single Page Applications
+  form_interactions: true

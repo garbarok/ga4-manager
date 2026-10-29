@@ -1,0 +1,333 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "ga4-manager-mcp",
+  "display_name": "GA4 Manager",
+  "version": "4.0.0",
+  "description": "Manage GA4 properties and audit Search Console / SEO from Claude.",
+  "long_description": "Exposes the GA4 Manager toolkit as MCP tools: GA4 property setup, reporting, cleanup and data-stream linking (via a bundled `ga4` CLI), Search Console analytics, coverage, cannibalization, CTR-anomaly and URL inspection, native SEO page/batch audits (optionally via Cloudflare Browser Rendering for JS-rendered pages) and consent-health checks, AdSense publisher reporting (earnings, page views, impressions, clicks, RPM), GA4 traffic and per-page ad revenue, URL-hygiene and hreflang checks, opt-in keyword research and live rank tracking (DataForSEO / ValueSERP), competitor keyword gaps, Google Trends, backlink and link-gap analysis and AI-answer (LLM) mention tracking (DataForSEO), and a per-site growth brief that joins them for SEO and monetization planning. Runs locally so it can read your Google service-account credentials and talk to the Admin/Search Console/AdSense APIs on your behalf.",
+  "author": {
+    "name": "Oscar Gallego",
+    "email": "77354899+garbarok@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/garbarok/ga4-manager",
+  "documentation": "https://github.com/garbarok/ga4-manager/tree/main/mcp",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/dist/index.js"
+      ],
+      "env": {
+        "GA4_BINARY_PATH": "${__dirname}/bin/ga4",
+        "GOOGLE_APPLICATION_CREDENTIALS": "${user_config.credentials}",
+        "GOOGLE_CLOUD_PROJECT": "${user_config.project}",
+        "PSI_API_KEY": "${user_config.psi_api_key}",
+        "CRUX_API_KEY": "${user_config.crux_api_key}",
+        "CF_ACCOUNT_ID": "${user_config.cf_account_id}",
+        "CF_API_TOKEN": "${user_config.cf_api_token}",
+        "SITEONE_CRAWLER_PATH": "${user_config.siteone_crawler_path}",
+        "SITEONE_CRAWL_TIMEOUT_MS": "${user_config.siteone_crawl_timeout_ms}",
+        "DATAFORSEO_USERNAME": "${user_config.dataforseo_username}",
+        "DATAFORSEO_PASSWORD": "${user_config.dataforseo_password}",
+        "VALUESERP_API_KEY": "${user_config.valueserp_api_key}",
+        "GA4M_ALLOW_DESTRUCTIVE": "${user_config.allow_destructive}",
+        "GA4M_READ_ONLY": "${user_config.read_only}",
+        "INDEXNOW_KEY": "${user_config.indexnow_key}",
+        "DATAFORSEO_ALLOW_RAW": "${user_config.dataforseo_allow_raw}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "site_growth_brief",
+      "description": "Site growth brief"
+    },
+    {
+      "name": "ga4_setup",
+      "description": "Set up GA4/GSC from config"
+    },
+    {
+      "name": "ga4_report",
+      "description": "Run GA4 report"
+    },
+    {
+      "name": "ga4_cleanup",
+      "description": "Clean up GA4 resources"
+    },
+    {
+      "name": "ga4_link_list",
+      "description": "List GA4 service links"
+    },
+    {
+      "name": "ga4_link_create",
+      "description": "Create GA4 service link"
+    },
+    {
+      "name": "ga4_link_remove",
+      "description": "Remove GA4 service link"
+    },
+    {
+      "name": "ga4_validate",
+      "description": "Validate GA4 configuration"
+    },
+    {
+      "name": "gsc_sitemaps_list",
+      "description": "List sitemaps"
+    },
+    {
+      "name": "gsc_sitemaps_submit",
+      "description": "Submit a sitemap"
+    },
+    {
+      "name": "gsc_sitemaps_delete",
+      "description": "Delete a sitemap"
+    },
+    {
+      "name": "gsc_sitemaps_get",
+      "description": "Get sitemap details"
+    },
+    {
+      "name": "gsc_inspect_url",
+      "description": "Inspect URL in Search Console"
+    },
+    {
+      "name": "gsc_analytics_run",
+      "description": "Run Search Console analytics"
+    },
+    {
+      "name": "gsc_index_coverage",
+      "description": "Search Console index coverage"
+    },
+    {
+      "name": "gsc_cannibalization",
+      "description": "Detect keyword cannibalization"
+    },
+    {
+      "name": "gsc_opportunities",
+      "description": "Find SEO opportunities"
+    },
+    {
+      "name": "gsc_ctr_anomaly",
+      "description": "Detect CTR anomalies"
+    },
+    {
+      "name": "gsc_decay",
+      "description": "Detect content decay"
+    },
+    {
+      "name": "gsc_url_hygiene",
+      "description": "Find index-polluting URLs"
+    },
+    {
+      "name": "gsc_hreflang",
+      "description": "Check hreflang pairs"
+    },
+    {
+      "name": "gsc_health",
+      "description": "Search Console health check"
+    },
+    {
+      "name": "gsc_monitor_urls",
+      "description": "Monitor URLs in Search Console"
+    },
+    {
+      "name": "gsc_traffic_compare",
+      "description": "Compare Search Console traffic"
+    },
+    {
+      "name": "ga4_consent_health",
+      "description": "GA4 consent-mode health"
+    },
+    {
+      "name": "ga4_traffic_report",
+      "description": "GA4 traffic & ad revenue report"
+    },
+    {
+      "name": "ga4_annotations",
+      "description": "List or create GA4 annotations (SEO decision log)"
+    },
+    {
+      "name": "seo_page_audit",
+      "description": "Audit a page for SEO"
+    },
+    {
+      "name": "seo_audit_batch",
+      "description": "Batch SEO page audit"
+    },
+    {
+      "name": "adsense_accounts_list",
+      "description": "List AdSense accounts"
+    },
+    {
+      "name": "adsense_report",
+      "description": "Generate AdSense report"
+    },
+    {
+      "name": "keyword_volume",
+      "description": "Keyword search volume"
+    },
+    {
+      "name": "keyword_serp_snapshot",
+      "description": "SERP snapshot for a keyword"
+    },
+    {
+      "name": "keyword_rank_check",
+      "description": "Live keyword rank check"
+    },
+    {
+      "name": "dataforseo_balance",
+      "description": "DataForSEO balance"
+    },
+    {
+      "name": "llm_mentions",
+      "description": "AI answer mentions for a domain"
+    },
+    {
+      "name": "keyword_gap",
+      "description": "Keyword gap vs a competitor"
+    },
+    {
+      "name": "ranked_keywords",
+      "description": "Ranked keywords for a domain"
+    },
+    {
+      "name": "keyword_ideas",
+      "description": "Keyword ideas with difficulty and intent"
+    },
+    {
+      "name": "google_trends",
+      "description": "Google Trends interest over time"
+    },
+    {
+      "name": "backlinks_overview",
+      "description": "Backlink overview by domain"
+    },
+    {
+      "name": "link_gap",
+      "description": "Link gap vs competitors"
+    },
+    {
+      "name": "indexnow_submit",
+      "description": "Submit URLs to IndexNow"
+    },
+    {
+      "name": "dataforseo_request",
+      "description": "Raw DataForSEO v3 request (billed, opt-in)"
+    }
+  ],
+  "user_config": {
+    "credentials": {
+      "type": "file",
+      "title": "Google credentials JSON",
+      "description": "Service-account key file, or an Application Default Credentials file (~/.config/gcloud/application_default_credentials.json).",
+      "required": true
+    },
+    "project": {
+      "type": "string",
+      "title": "Google Cloud project ID",
+      "description": "The GCP project that owns the GA4 / Search Console access.",
+      "required": true
+    },
+    "psi_api_key": {
+      "type": "string",
+      "title": "PageSpeed Insights API key (optional)",
+      "description": "Enables Core Web Vitals in SEO audits. Leave blank to skip CWV.",
+      "sensitive": true,
+      "required": false
+    },
+    "crux_api_key": {
+      "type": "string",
+      "title": "Chrome UX Report API key (optional)",
+      "description": "Enables real-user (field) Core Web Vitals via field_data in seo_page_audit. Falls back to the PageSpeed Insights key when blank.",
+      "sensitive": true,
+      "required": false
+    },
+    "cf_account_id": {
+      "type": "string",
+      "title": "Cloudflare account ID (optional)",
+      "description": "Enables render_js in SEO audits (Browser Rendering, for JS-rendered/SPA pages). Leave blank to skip.",
+      "required": false
+    },
+    "cf_api_token": {
+      "type": "string",
+      "title": "Cloudflare API token (optional)",
+      "description": "Paired with the Cloudflare account ID for render_js. Needs the Browser Rendering – Edit permission.",
+      "sensitive": true,
+      "required": false
+    },
+    "siteone_crawler_path": {
+      "type": "string",
+      "title": "SiteOne Crawler path (optional)",
+      "description": "Path to the siteone-crawler binary, for URL discovery in seo_audit_batch. Leave blank to look it up on PATH.",
+      "required": false
+    },
+    "siteone_crawl_timeout_ms": {
+      "type": "string",
+      "title": "SiteOne crawl timeout in ms (optional)",
+      "description": "Kills the SiteOne crawl after this many milliseconds. Leave blank for 90000 (90 s).",
+      "required": false
+    },
+    "dataforseo_username": {
+      "type": "string",
+      "title": "DataForSEO login (optional)",
+      "description": "Enables keyword_volume, keyword_serp_snapshot, dataforseo_balance, llm_mentions, keyword_gap, ranked_keywords, keyword_ideas, google_trends, backlinks_overview and link_gap. Leave blank to skip.",
+      "required": false
+    },
+    "dataforseo_password": {
+      "type": "string",
+      "title": "DataForSEO password (optional)",
+      "description": "Paired with the DataForSEO login.",
+      "sensitive": true,
+      "required": false
+    },
+    "valueserp_api_key": {
+      "type": "string",
+      "title": "ValueSERP API key (optional)",
+      "description": "Enables keyword_rank_check (live Google rank for a domain/keyword pair). Leave blank to skip.",
+      "sensitive": true,
+      "required": false
+    },
+    "allow_destructive": {
+      "type": "boolean",
+      "title": "Allow destructive tools (optional)",
+      "description": "Off by default. Enables ga4_cleanup, ga4_link_remove, gsc_sitemaps_delete and ga4_setup, which delete or overwrite data.",
+      "default": false,
+      "required": false
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only mode (optional)",
+      "description": "Off by default. When on, every tool that is not read-only is refused, even if destructive tools are allowed.",
+      "default": false,
+      "required": false
+    },
+    "indexnow_key": {
+      "type": "string",
+      "title": "IndexNow key (optional)",
+      "description": "Default key for indexnow_submit (8-128 chars of a-z, A-Z, 0-9, -). The same key must be hosted as <key>.txt on your site. Leave blank to pass a key per call.",
+      "sensitive": true,
+      "required": false
+    },
+    "dataforseo_allow_raw": {
+      "type": "boolean",
+      "title": "Allow raw DataForSEO requests (optional)",
+      "description": "Enables dataforseo_request, which calls any DataForSEO endpoint by path. Every call is billed to your account. Leave off unless the specialised tools do not cover what you need.",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

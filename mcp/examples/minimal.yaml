@@ -1,0 +1,28 @@
+# Minimal GA4 Manager Configuration
+# Use this as a starting template for your project
+
+project:
+  name: "My Website"
+  property_id: "YOUR_PROPERTY_ID"  # Replace with your GA4 property ID
+
+ga4:
+  # Basic conversion tracking
+  conversions:
+    - name: "purchase"
+      counting_method: "ONCE_PER_EVENT"
+
+    - name: "sign_up"
+      counting_method: "ONCE_PER_EVENT"
+
+  # Basic custom dimension
+  dimensions:
+    - parameter: "user_type"
+      display_name: "User Type"
+      scope: "USER"
+
+# Optional: Google Search Console integration
+# gsc:
+#   sites:
+#     - url: "sc-domain:example.com"
+#       sitemaps:
+#         - "https://example.com/sitemap.xml"

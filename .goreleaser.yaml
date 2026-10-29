@@ -1,0 +1,139 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: ga4
+    binary: ga4
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X 'github.com/garbarok/ga4-manager/cmd.Version={{.Version}}'
+
+archives:
+  - id: ga4
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - CLAUDE.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Other Changes'
+      order: 999
+
+release:
+  github:
+    owner: garbarok
+    name: ga4-manager
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} {{.Version}}"
+  header: |
+    ## GA4 Manager {{.Version}}
+
+    ### Quick Start (Easiest Method)
+
+    Download and run - the binary will offer to install itself automatically:
+
+    **Linux (amd64)**:
+    ```bash
+    curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-linux-amd64.tar.gz
+    tar -xzf ga4.tar.gz
+    ./ga4
+    ```
+
+    **macOS (Apple Silicon)**:
+    ```bash
+    curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-darwin-arm64.tar.gz
+    tar -xzf ga4.tar.gz
+    ./ga4
+    ```
+
+    **macOS (Intel)**:
+    ```bash
+    curl -Lo ga4.tar.gz https://github.com/garbarok/ga4-manager/releases/download/{{.Version}}/ga4-{{.Version}}-darwin-amd64.tar.gz
+    tar -xzf ga4.tar.gz
+    ./ga4
+    ```
+
+    On first run, GA4 Manager will:
+    - ✅ Create configuration directories automatically
+    - ✅ Offer to install itself to `/usr/local/bin` (optional, with sudo)
+    - ✅ Provide manual installation instructions if you decline
+
+    **Windows**:
+    Download `ga4-{{.Version}}-windows-amd64.zip`, extract it, and run `ga4.exe`.
+    Follow the on-screen instructions for installation options.
+
+  footer: |
+    ### Verify Your Installation
+    ```bash
+    ga4 --version
+    ```
+
+    **Full Changelog**: https://github.com/garbarok/ga4-manager/compare/{{.PreviousTag}}...{{.Tag}}
+
+# Optional: Homebrew tap configuration (uncomment if you want to maintain a Homebrew tap)
+# brews:
+#   - repository:
+#       owner: garbarok
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     commit_author:
+#       name: goreleaserbot
+#       email: bot@goreleaser.com
+#     folder: Formula
+#     homepage: https://github.com/garbarok/ga4-manager
+#     description: "CLI tool for managing Google Analytics 4 properties"
+#     license: MIT
+#     install: |
+#       bin.install "ga4"
+#     test: |
+#       system "#{bin}/ga4 --version"

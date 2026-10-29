@@ -1,0 +1,42 @@
+# GA4 Manager Configuration Template
+# Copy this file to create your project configuration
+
+project:
+  name: "My Project"
+  description: "Project description"
+
+ga4:
+  property_id: "YOUR_PROPERTY_ID"  # Required: Get from GA4 Admin
+
+# Conversion Events
+conversions:
+  - name: "purchase"
+    counting_method: "ONCE_PER_EVENT"
+  
+  - name: "sign_up"
+    counting_method: "ONCE_PER_SESSION"
+
+# Custom Dimensions
+dimensions:
+  - parameter: "user_type"
+    display_name: "User Type"
+    scope: "USER"
+    description: "Type of user (free, premium, etc.)"
+  
+  - parameter: "page_category"
+    display_name: "Page Category"
+    scope: "EVENT"
+    description: "Category of the page"
+
+# Custom Metrics
+metrics:
+  - parameter: "custom_value"
+    display_name: "Custom Value"
+    scope: "EVENT"
+    unit: "STANDARD"
+    description: "Custom numeric value"
+
+# Data Retention (optional)
+data_retention:
+  event_data_retention: "FOURTEEN_MONTHS"
+  reset_user_data_on_new_activity: true

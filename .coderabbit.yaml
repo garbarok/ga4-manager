@@ -1,0 +1,20 @@
+# CodeRabbit configuration — auto-review disabled for this repo.
+#
+# Code review is handled via:
+# - manual PR self-review by the maintainer
+# - local /code-review and /thermo-nuclear-code-quality-review skills
+#
+# To fully uninstall CodeRabbit from this repo, the Operator must also
+# remove it via GitHub repo Settings → Integrations & services →
+# Configure → Repository access.
+
+reviews:
+  auto_review:
+    enabled: false
+  high_level_summary: false
+  poem: false
+  review_status: false
+  collapse_walkthrough: true
+
+chat:
+  auto_reply: false
