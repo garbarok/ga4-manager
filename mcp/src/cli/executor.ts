@@ -6,10 +6,10 @@ import { stripANSI } from '../utils/ansi-strip.js';
 /**
  * Executes CLI commands and captures output.
  *
- * The binary path is validated at construction time. If the binary does
- * not exist or is not executable, an Error with a remediation hint is
- * thrown immediately — the previous behaviour surfaced an opaque
- * `spawn .../ga4 ENOENT` on the first tool call instead.
+ * The binary path is validated on each CLI call, not at construction: an
+ * npm install has no `ga4` binary, and native tools must keep working
+ * without it. A missing binary fails that call with a remediation hint
+ * instead of an opaque `spawn .../ga4 ENOENT`.
  */
 export class CLIExecutor {
   private binaryPath: string;
@@ -17,7 +17,16 @@ export class CLIExecutor {
 
   constructor(binaryPath: string) {
     this.binaryPath = binaryPath;
-    this.assertBinaryUsable();
+  }
+
+  /** Whether the binary exists and is executable (for startup diagnostics). */
+  isBinaryUsable(): boolean {
+    try {
+      accessSync(this.binaryPath, constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private assertBinaryUsable(): void {
@@ -26,9 +35,9 @@ export class CLIExecutor {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `ga4 CLI binary not found or not executable at ${this.binaryPath} (${reason}).\n` +
-          `Build it first: 'make build' or 'go build -o ga4 .' from the repo root.\n` +
-          `Override the path with the GA4_BINARY_PATH environment variable.`,
+        `This tool needs the ga4 CLI binary, which was not found or is not executable at ${this.binaryPath} (${reason}).\n` +
+          `Download it from https://github.com/garbarok/ga4-manager/releases and put it on PATH, ` +
+          `or set GA4_BINARY_PATH. From a source checkout: 'make build' in the repo root.`,
         { cause: err },
       );
     }
@@ -42,6 +51,7 @@ export class CLIExecutor {
    * @throws Error if timeout occurs
    */
   async execute(params: CLIExecuteParams): Promise<CLIResult> {
+    this.assertBinaryUsable();
     const startTime = Date.now();
     const timeout = params.timeout || this.defaultTimeout;
 

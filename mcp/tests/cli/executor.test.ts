@@ -12,6 +12,14 @@ describe('CLIExecutor', () => {
     executor = new CLIExecutor(testBinaryPath);
   });
 
+  describe('missing binary', () => {
+    it('constructs without throwing and fails only the CLI call, with an install hint', async () => {
+      const missing = new CLIExecutor('/nonexistent/ga4');
+      expect(missing.isBinaryUsable()).toBe(false);
+      await expect(missing.execute({ command: '--version', args: [] })).rejects.toThrow(/GA4_BINARY_PATH/);
+    });
+  });
+
   describe('execute', () => {
     it('should execute command and capture output', async () => {
       const result: CLIResult = await executor.execute({

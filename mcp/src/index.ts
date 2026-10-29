@@ -172,7 +172,11 @@ async function main() {
 
   // Log to stderr (stdout is reserved for MCP protocol)
   console.error('GA4 Manager MCP Server running on stdio')
-  console.error(`Binary path: ${binaryPath}`)
+  console.error(
+    executor.isBinaryUsable()
+      ? `Binary path: ${binaryPath}`
+      : `ga4 CLI binary not found at ${binaryPath}: native tools work, CLI-backed tools will report how to install it`,
+  )
 }
 
 main().catch((error) => {
