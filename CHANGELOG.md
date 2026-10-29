@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ga4 --version`, `help` and completion stay silent; `configs/` is scaffolded only by interactive mode, never by every command.
 - `ga4 gsc url-hygiene` — URLs with search impressions that should not be indexed (malformed paths, fragments, framework asset routes, query duplicates, utility pages).
 - `ga4 gsc hreflang` — hreflang pair integrity and cross-language ranking; own-site HTTP probe (`internal/gsc/httpprobe`).
 - `ga4 gsc opportunities --granularity page` — page-level opportunities with `top_queries` and `anonymized_share`.
