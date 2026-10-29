@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-29
+
 ### Added
 
 - **Session spending cap for paid APIs.** `GA4M_MAX_SPEND_USD` (default $5 of DataForSEO billing) and `GA4M_MAX_PAID_CALLS` (default 300 calls across DataForSEO, ValueSERP and Cloudflare Browser Rendering) refuse further paid calls with `QUOTA_EXCEEDED` until the server restarts; `off` disables either. Bounds what a looping or prompt-injected agent can spend. `dataforseo_balance` stays available and now reports the session totals.
