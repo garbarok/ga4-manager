@@ -426,7 +426,7 @@ func linkBigQuery(client *ga4.Client, cfg *config.ProjectConfig) error {
 	bqCfg := ga4.GetDefaultBigQueryConfig(propertyID, linkGCPProject, linkDataset)
 	// The Admin API can't create BigQuery links, so this stub always errors on purpose (SA4023).
 	createdLink, err := client.CreateBigQueryLink(bqCfg) //nolint:staticcheck
-	if err != nil { //nolint:staticcheck
+	if err != nil {                                      //nolint:staticcheck
 		return fmt.Errorf("could not create BigQuery link: %w", err)
 	}
 

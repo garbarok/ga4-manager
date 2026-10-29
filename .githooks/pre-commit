@@ -1,12 +1,6 @@
 #!/bin/bash
-# Pre-commit hook to prevent committing sensitive files
-#
-# Installation:
-#   cp .githooks/pre-commit .git/hooks/pre-commit
-#   chmod +x .git/hooks/pre-commit
-#
-# Or configure git to use this directory:
-#   git config core.hooksPath .githooks
+# Pre-commit hook to prevent committing sensitive files and personal data.
+# Non-interactive, so agent and script commits work. Install: make install-hooks
 
 set -e
 
@@ -30,6 +24,9 @@ if git diff --cached --name-only | grep -E "credentials.*\.json$|service-account
     git diff --cached --name-only | grep -E "credentials.*\.json$|service-account.*\.json$|.*\.pem$|.*\.key$"
     exit 1
 fi
+
+# Personal data (site names, account IDs, emails, $HOME paths) in any staged file, docs included
+"$(git rev-parse --show-toplevel)/scripts/scan-private.sh" --staged
 
 # Check for common secret patterns in staged changes
 # Only scan Go source code files (exclude tests, docs, scripts, configs)
@@ -73,28 +70,19 @@ fi
 
 if [ $SECRETS_FOUND -eq 1 ]; then
     echo ""
-    echo -e "${YELLOW}Potential secrets detected in your commit.${NC}"
-    echo "Please review the changes carefully."
-    echo ""
-    read -p "Do you want to continue anyway? (yes/no): " -n 3 -r
-    echo
-    if [[ ! $REPLY =~ ^yes$ ]]; then
-        echo "Commit aborted."
-        exit 1
-    fi
+    echo -e "${RED}Potential secrets detected in your commit.${NC}"
+    echo "Review the lines above. If they are false positives, commit with --no-verify."
+    exit 1
 fi
 
-# Run go fmt check
-UNFORMATTED=$(gofmt -l .)
-if [ -n "$UNFORMATTED" ]; then
-    echo -e "${YELLOW}WARNING: The following files are not formatted:${NC}"
-    echo "$UNFORMATTED"
-    echo ""
-    read -p "Run 'gofmt -w .' to format? (y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        gofmt -w .
-        echo "Files formatted. Please review and stage the changes."
+# gofmt check on staged Go files
+STAGED_ALL_GO=$(git diff --cached --name-only --diff-filter=ACMR | grep "\.go$" || true)
+if [ -n "$STAGED_ALL_GO" ]; then
+    UNFORMATTED=$(gofmt -l $STAGED_ALL_GO)
+    if [ -n "$UNFORMATTED" ]; then
+        echo -e "${RED}ERROR: these staged files are not gofmt-formatted:${NC}"
+        echo "$UNFORMATTED"
+        echo "Run: gofmt -w $UNFORMATTED && git add $UNFORMATTED"
         exit 1
     fi
 fi

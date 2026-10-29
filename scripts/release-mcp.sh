@@ -6,9 +6,10 @@
 #
 # Steps: preflight → bump mcp/package.json + mcp/manifest.json → move the
 # mcp/CHANGELOG.md "Unreleased" section under the new version → full checks →
-# commit, tag vX.Y.Z, push → GoReleaser (binaries) from a clean worktree →
-# .mcpb bundle uploaded to the release → npm publish (asks for 2FA in the
-# browser). Re-running after a failure is safe up to the push; after that,
+# personal-data scan of a trimpath binary → commit, tag vX.Y.Z, push →
+# GoReleaser (binaries) from a clean worktree → .mcpb bundle, scanned, then
+# uploaded → npm tarball scanned and smoke-tested by prepublishOnly → npm
+# publish (asks for 2FA in the browser). Re-running after a failure is safe up to the push; after that,
 # finish the remaining steps by hand.
 set -euo pipefail
 
@@ -32,6 +33,7 @@ git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && { echo "tag $TAG alread
 npm view "ga4-manager-mcp@$VERSION" version >/dev/null 2>&1 && { echo "ga4-manager-mcp@$VERSION is already on npm" >&2; exit 1; }
 UNRELEASED="$(awk '/^## \[Unreleased\]/{f=1;next} /^## \[/{f=0} f' mcp/CHANGELOG.md | grep -c '[^[:space:]]' || true)"
 [ "$UNRELEASED" -gt 0 ] || { echo "mcp/CHANGELOG.md has nothing under [Unreleased]" >&2; exit 1; }
+[ "$(git config core.hooksPath)" = ".githooks" ] || { echo "git hooks are off: run make install-hooks" >&2; exit 1; }
 if [ "$DRY_RUN" != "--dry-run" ]; then
   npm whoami >/dev/null 2>&1 || { echo "not logged in to npm: run npm login first" >&2; exit 1; }
 fi
@@ -40,6 +42,13 @@ step "Checks"
 (cd mcp && pnpm run lint && pnpm exec tsc --noEmit && pnpm run test:run)
 go test ./...
 make lint
+SCAN="$(mktemp -d)"
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$SCAN/ga4" .
+git archive --format=tar.gz -o "$SCAN/tree.tar.gz" HEAD
+(cd mcp && npm pack --ignore-scripts --silent --pack-destination "$SCAN" >/dev/null)
+scripts/scan-private.sh "$SCAN/ga4" "$SCAN/tree.tar.gz" "$SCAN"/ga4-manager-mcp-*.tgz
+rm -rf "$SCAN"
+(cd mcp && pnpm run build >/dev/null && pnpm run smoke:pack)
 if [ "$DRY_RUN" = "--dry-run" ]; then
   echo "dry run: checks passed, nothing changed"
   exit 0
@@ -68,9 +77,10 @@ trap 'git -C "$ROOT" worktree remove --force "$WT" 2>/dev/null || true' EXIT
 
 step ".mcpb bundle"
 (cd mcp && pnpm run pack:mcpb && rm -rf build)   # build/ is staging; left behind it trips eslint
+scripts/scan-private.sh mcp/dist-mcpb/*.mcpb
 gh release upload "$TAG" mcp/dist-mcpb/*.mcpb --clobber
 
-step "npm publish (approve 2FA in the browser)"
+step "npm publish: press ENTER at the link and approve 2FA right away (it expires in minutes)"
 (cd mcp && npm publish --access public)
 
 step "Done: $TAG"

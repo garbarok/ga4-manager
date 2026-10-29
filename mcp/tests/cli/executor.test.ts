@@ -2,11 +2,22 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CLIExecutor } from '../../src/cli/executor';
 import type { CLIResult } from '../../src/types/cli';
 import path from 'path';
+import { accessSync, constants } from 'fs';
 
 describe('CLIExecutor', () => {
   let executor: CLIExecutor;
   // Binary path: use env var or resolve from project root
   const testBinaryPath = process.env.GA4_BINARY_PATH || path.resolve(__dirname, '../../../ga4');
+  // The execute tests spawn the real CLI. A fresh worktree has none until `make build`.
+  const hasBinary = (() => {
+    try {
+      accessSync(testBinaryPath, constants.X_OK);
+      return true;
+    } catch {
+      console.warn(`executor.test: skipping CLI execution tests, no ga4 binary at ${testBinaryPath} (run make build)`);
+      return false;
+    }
+  })();
 
   beforeEach(() => {
     executor = new CLIExecutor(testBinaryPath);
@@ -20,7 +31,7 @@ describe('CLIExecutor', () => {
     });
   });
 
-  describe('execute', () => {
+  describe.skipIf(!hasBinary)('execute', () => {
     it('should execute command and capture output', async () => {
       const result: CLIResult = await executor.execute({
         command: '--version',

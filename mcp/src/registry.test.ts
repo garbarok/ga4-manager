@@ -6,9 +6,11 @@ import { SPECS, SPEC_BY_NAME } from './registry.js';
 // to live inside index.ts and was only reachable at runtime. A miswired tool
 // (missing command, wrong kind, missing annotations) now fails here.
 describe('tool registry', () => {
-  it('registers 44 tools with unique names', () => {
+  // No literal tool count: parallel branches adding tools would all conflict on
+  // it. Completeness is pinned by the manifest.json parity test below.
+  it('registers tools with unique names', () => {
     const names = SPECS.map((s) => s.tool.name);
-    expect(names).toHaveLength(44);
+    expect(names.length).toBeGreaterThan(0);
     expect(new Set(names).size).toBe(names.length);
   });
 

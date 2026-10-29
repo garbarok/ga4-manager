@@ -1,4 +1,4 @@
-.PHONY: build install run clean test lint release release-mcp
+.PHONY: build install run clean test lint release release-mcp install-hooks
 
 # Binary name
 BINARY=ga4
@@ -58,6 +58,12 @@ lint:
 release: test lint
 	@GITHUB_TOKEN=$$(gh auth token) $(GORELEASER) release --clean
 
+# Use the repo's git hooks (secrets, personal data, gofmt, commit messages)
+install-hooks:
+	@git config core.hooksPath .githooks
+	@test -f .githooks/denylist.local || printf '# One personal identifier per line (site names, account IDs, emails). Gitignored.\n' > .githooks/denylist.local
+	@echo "✓ Hooks enabled; list your personal identifiers in .githooks/denylist.local"
+
 # Full MCP + CLI release: bump, changelog, tag, binaries, .mcpb, npm. Usage: make release-mcp V=4.1.0
 release-mcp:
 	@test -n "$(V)" || { echo "usage: make release-mcp V=X.Y.Z" >&2; exit 1; }
@@ -78,6 +84,7 @@ help:
 	@echo "  make test           - Run tests"
 	@echo "  make lint           - Run golangci-lint"
 	@echo "  make release        - Test, lint and publish the current tag with GoReleaser"
+	@echo "  make install-hooks  - Enable git hooks (secrets, personal data, gofmt)"
 	@echo "  make release-mcp V=X.Y.Z - Bump, tag and publish CLI + MCP (GitHub, .mcpb, npm)"
 	@echo ""
 	@echo "Usage Examples:"

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Block personal data in commit messages (see scripts/scan-private.sh).
+exec "$(git rev-parse --show-toplevel)/scripts/scan-private.sh" --msg "$1"

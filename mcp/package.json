@@ -52,7 +52,8 @@
     "test:watch": "vitest watch",
     "lint": "eslint src/",
     "pack:mcpb": "bash scripts/build-mcpb.sh",
-    "prepublishOnly": "pnpm run lint && pnpm exec tsc --noEmit && pnpm run test:run && pnpm run build"
+    "prepublishOnly": "pnpm run lint && pnpm exec tsc --noEmit && pnpm run test:run --reporter=dot && pnpm run build && pnpm run smoke:pack",
+    "smoke:pack": "node scripts/pack-smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

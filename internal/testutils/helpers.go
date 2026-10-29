@@ -51,7 +51,7 @@ func NewTestDimension(parameterName string, displayName string, scope string) co
 func NewTestMetric(displayName string, eventParameter string, unit string) config.MetricConfig {
 	return config.MetricConfig{
 		DisplayName:     displayName,
-		ParameterName:  eventParameter,
+		ParameterName:   eventParameter,
 		MeasurementUnit: unit,
 		Scope:           "EVENT",
 	}

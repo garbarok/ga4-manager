@@ -294,15 +294,15 @@ func shouldProceedWithCleanup(hasItems, skipConfirmation bool, yellow func(a ...
 // conversion-events preview table. Each row is a single event name plus a
 // fixed status string — matching the previous hand-rolled tablewriter
 // output.
-func cleanupConversionsColumns() []string         { return []string{"Event Name", "Status"} }
+func cleanupConversionsColumns() []string          { return []string{"Event Name", "Status"} }
 func cleanupConversionsTableRow(s string) []string { return []string{s, "Will be deleted"} }
 
 // cleanupDimensionsColumns / cleanupDimensionsTableRow project the
 // custom-dimensions preview table.
-func cleanupDimensionsColumns() []string         { return []string{"Parameter Name", "Status"} }
+func cleanupDimensionsColumns() []string          { return []string{"Parameter Name", "Status"} }
 func cleanupDimensionsTableRow(s string) []string { return []string{s, "Will be archived"} }
 
 // cleanupMetricsColumns / cleanupMetricsTableRow project the custom-metrics
 // preview table.
-func cleanupMetricsColumns() []string         { return []string{"Parameter Name", "Status"} }
+func cleanupMetricsColumns() []string          { return []string{"Parameter Name", "Status"} }
 func cleanupMetricsTableRow(s string) []string { return []string{s, "Will be archived"} }

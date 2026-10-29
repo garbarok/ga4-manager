@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
 onlyBuiltDependencies:
   - esbuild
+# Agent worktrees symlink node_modules from the main checkout; pnpm's pre-run
+# dependency check rejects that and tries to reinstall. Install explicitly instead.
+verifyDepsBeforeRun: false

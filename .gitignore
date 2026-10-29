@@ -84,3 +84,16 @@ docs/internal/
 !tools
 # Codegraph index
 .codegraph/
+
+# Personal identifiers for scripts/scan-private.sh (never commit)
+.githooks/denylist.local
+
+# Local agent and editor tooling (per machine, not part of the project)
+/.agents/skills/openspec-*/
+/.agents/skills/source-command-*/
+/.claude/
+/.codex/
+/mcp/.agents/
+/mcp/.claude/
+/mcp/.opencode/
+/mcp/openspec/

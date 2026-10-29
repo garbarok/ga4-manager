@@ -9,15 +9,15 @@ import (
 
 // URLInspectionResult contains information about a URL's indexing status
 type URLInspectionResult struct {
-	URL               string
-	InspectionURL     string
-	IndexStatus       string // INDEXED, EXCLUDED, ERROR
-	CoverageState     string // SUBMITTED_AND_INDEXED, NOT_FOUND, BLOCKED, etc.
-	LastCrawlTime     string
-	GoogleCanonical   string
-	UserCanonical     string
-	RobotsBlocked     bool
-	IndexingAllowed   bool
+	URL             string
+	InspectionURL   string
+	IndexStatus     string // INDEXED, EXCLUDED, ERROR
+	CoverageState   string // SUBMITTED_AND_INDEXED, NOT_FOUND, BLOCKED, etc.
+	LastCrawlTime   string
+	GoogleCanonical string
+	UserCanonical   string
+	RobotsBlocked   bool
+	IndexingAllowed bool
 	// MobileUsable reflects the Mobile Usability verdict. Google deprecated the
 	// Mobile Usability report and its URL Inspection field in December 2023, so
 	// the API now usually returns no verdict at all. Trust MobileUsable ONLY
@@ -26,11 +26,11 @@ type URLInspectionResult struct {
 	MobileUsable           bool
 	MobileUsabilityChecked bool
 	MobileIssues           []string
-	RichResultsStatus string
-	RichResultsIssues []string
-	RichResultTypes   []string         // e.g., ["Recipe", "FAQ", "Breadcrumb"]
-	RichResultItems   []RichResultItem // Individual detected items with details
-	IndexingIssues    []IndexingIssue
+	RichResultsStatus      string
+	RichResultsIssues      []string
+	RichResultTypes        []string         // e.g., ["Recipe", "FAQ", "Breadcrumb"]
+	RichResultItems        []RichResultItem // Individual detected items with details
+	IndexingIssues         []IndexingIssue
 }
 
 // RichResultItem represents a detected rich result item
