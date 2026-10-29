@@ -1,4 +1,4 @@
-.PHONY: build install run clean test lint release
+.PHONY: build install run clean test lint release release-mcp
 
 # Binary name
 BINARY=ga4
@@ -58,6 +58,11 @@ lint:
 release: test lint
 	@GITHUB_TOKEN=$$(gh auth token) $(GORELEASER) release --clean
 
+# Full MCP + CLI release: bump, changelog, tag, binaries, .mcpb, npm. Usage: make release-mcp V=4.1.0
+release-mcp:
+	@test -n "$(V)" || { echo "usage: make release-mcp V=X.Y.Z" >&2; exit 1; }
+	@scripts/release-mcp.sh $(V)
+
 # Help
 help:
 	@echo "GA4 Manager - Makefile targets:"
@@ -73,6 +78,7 @@ help:
 	@echo "  make test           - Run tests"
 	@echo "  make lint           - Run golangci-lint"
 	@echo "  make release        - Test, lint and publish the current tag with GoReleaser"
+	@echo "  make release-mcp V=X.Y.Z - Bump, tag and publish CLI + MCP (GitHub, .mcpb, npm)"
 	@echo ""
 	@echo "Usage Examples:"
 	@echo "  ./ga4 setup --config configs/my-project.yaml"
