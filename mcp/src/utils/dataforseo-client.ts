@@ -1,4 +1,5 @@
 import { ToolError, ErrorCode, errorCodeForStatus } from './errors.js'
+import { beforePaidCall, recordSpend } from './spend-guard.js'
 
 /**
  * Thin client for the DataForSEO v3 API (keyword volume, SERP snapshots).
@@ -79,10 +80,13 @@ export function normalizeDomain(input: string): string {
  * POST wraps `task` in the array body DataForSEO expects; GET (e.g. "appendix/user_data") sends no body.
  */
 export async function dataforseoRequest<R>(
-  req: { method?: 'GET' | 'POST'; path: string; task?: Record<string, unknown>; timeoutMs?: number },
+  req: { method?: 'GET' | 'POST'; path: string; task?: Record<string, unknown>; timeoutMs?: number; unbilled?: boolean },
   creds: DataforseoCredentials = {},
 ): Promise<DataforseoResult<R>> {
   const { username, password } = resolveCredentials(creds)
+  // `unbilled` endpoints (appendix/user_data) stay usable once the cap is hit,
+  // so the agent can still check the balance.
+  if (!req.unbilled) beforePaidCall('dataforseo')
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
   const method = req.method ?? 'POST'
 
@@ -113,6 +117,7 @@ export async function dataforseoRequest<R>(
   // DataForSEO signals task-level failures (bad params, no credits, etc.) with a
   // non-20000 status even on HTTP 200 — this is the caller's problem, not an outage.
   const cost = typeof task0.cost === 'number' ? task0.cost : typeof data.cost === 'number' ? data.cost : null
+  recordSpend(cost)
   if (task0.status_code !== 20000) {
     throw new DataforseoTaskError(`DataForSEO task failed: ${task0.status_message}`, cost)
   }

@@ -1,5 +1,6 @@
 import { ToolError, ErrorCode, errorCodeForStatus } from './errors.js'
 import { TTLCache } from './cache.js'
+import { beforePaidCall } from './spend-guard.js'
 
 /**
  * Thin client for Cloudflare's Browser Rendering REST API — a hosted headless
@@ -48,6 +49,7 @@ export async function renderHtml(url: string, opts: CloudflareRenderOptions = {}
   const cached = renderCache.get(cacheKey)
   if (cached !== undefined) return cached
 
+  beforePaidCall('cloudflare')
   const response = await fetch(`${CF_API_BASE}/accounts/${accountId}/browser-rendering/content`, {
     method: 'POST',
     headers: {

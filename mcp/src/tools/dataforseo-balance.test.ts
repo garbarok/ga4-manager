@@ -29,7 +29,9 @@ describe('runDataforseoBalance', () => {
 
     const result = await runDataforseoBalance()
 
-    expect(result).toEqual({ success: true, login: 'me', balance_usd: 49.43, total_deposited_usd: 50, cost_usd: 0 })
+    expect(result).toMatchObject({ success: true, login: 'me', balance_usd: 49.43, total_deposited_usd: 50, cost_usd: 0 })
+    // The balance check is unbilled, so it does not count against the session caps.
+    expect(result).toMatchObject({ session: { paid_calls: 0, spent_usd: 0, max_spend_usd: 5 } })
     expect(mockFetch.mock.calls[0][0]).toBe('https://api.dataforseo.com/v3/appendix/user_data')
     expect(mockFetch.mock.calls[0][1].method).toBe('GET')
   })

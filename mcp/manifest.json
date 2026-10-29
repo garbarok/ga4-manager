@@ -37,7 +37,9 @@
         "GA4M_ALLOW_DESTRUCTIVE": "${user_config.allow_destructive}",
         "GA4M_READ_ONLY": "${user_config.read_only}",
         "INDEXNOW_KEY": "${user_config.indexnow_key}",
-        "DATAFORSEO_ALLOW_RAW": "${user_config.dataforseo_allow_raw}"
+        "DATAFORSEO_ALLOW_RAW": "${user_config.dataforseo_allow_raw}",
+        "GA4M_MAX_SPEND_USD": "${user_config.max_spend_usd}",
+        "GA4M_MAX_PAID_CALLS": "${user_config.max_paid_calls}"
       }
     }
   },
@@ -289,6 +291,18 @@
       "title": "ValueSERP API key (optional)",
       "description": "Enables keyword_rank_check (live Google rank for a domain/keyword pair). Leave blank to skip.",
       "sensitive": true,
+      "required": false
+    },
+    "max_spend_usd": {
+      "type": "string",
+      "title": "Max DataForSEO spend per session, USD (optional)",
+      "description": "Paid DataForSEO calls are refused once this server process has been billed this much. Default 5. \"off\" disables the cap. Resets when the server restarts.",
+      "required": false
+    },
+    "max_paid_calls": {
+      "type": "string",
+      "title": "Max paid API calls per session (optional)",
+      "description": "DataForSEO, ValueSERP and Cloudflare rendering calls are refused after this many in one server process. Default 300. \"off\" disables the cap.",
       "required": false
     },
     "allow_destructive": {

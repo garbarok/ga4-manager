@@ -1,4 +1,5 @@
 import { ToolError, ErrorCode, errorCodeForStatus } from './errors.js'
+import { beforePaidCall } from './spend-guard.js'
 
 /**
  * Thin client for the ValueSERP API — live Google SERP snapshots, used here to
@@ -106,6 +107,7 @@ async function doSearch(params: ValueSerpSearchParams): Promise<ValueSerpRespons
   })
   if (params.include_ai_overview) query.set('include_ai_overview', 'true')
 
+  beforePaidCall('valueserp')
   const response = await fetchWithRetry(`${VALUESERP_BASE}?${query.toString()}`)
 
   if (!response.ok) {
