@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-10-29
+
 ### Fixed
 
 - **The server no longer crashes at startup without the `ga4` binary.** An npm install (`npx ga4-manager-mcp`) has no binary, so 4.0.0 and 4.1.0 exited before listing any tool. The binary is now checked per CLI call: native tools work without it, and CLI-backed tools return an error saying where to download it or how to set `GA4_BINARY_PATH`.

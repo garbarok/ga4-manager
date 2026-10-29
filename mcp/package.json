@@ -1,6 +1,6 @@
 {
   "name": "ga4-manager-mcp",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "description": "MCP server for organic growth: Google Analytics 4, Search Console, AdSense, on-page SEO audits and DataForSEO, built for AI agents",
   "mcpName": "io.github.garbarok/ga4-manager",
   "type": "module",
