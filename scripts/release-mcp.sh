@@ -31,7 +31,8 @@ git fetch -q origin main --tags
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main is not in sync with origin/main" >&2; exit 1; }
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && { echo "tag $TAG already exists" >&2; exit 1; }
 npm view "ga4-manager-mcp@$VERSION" version >/dev/null 2>&1 && { echo "ga4-manager-mcp@$VERSION is already on npm" >&2; exit 1; }
-UNRELEASED="$(awk '/^## \[Unreleased\]/{f=1;next} /^## \[/{f=0} f' mcp/CHANGELOG.md | grep -c '[^[:space:]]' || true)"
+# Only the first [Unreleased] section counts: the file has an old one further down.
+UNRELEASED="$(awk '/^## \[/{if(f)exit} /^## \[Unreleased\]/{f=1;next} f' mcp/CHANGELOG.md | grep -c '[^[:space:]]' || true)"
 [ "$UNRELEASED" -gt 0 ] || { echo "mcp/CHANGELOG.md has nothing under [Unreleased]" >&2; exit 1; }
 [ "$(git config core.hooksPath)" = ".githooks" ] || { echo "git hooks are off: run make install-hooks" >&2; exit 1; }
 if [ "$DRY_RUN" != "--dry-run" ]; then
