@@ -2,12 +2,11 @@
 
 > **AI-powered GA4 and Google Search Console management through Model Context Protocol**
 
-A Model Context Protocol (MCP) server that exposes GA4 Manager CLI commands as 13 structured tools for AI assistants. Configure Google Analytics 4 properties, manage Search Console, and query analytics data using natural language with Claude Code, Claude Desktop, and other MCP clients.
+A Model Context Protocol (MCP) server with 44 tools and 3 workflow prompts for AI assistants: Google Analytics 4 setup and reports, Search Console diagnostics, AdSense, on-page SEO audits with Core Web Vitals field data, IndexNow, and DataForSEO keyword, backlink and AI-visibility research. Works with Claude Code, Claude Desktop and other MCP clients.
 
-[![Tests](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml/badge.svg)](https://github.com/garbarok/ga4-manager/actions/workflows/test.yml)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
-[![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.25-purple)]()
-[![Tools](https://img.shields.io/badge/MCP%20Tools-17-orange)]()
+[![npm](https://img.shields.io/npm/v/ga4-manager-mcp)](https://www.npmjs.com/package/ga4-manager-mcp)
+[![Latest Release](https://img.shields.io/github/v/release/garbarok/ga4-manager)](https://github.com/garbarok/ga4-manager/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
