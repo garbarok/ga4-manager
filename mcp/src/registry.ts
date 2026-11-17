@@ -48,11 +48,15 @@ import { dataforseoRequestSpec } from './tools/dataforseo-request.js'
 import { googleTrendsSpec } from './tools/google-trends.js'
 import { indexnowSubmitSpec } from './tools/indexnow-submit.js'
 import { serverInfoSpec } from './tools/server-info.js'
+import { projectContextGetSpec, projectContextUpdateSpec } from './tools/project-context.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
   // What this install can do and why a group is off (start here)
   serverInfoSpec,
+  // Project context: shared agent memory per site (item 4)
+  projectContextGetSpec,
+  projectContextUpdateSpec,
   // Cross-source entry point: the brief an assistant starts a growth plan from
   siteGrowthBriefSpec,
   // GA4

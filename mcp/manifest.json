@@ -49,6 +49,14 @@
       "description": "Server info and enabled tool groups"
     },
     {
+      "name": "project_context_get",
+      "description": "Read project context"
+    },
+    {
+      "name": "project_context_update",
+      "description": "Update project context"
+    },
+    {
       "name": "site_growth_brief",
       "description": "Site growth brief"
     },
