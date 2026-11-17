@@ -153,6 +153,38 @@
       "description": "GA4 traffic & ad revenue report"
     },
     {
+      "name": "ga4_organic_overview",
+      "description": "GA4 organic overview"
+    },
+    {
+      "name": "ga4_organic_landing_pages",
+      "description": "GA4 organic landing pages"
+    },
+    {
+      "name": "ga4_key_events",
+      "description": "GA4 key events"
+    },
+    {
+      "name": "ga4_traffic_acquisition",
+      "description": "GA4 traffic acquisition"
+    },
+    {
+      "name": "ga4_audience",
+      "description": "GA4 audience breakdown"
+    },
+    {
+      "name": "ga4_site_search",
+      "description": "GA4 site search terms"
+    },
+    {
+      "name": "ga4_ecommerce",
+      "description": "GA4 ecommerce"
+    },
+    {
+      "name": "ga4_measurement_health",
+      "description": "GA4 measurement health"
+    },
+    {
       "name": "ga4_annotations",
       "description": "List or create GA4 annotations (SEO decision log)"
     },

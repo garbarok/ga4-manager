@@ -28,6 +28,16 @@ import { gscMonitorUrlsSpec } from './tools/gsc-monitor.js'
 import { gscTrafficCompareSpec } from './tools/gsc-traffic-compare.js'
 import { ga4ConsentHealthSpec } from './tools/ga4-consent-health.js'
 import { ga4TrafficReportSpec } from './tools/ga4-traffic-report.js'
+import {
+  ga4OrganicOverviewSpec,
+  ga4OrganicLandingPagesSpec,
+  ga4KeyEventsSpec,
+  ga4TrafficAcquisitionSpec,
+  ga4AudienceSpec,
+  ga4SiteSearchSpec,
+  ga4EcommerceSpec,
+} from './tools/ga4-organic-reports.js'
+import { ga4MeasurementHealthSpec } from './tools/ga4-measurement-health.js'
 import { ga4AnnotationsSpec } from './tools/ga4-annotations.js'
 import { siteGrowthBriefSpec } from './tools/site-growth-brief.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
@@ -83,6 +93,15 @@ export const SPECS: ToolSpec[] = [
   gscTrafficCompareSpec,
   ga4ConsentHealthSpec,
   ga4TrafficReportSpec,
+  // GA4 organic reports (item 3)
+  ga4OrganicOverviewSpec,
+  ga4OrganicLandingPagesSpec,
+  ga4KeyEventsSpec,
+  ga4TrafficAcquisitionSpec,
+  ga4AudienceSpec,
+  ga4SiteSearchSpec,
+  ga4EcommerceSpec,
+  ga4MeasurementHealthSpec,
   ga4AnnotationsSpec,
   seoPageAuditSpec,
   seoAuditBatchSpec,
