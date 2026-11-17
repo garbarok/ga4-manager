@@ -48,6 +48,7 @@ import { dataforseoRequestSpec } from './tools/dataforseo-request.js'
 import { googleTrendsSpec } from './tools/google-trends.js'
 import { indexnowSubmitSpec } from './tools/indexnow-submit.js'
 import { serverInfoSpec } from './tools/server-info.js'
+import { rankTrackerSpecs } from './tools/rank-tracker.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
@@ -102,6 +103,8 @@ export const SPECS: ToolSpec[] = [
   googleTrendsSpec,
   backlinksOverviewSpec,
   linkGapSpec,
+  // Rank tracker (item 5)
+  ...rankTrackerSpecs,
   // Indexing notification (IndexNow — Bing, Yandex, etc.; native, no CLI)
   indexnowSubmitSpec,
   // Gated raw escape hatch (needs DATAFORSEO_ALLOW_RAW)

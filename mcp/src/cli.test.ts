@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseToolArgs, helpFor, main, toolName, UsageError, EXIT_OK, EXIT_USAGE } from './cli.js'
+import { parseToolArgs, helpFor, main, toolName, UsageError, EXIT_OK, EXIT_USAGE, type Writer } from './cli.js'
 import { SPECS, SPEC_BY_NAME } from './registry.js'
 import type { ToolDef } from './tool-spec.js'
 
@@ -22,7 +22,7 @@ const TOOL: ToolDef = {
 
 function sink() {
   let text = ''
-  return { stream: { write: (s: string) => ((text += s), true) } as unknown as NodeJS.WriteStream, text: () => text }
+  return { stream: { write: (s: string) => ((text += s), true) } as Writer, text: () => text }
 }
 
 describe('parseToolArgs', () => {

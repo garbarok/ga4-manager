@@ -217,6 +217,38 @@
       "description": "Link gap vs competitors"
     },
     {
+      "name": "rank_tracker_create",
+      "description": "Create a rank tracker"
+    },
+    {
+      "name": "rank_tracker_update",
+      "description": "Update a rank tracker"
+    },
+    {
+      "name": "rank_tracker_get",
+      "description": "Rank tracker with latest positions"
+    },
+    {
+      "name": "rank_tracker_history",
+      "description": "Rank history"
+    },
+    {
+      "name": "rank_tracker_list",
+      "description": "List rank trackers"
+    },
+    {
+      "name": "rank_tracker_delete",
+      "description": "Delete a rank tracker"
+    },
+    {
+      "name": "rank_tracker_estimate",
+      "description": "Estimate a rank tracker run"
+    },
+    {
+      "name": "rank_tracker_run",
+      "description": "Run a rank tracker"
+    },
+    {
       "name": "indexnow_submit",
       "description": "Submit URLs to IndexNow"
     },

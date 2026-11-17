@@ -147,7 +147,11 @@ Examples:
   ga4m project-context-get --site example.com
 `
 
-export async function main(argv: string[], out = process.stdout, err = process.stderr): Promise<number> {
+export interface Writer {
+  write(text: string): unknown
+}
+
+export async function main(argv: string[], out: Writer = process.stdout, err: Writer = process.stderr): Promise<number> {
   const [cmd, ...rest] = argv
   try {
     if (!cmd || cmd === '--help' || cmd === '-h') {
