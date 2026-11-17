@@ -1,0 +1,73 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.012,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.012,
+      "path": [
+        "v3",
+        "ai_optimization",
+        "claude",
+        "llm_responses",
+        "live"
+      ],
+      "result": [
+        {
+          "model_name": "claude-haiku-5-5",
+          "input_tokens": 1000,
+          "output_tokens": 300,
+          "reasoning_tokens": 0,
+          "web_search": true,
+          "money_spent": 0.01,
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "items": [
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "Here are good options.",
+                  "annotations": null
+                },
+                {
+                  "type": "text",
+                  "text": "ToolC is the most complete; ToolA and toolb.example.com are lighter.",
+                  "annotations": [
+                    {
+                      "title": "ToolC guide",
+                      "url": "https://toolc.example.org/guide",
+                      "start_index": null,
+                      "end_index": null,
+                      "text": null
+                    },
+                    {
+                      "title": "ToolB",
+                      "url": "https://www.toolb.example.com/features",
+                      "start_index": null,
+                      "end_index": null,
+                      "text": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": [
+            "best open source web analytics tools"
+          ],
+          "search_results": [
+            {
+              "title": "ToolC guide",
+              "url": "https://toolc.example.org/guide",
+              "date": "2026-11-01 00:00:00 +00:00",
+              "snippet": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

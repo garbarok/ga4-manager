@@ -23,6 +23,11 @@ export interface PlannedRequest {
   task: Record<string, unknown>
   /** Results the request is expected to bill for (per_result endpoints). */
   expected_results?: number
+  /**
+   * Measured cost the price list does not show (e.g. Google AI Overview async
+   * loading, LLM tokens above the built-in allowance). Added when not cached.
+   */
+  surcharge_usd?: number
 }
 
 export interface CostLine {
@@ -169,7 +174,7 @@ export function priceRequests(
     const results = req.expected_results ?? 0
     const cached = isCached(req)
     const tokenAllowance = req.path.includes('/llm_responses/') ? LLM_RESPONSE_TOKEN_ALLOWANCE_USD : 0
-    const cost = cached ? 0 : u.per_request * pages + u.per_result * results + tokenAllowance
+    const cost = cached ? 0 : u.per_request * pages + u.per_result * results + tokenAllowance + (req.surcharge_usd ?? 0)
     const line = lines.get(req.path) ?? {
       endpoint: req.path,
       requests: 0,

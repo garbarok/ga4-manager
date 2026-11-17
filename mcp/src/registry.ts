@@ -39,6 +39,21 @@ import { keywordSerpSnapshotSpec } from './tools/keyword-serp.js'
 import { keywordRankCheckSpec } from './tools/keyword-rank-check.js'
 import { dataforseoBalanceSpec } from './tools/dataforseo-balance.js'
 import { llmMentionsSpec } from './tools/llm-mentions.js'
+import {
+  aiVisibilityResearchSpec,
+  aiVisibilityExploreSpec,
+  aiVisibilityEstimateSpec,
+  aiVisibilityRunSpec,
+} from './tools/ai-visibility-paid.js'
+import {
+  aiVisibilityPromptsGenerateSpec,
+  aiVisibilityTrackerSaveSpec,
+  aiVisibilityResultsSpec,
+  aiVisibilityTrendSpec,
+  aiVisibilitySourcesSpec,
+  aiVisibilityAnswerSpec,
+  aiVisibilityExportSpec,
+} from './tools/ai-visibility-local.js'
 import { keywordGapSpec } from './tools/keyword-gap.js'
 import { rankedKeywordsSpec } from './tools/ranked-keywords.js'
 import { keywordIdeasSpec } from './tools/keyword-ideas.js'
@@ -100,6 +115,18 @@ export const SPECS: ToolSpec[] = [
   // Competitive & AI-visibility research (DataForSEO)
   dataforseoBalanceSpec,
   llmMentionsSpec,
+  // AI visibility (item 6)
+  aiVisibilityResearchSpec,
+  aiVisibilityPromptsGenerateSpec,
+  aiVisibilityTrackerSaveSpec,
+  aiVisibilityEstimateSpec,
+  aiVisibilityExploreSpec,
+  aiVisibilityRunSpec,
+  aiVisibilityResultsSpec,
+  aiVisibilityTrendSpec,
+  aiVisibilitySourcesSpec,
+  aiVisibilityAnswerSpec,
+  aiVisibilityExportSpec,
   keywordGapSpec,
   rankedKeywordsSpec,
   keywordIdeasSpec,

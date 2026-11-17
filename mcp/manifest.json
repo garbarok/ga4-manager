@@ -201,6 +201,50 @@
       "description": "AI answer mentions for a domain"
     },
     {
+      "name": "ai_visibility_research",
+      "description": "Research AI prompts for a market"
+    },
+    {
+      "name": "ai_visibility_prompts_generate",
+      "description": "Generate AI-visibility prompts"
+    },
+    {
+      "name": "ai_visibility_tracker_save",
+      "description": "Save AI-visibility tracker"
+    },
+    {
+      "name": "ai_visibility_estimate",
+      "description": "Estimate an AI-visibility run"
+    },
+    {
+      "name": "ai_visibility_explore",
+      "description": "Explore one prompt across AI engines"
+    },
+    {
+      "name": "ai_visibility_run",
+      "description": "Run AI-visibility tracking"
+    },
+    {
+      "name": "ai_visibility_results",
+      "description": "AI-visibility run results"
+    },
+    {
+      "name": "ai_visibility_trend",
+      "description": "AI-visibility trend"
+    },
+    {
+      "name": "ai_visibility_sources",
+      "description": "Sources cited by AI answers"
+    },
+    {
+      "name": "ai_visibility_answer",
+      "description": "Stored AI answer"
+    },
+    {
+      "name": "ai_visibility_export",
+      "description": "Export AI-visibility data"
+    },
+    {
       "name": "keyword_gap",
       "description": "Keyword gap vs a competitor"
     },

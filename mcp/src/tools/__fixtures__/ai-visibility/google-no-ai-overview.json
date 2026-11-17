@@ -1,0 +1,77 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.002,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.002,
+      "path": [
+        "v3",
+        "serp",
+        "google",
+        "organic",
+        "live",
+        "advanced"
+      ],
+      "result": [
+        {
+          "keyword": "what are the best open source web analytics tools",
+          "type": "organic",
+          "se_domain": "google.com",
+          "location_code": 2840,
+          "language_code": "en",
+          "check_url": "https://www.google.com/search?q=what+are+the+best+open+source+web+analytics+tools",
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "spell": null,
+          "refinement_chips": null,
+          "item_types": [
+            "organic"
+          ],
+          "se_results_count": 73,
+          "pages_count": 1,
+          "items_count": 1,
+          "items": [
+            {
+              "type": "organic",
+              "rank_group": 1,
+              "rank_absolute": 2,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]",
+              "domain": "reviews.example.net",
+              "title": "Best analytics tools",
+              "url": "https://reviews.example.net/best-analytics",
+              "cache_url": null,
+              "related_search_url": null,
+              "breadcrumb": "https://reviews.example.net",
+              "website_name": "Reviews",
+              "is_image": false,
+              "is_video": false,
+              "is_featured_snippet": false,
+              "is_malicious": false,
+              "is_web_story": false,
+              "checks": null,
+              "description": "A comparison.",
+              "pre_snippet": null,
+              "extended_snippet": null,
+              "images": null,
+              "amp_version": false,
+              "rating": null,
+              "price": null,
+              "highlighted": null,
+              "links": null,
+              "faq": null,
+              "extended_people_also_search": null,
+              "about_this_result": null,
+              "related_result": null,
+              "timestamp": null,
+              "rectangle": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.033,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.033,
+      "path": [
+        "v3",
+        "ai_optimization",
+        "gemini",
+        "llm_responses",
+        "live"
+      ],
+      "result": [
+        {
+          "model_name": "gemini-3.6-flash",
+          "input_tokens": 1000,
+          "output_tokens": 300,
+          "reasoning_tokens": 0,
+          "web_search": true,
+          "money_spent": 0.01,
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "items": [
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "ToolB is a good start.",
+                  "annotations": null
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": [
+            "best open source web analytics tools"
+          ],
+          "search_results": [
+            {
+              "title": "ToolB review",
+              "url": "https://reviews.example.net/toolb",
+              "date": "2026-11-01 00:00:00 +00:00",
+              "snippet": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

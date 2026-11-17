@@ -1,0 +1,109 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.004,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.004,
+      "path": [
+        "v3",
+        "serp",
+        "google",
+        "ai_mode",
+        "live",
+        "advanced"
+      ],
+      "result": [
+        {
+          "keyword": "what are the best open source web analytics tools",
+          "type": "ai_mode",
+          "se_domain": "google.com",
+          "location_code": 2840,
+          "language_code": "en",
+          "check_url": "https://www.google.com/search?q=what+are+the+best+open+source+web+analytics+tools&udm=50",
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "spell": null,
+          "refinement_chips": null,
+          "item_types": [
+            "ai_overview"
+          ],
+          "se_results_count": 0,
+          "items_count": 1,
+          "items": [
+            {
+              "type": "ai_overview",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "page": 1,
+              "position": "left",
+              "xpath": "/html[1]/body[1]",
+              "markdown": "Popular choices are **ToolB** and **ToolA**.",
+              "items": [
+                {
+                  "type": "ai_overview_element",
+                  "position": "left",
+                  "title": null,
+                  "text": "Popular choices are **ToolB** and **ToolA**.",
+                  "markdown": "Popular choices are **ToolB** and **ToolA**.",
+                  "links": [
+                    {
+                      "type": "link_element",
+                      "title": "ToolA",
+                      "description": null,
+                      "url": "https://toola.example.com/",
+                      "domain": "toola.example.com"
+                    }
+                  ],
+                  "images": null,
+                  "references": [
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "ToolB",
+                      "domain": "toolb.example.com",
+                      "url": "https://toolb.example.com/",
+                      "title": "ToolB - open-source analytics",
+                      "text": "ToolB is privacy-first."
+                    },
+                    {
+                      "type": "ai_overview_reference",
+                      "position": "left",
+                      "source": "Reviews",
+                      "domain": "reviews.example.net",
+                      "url": "https://reviews.example.net/best-analytics",
+                      "title": "Best analytics tools",
+                      "text": "A comparison."
+                    }
+                  ]
+                }
+              ],
+              "references": [
+                {
+                  "type": "ai_overview_reference",
+                  "position": "left",
+                  "source": "ToolB",
+                  "domain": "toolb.example.com",
+                  "url": "https://toolb.example.com/",
+                  "title": "ToolB - open-source analytics",
+                  "text": "ToolB is privacy-first."
+                },
+                {
+                  "type": "ai_overview_reference",
+                  "position": "left",
+                  "source": "Reviews",
+                  "domain": "reviews.example.net",
+                  "url": "https://reviews.example.net/best-analytics",
+                  "title": "Best analytics tools",
+                  "text": "A comparison."
+                }
+              ],
+              "rectangle": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
