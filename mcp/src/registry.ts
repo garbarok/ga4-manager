@@ -49,6 +49,11 @@ import { googleTrendsSpec } from './tools/google-trends.js'
 import { indexnowSubmitSpec } from './tools/indexnow-submit.js'
 import { serverInfoSpec } from './tools/server-info.js'
 import { rankTrackerSpecs } from './tools/rank-tracker.js'
+import { keywordsSaveSpec, keywordsListSpec, keywordsRemoveSpec } from './tools/keyword-workspace.js'
+import { keywordSuggestionsSpec } from './tools/keyword-suggestions.js'
+import { serpCompetitorsSpec } from './tools/serp-competitors.js'
+import { serpLocationsSpec } from './tools/serp-locations.js'
+import { domainOverviewSpec } from './tools/domain-overview.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
@@ -105,6 +110,14 @@ export const SPECS: ToolSpec[] = [
   linkGapSpec,
   // Rank tracker (item 5)
   ...rankTrackerSpecs,
+  // Keyword workspace (item 7)
+  keywordsSaveSpec,
+  keywordsListSpec,
+  keywordsRemoveSpec,
+  keywordSuggestionsSpec,
+  serpCompetitorsSpec,
+  serpLocationsSpec,
+  domainOverviewSpec,
   // Indexing notification (IndexNow — Bing, Yandex, etc.; native, no CLI)
   indexnowSubmitSpec,
   // Gated raw escape hatch (needs DATAFORSEO_ALLOW_RAW)

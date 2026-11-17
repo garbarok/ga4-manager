@@ -249,6 +249,34 @@
       "description": "Run a rank tracker"
     },
     {
+      "name": "keywords_save",
+      "description": "Save keywords"
+    },
+    {
+      "name": "keywords_list",
+      "description": "List saved keywords"
+    },
+    {
+      "name": "keywords_remove",
+      "description": "Remove saved keywords"
+    },
+    {
+      "name": "keyword_suggestions",
+      "description": "Suggested keywords for a site"
+    },
+    {
+      "name": "serp_competitors",
+      "description": "SERP competitors for a keyword set"
+    },
+    {
+      "name": "serp_locations",
+      "description": "Location and language codes"
+    },
+    {
+      "name": "domain_overview",
+      "description": "Domain overview"
+    },
+    {
       "name": "indexnow_submit",
       "description": "Submit URLs to IndexNow"
     },
