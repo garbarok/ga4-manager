@@ -45,6 +45,10 @@
   },
   "tools": [
     {
+      "name": "server_info",
+      "description": "Server info and enabled tool groups"
+    },
+    {
       "name": "site_growth_brief",
       "description": "Site growth brief"
     },

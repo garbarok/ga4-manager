@@ -6,7 +6,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "ga4-manager-mcp": "dist/index.js"
+    "ga4-manager-mcp": "dist/index.js",
+    "ga4m": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -53,7 +54,8 @@
     "lint": "eslint src/",
     "pack:mcpb": "bash scripts/build-mcpb.sh",
     "prepublishOnly": "pnpm run lint && pnpm exec tsc --noEmit && pnpm run test:run --reporter=dot && pnpm run build && pnpm run smoke:pack",
-    "smoke:pack": "node scripts/pack-smoke.mjs"
+    "smoke:pack": "node scripts/pack-smoke.mjs",
+    "manifest:sync": "tsx scripts/sync-manifest-tools.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

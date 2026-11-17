@@ -47,9 +47,12 @@ import { linkGapSpec } from './tools/link-gap.js'
 import { dataforseoRequestSpec } from './tools/dataforseo-request.js'
 import { googleTrendsSpec } from './tools/google-trends.js'
 import { indexnowSubmitSpec } from './tools/indexnow-submit.js'
+import { serverInfoSpec } from './tools/server-info.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
+  // What this install can do and why a group is off (start here)
+  serverInfoSpec,
   // Cross-source entry point: the brief an assistant starts a growth plan from
   siteGrowthBriefSpec,
   // GA4
