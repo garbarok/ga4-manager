@@ -162,6 +162,14 @@ export async function main(argv: string[], out: Writer = process.stdout, err: Wr
       out.write(`${readServerVersion()}\n`)
       return EXIT_OK
     }
+    if (cmd === '__site-audit-worker') {
+      // Internal: the detached background process started by site_audit_run.
+      const [stateDir, site, id] = rest
+      if (!stateDir || !site || !id) throw new UsageError('__site-audit-worker <state_dir> <site> <id>')
+      const { runAuditJob } = await import('./audit/audit-job.js')
+      const rec = await runAuditJob(stateDir, site, id)
+      return rec.status === 'done' ? EXIT_OK : EXIT_TOOL_ERROR
+    }
     if (cmd === 'list') {
       for (const spec of SPECS) out.write(`${spec.tool.name.replace(/_/g, '-').padEnd(30)} ${spec.tool.annotations?.title ?? ''}\n`)
       return EXIT_OK

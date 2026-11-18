@@ -32,6 +32,15 @@ import { ga4AnnotationsSpec } from './tools/ga4-annotations.js'
 import { siteGrowthBriefSpec } from './tools/site-growth-brief.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
+import {
+  siteAuditRunSpec,
+  siteAuditStatusSpec,
+  siteAuditIssuesSpec,
+  siteAuditPagesSpec,
+  siteAuditLighthouseSpec,
+  siteAuditListSpec,
+  siteAuditDeleteSpec,
+} from './tools/site-audit.js'
 import { adsenseAccountsListSpec } from './tools/adsense-accounts.js'
 import { adsenseReportSpec } from './tools/adsense-report.js'
 import { keywordVolumeSpec } from './tools/keyword-volume.js'
@@ -90,6 +99,14 @@ export const SPECS: ToolSpec[] = [
   ga4AnnotationsSpec,
   seoPageAuditSpec,
   seoAuditBatchSpec,
+  // Site crawl audit (item 1): background crawl, site-wide issues, Lighthouse
+  siteAuditRunSpec,
+  siteAuditStatusSpec,
+  siteAuditIssuesSpec,
+  siteAuditPagesSpec,
+  siteAuditLighthouseSpec,
+  siteAuditListSpec,
+  siteAuditDeleteSpec,
   // AdSense (publisher reporting — native, no CLI)
   adsenseAccountsListSpec,
   adsenseReportSpec,

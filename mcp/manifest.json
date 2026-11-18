@@ -173,6 +173,34 @@
       "description": "Batch SEO page audit"
     },
     {
+      "name": "site_audit_run",
+      "description": "Start a site crawl audit"
+    },
+    {
+      "name": "site_audit_status",
+      "description": "Site audit status"
+    },
+    {
+      "name": "site_audit_issues",
+      "description": "Site audit issues"
+    },
+    {
+      "name": "site_audit_pages",
+      "description": "Site audit pages"
+    },
+    {
+      "name": "site_audit_lighthouse",
+      "description": "Site audit Lighthouse"
+    },
+    {
+      "name": "site_audit_list",
+      "description": "List site audits"
+    },
+    {
+      "name": "site_audit_delete",
+      "description": "Delete a site audit"
+    },
+    {
       "name": "adsense_accounts_list",
       "description": "List AdSense accounts"
     },
