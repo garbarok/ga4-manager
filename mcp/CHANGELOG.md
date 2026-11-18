@@ -81,6 +81,12 @@ OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO 
 
 ### Changed
 
+- **Dependencies updated:**
+  - @modelcontextprotocol/sdk 1.32.2, zod 4.6.7, tldts 7.5.4;
+  - csv-parse 7 and node-html-parser 9 (majors; same behaviour, all tests pass);
+  - dev: vitest 5, eslint 10.15, typescript-eslint 8.73, @types/node 26.
+  - TypeScript stays on 6.0.3: typescript-eslint does not support TypeScript 7 yet.
+  - Transitive dependencies of the MCP SDK (express, hono, body-parser, qs…) refreshed: `npm audit --omit=dev` and `pnpm audit --prod` report no known vulnerabilities.
 - Search Console diagnostics use one more quota unit per run, for the `data_through` lookup.
 - MCP tool calls go through a shared dispatcher (`src/dispatch.ts`). Results of paid tools gain `research_log`, and `cache` when a lookup was served from cache.
 

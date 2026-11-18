@@ -4,6 +4,8 @@ import { joinWindow, runPageOpportunities } from './page-opportunities.js'
 import { latestDate } from '../utils/gsc-data-through.js'
 import { CLIExecutor } from '../cli/executor.js'
 
+vi.mock('../utils/google-auth.js', () => ({ getGoogleAuthHeaders: async () => ({ Authorization: 'Bearer t' }) }))
+
 const OPTS = { min_position: 4, max_position: 20, min_impressions: 50 }
 
 const gscRow = (path: string, impressions: number, position: number, clicks = 5): GscPageRow => ({
@@ -116,7 +118,6 @@ describe('runPageOpportunities', () => {
   })
 
   it('joins GSC and GA4 over the same window ending at data_through', async () => {
-    vi.mock('../utils/google-auth.js', () => ({ getGoogleAuthHeaders: async () => ({ Authorization: 'Bearer t' }) }))
     const bodies: { url: string; body: Record<string, unknown> }[] = []
     vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
       const u = String(url)
