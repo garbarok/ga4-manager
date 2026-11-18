@@ -5,3 +5,11 @@ onlyBuiltDependencies:
 # Agent worktrees symlink node_modules from the main checkout; pnpm's pre-run
 # dependency check rejects that and tries to reinstall. Install explicitly instead.
 verifyDepsBeforeRun: false
+minimumReleaseAge: 43200
+# Security fixes newer than the 30-day window, pinned to the first patched
+# release (pnpm audit --prod, 2026-11-18). Remove once they age past 30 days.
+minimumReleaseAgeExclude:
+  - body-parser@2.4.0
+  - fast-uri@3.1.9
+  - hono@4.13.16
+  - '@hono/node-server@2.1.6'
