@@ -117,7 +117,7 @@ ga4 --help
 ## Build from Source
 
 ### Prerequisites
-- Go 1.21 or higher
+- Go 1.27 or higher (`go.mod` pins 1.27.4; with the default `GOTOOLCHAIN=auto`, an older `go` downloads it automatically)
 - Git
 
 ### Steps

@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config: optional `search_console.hreflang_pairs`.
 - `ga4 gsc decay` — BO-02 content decay: query/page pairs with position slip ≥ 1 and clicks down ≥ 20% between two equal, finalised windows; exit 2 on findings.
 
+### Changed
+- Go 1.27.4 (was 1.25.8) and updated modules: google.golang.org/api v0.316.0, golang.org/x/net v0.63.0, golang.org/x/vuln v1.10.0, testify v1.12.1 and their dependencies. `make lint` uses golangci-lint v2.15.0, built with the `go.mod` toolchain.
+
 ### Fixed
 - Configs found by name outside the repo's working directory: `GA4M_CONFIG_DIR`, `./configs`, `configs/` next to the `ga4` binary, then `~/.config/ga4-manager/configs`. Operator configs are searched before examples, and the error lists every directory searched. Name lookups also accept a path to a YAML file.
 - API errors print without the cobra usage block; typos in flags still show usage.
