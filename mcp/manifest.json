@@ -313,6 +313,66 @@
       "description": "Delete a report template"
     },
     {
+      "name": "rank_tracker_create",
+      "description": "Create a rank tracker"
+    },
+    {
+      "name": "rank_tracker_update",
+      "description": "Update a rank tracker"
+    },
+    {
+      "name": "rank_tracker_get",
+      "description": "Rank tracker with latest positions"
+    },
+    {
+      "name": "rank_tracker_history",
+      "description": "Rank history"
+    },
+    {
+      "name": "rank_tracker_list",
+      "description": "List rank trackers"
+    },
+    {
+      "name": "rank_tracker_delete",
+      "description": "Delete a rank tracker"
+    },
+    {
+      "name": "rank_tracker_estimate",
+      "description": "Estimate a rank tracker run"
+    },
+    {
+      "name": "rank_tracker_run",
+      "description": "Run a rank tracker"
+    },
+    {
+      "name": "keywords_save",
+      "description": "Save keywords"
+    },
+    {
+      "name": "keywords_list",
+      "description": "List saved keywords"
+    },
+    {
+      "name": "keywords_remove",
+      "description": "Remove saved keywords"
+    },
+    {
+      "name": "keyword_suggestions",
+      "description": "Suggested keywords for a site"
+    },
+    {
+      "name": "serp_competitors",
+      "description": "SERP competitors for a keyword set"
+    },
+    {
+      "name": "serp_locations",
+      "description": "Location and language codes"
+    },
+    {
+      "name": "domain_overview",
+      "description": "Domain overview"
+    },
+    {
       "name": "indexnow_submit",
       "description": "Submit URLs to IndexNow"
     },
