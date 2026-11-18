@@ -231,9 +231,10 @@ describe('ai_visibility_research', () => {
   it('digests questions, volumes and cited domains', () => {
     const d = digestResearch([{ keyword: 'web analytics', items: MENTIONS_RESULT.tasks[0].result[0].items }], 'toolb.example.com')
     expect(d.questions).toEqual([
-      { question: 'which open source analytics tool is best', keyword: 'web analytics', ai_search_volume: 900, source_count: 2, cites_site: true },
-      { question: 'is ToolA free', keyword: 'web analytics', ai_search_volume: 40, source_count: 1, cites_site: false },
+      { question: 'which open source analytics tool is best', keyword: 'web analytics', ai_search_volume: 900, source_count: 2, cites_site: true, relevance: 0.5 },
     ])
+    // No topic word from the seed: kept for review, not suggested (B6).
+    expect(d.low_relevance).toEqual([{ question: 'is ToolA free', keyword: 'web analytics', ai_search_volume: 40, source_count: 1, cites_site: false, relevance: 0 }])
     expect(d.top_cited_domains[0]).toEqual({ domain: 'reviews.example.net', citations: 1, is_own: false })
     expect(d.top_cited_domains.find((x) => x.is_own)).toMatchObject({ domain: 'toolb.example.com' })
   })
@@ -243,8 +244,24 @@ describe('ai_visibility_research', () => {
     const out = (await runAiVisibilityResearch(
       aiVisibilityResearchInputSchema.parse({ site: 'toolb.example.com', keywords: ['web analytics'], limit: 20 }),
     )) as Record<string, unknown>
-    expect(out).toMatchObject({ success: true, cost_usd: 0.12, suggested_prompts: ['which open source analytics tool is best', 'is ToolA free'] })
+    expect(out).toMatchObject({ success: true, cost_usd: 0.12, suggested_prompts: ['which open source analytics tool is best'] })
     // 0.1 per request + 20 × 0.001 per result
     expect((out.estimate as { total_usd: number }).total_usd).toBe(0.12)
+  })
+})
+
+describe('research relevance (B6)', () => {
+  it('keeps on-topic questions and sets loose matches aside', async () => {
+    const { digestResearch, relevanceTo } = await import('./ai-visibility-paid.js')
+    expect(relevanceTo('app mantenimiento moto', 'app motos')).toBe(0.5)
+    expect(relevanceTo('app mantenimiento moto', 'mantenimiento de motos')).toBe(1)
+    expect(relevanceTo('app mantenimiento moto', 'uber eats repartidor')).toBe(0)
+    const d = digestResearch([{ keyword: 'app mantenimiento moto', items: [
+      { question: 'uber eats repartidor', ai_search_volume: 1600, sources: [] },
+      { question: 'mantenimiento de motos', ai_search_volume: 90, sources: [] },
+      { question: 'apps moto', ai_search_volume: 300, sources: [] },
+    ] }], 'example.com')
+    expect(d.questions.map((q) => q.question)).toEqual(['mantenimiento de motos', 'apps moto'])
+    expect(d.low_relevance.map((q) => q.question)).toEqual(['uber eats repartidor'])
   })
 })

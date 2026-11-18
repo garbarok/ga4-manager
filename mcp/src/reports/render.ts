@@ -164,6 +164,38 @@ function scalarCell(v: unknown): string {
   if (Array.isArray(v) && v.every((x) => x === null || ['string', 'number', 'boolean'].includes(typeof x))) {
     return escapeHtml(truncate(v.map((x) => (typeof x === 'number' ? formatNumber(x) : String(x))).join(', '), MAX_CELL_CHARS))
   }
+  return compactCell(v)
+}
+
+const LABEL_KEYS = ['url', 'page', 'keyword', 'query', 'domain', 'name', 'title', 'text', 'key', 'id']
+const CELL_ITEMS = 3
+
+/** One readable label for an object: its url/name/keyword-like field, plus a detail when present. */
+function itemLabel(o: Record<string, unknown>): string {
+  const key = LABEL_KEYS.find((k) => typeof o[k] === 'string' && o[k])
+  const label = key ? String(o[key]) : String(Object.values(o).find((x) => typeof x === 'string' || typeof x === 'number') ?? '…')
+  const detail = typeof o.detail === 'string' && o.detail ? ` — ${o.detail}` : ''
+  return truncate(label + detail, 140)
+}
+
+/**
+ * Nested data inside a table cell, readable in a narrow column: an array of
+ * objects becomes a short list of labels ("+N more"), an object a few
+ * key/value pairs. Raw JSON is the last resort.
+ */
+function compactCell(v: unknown): string {
+  if (Array.isArray(v)) {
+    if (v.length === 0) return '<span class="muted">—</span>'
+    const items = v.slice(0, CELL_ITEMS).map((x) => (isPlainObject(x) ? itemLabel(x) : String(x)))
+    const more = v.length > CELL_ITEMS ? `<li class="muted">+${formatNumber(v.length - CELL_ITEMS)} more</li>` : ''
+    return `<ul class="cell-list">${items.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}${more}</ul>`
+  }
+  if (isPlainObject(v)) {
+    const entries = Object.entries(v).filter(([, x]) => x === null || typeof x !== 'object').slice(0, 4)
+    if (entries.length) {
+      return `<ul class="cell-list">${entries.map(([k, x]) => `<li>${escapeHtml(humanize(k))}: ${escapeHtml(truncate(String(x ?? '—'), 80))}</li>`).join('')}</ul>`
+    }
+  }
   return `<code>${escapeHtml(truncate(JSON.stringify(v), MAX_CELL_CHARS))}</code>`
 }
 
@@ -253,6 +285,7 @@ h2{font-size:1.2rem;margin:32px 0 12px}
 h3,h4,h5,h6{font-size:1rem;margin:20px 0 8px}
 .meta,.muted,.note{color:var(--muted)}
 .note{font-size:.85rem;margin:6px 0 0}
+.cell-list{margin:0;padding-left:1.1em;min-width:14em}.cell-list li{margin:0 0 2px;overflow-wrap:anywhere}
 a{color:var(--accent);overflow-wrap:anywhere}
 code{font:.85em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
 .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}

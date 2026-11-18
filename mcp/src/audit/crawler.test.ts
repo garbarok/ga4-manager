@@ -88,7 +88,7 @@ describe('crawlSite on the fixture site', () => {
   it('stops at the page budget and says how much was left', async () => {
     const { fetch } = fakeFetcher()
     const res = await crawlSite({ ...OPTS, maxPages: 5, concurrency: 1 }, { fetch, sleep: noSleep })
-    expect(res.pages).toHaveLength(5)
+    expect(res.pages.filter((p) => p.status_kind !== 'blocked_robots')).toHaveLength(5)
     expect(res.page_limit_reached).toBe(true)
     expect(res.unvisited).toBeGreaterThan(0)
   })
@@ -196,5 +196,23 @@ describe('httpFetcher', () => {
     spy.mockResolvedValueOnce(new Response('PK', { status: 200, headers: { 'content-type': 'application/zip' } }))
     expect((await httpFetcher('https://example.com/a.zip', { userAgent: 'x', readBody: true })).body).toBeNull()
     spy.mockRestore()
+  })
+})
+
+describe('crawl budget (B7)', () => {
+  it('does not spend the page budget on robots-blocked URLs', async () => {
+    const links = Array.from({ length: 20 }, (_, i) => `<a href="/go/app?src=${i}">x</a>`).join('') + '<a href="/a">a</a><a href="/b">b</a>'
+    const { fetch, calls } = fakeFetcher({
+      'https://example.com/robots.txt': { status: 200, body: 'User-agent: *\nDisallow: /go/\n' },
+      'https://example.com/': { status: 200, body: `<html><body>${links}</body></html>` },
+      'https://example.com/a': { status: 200, body: '<html><body>a</body></html>' },
+      'https://example.com/b': { status: 200, body: '<html><body>b</body></html>' },
+    })
+    const res = await crawlSite({ ...OPTS, maxPages: 3, includeSitemap: false, concurrency: 1 }, { fetch, sleep: noSleep })
+    const fetched = res.pages.filter((p) => p.status_kind !== 'blocked_robots').map((p) => p.url).sort()
+    expect(fetched).toEqual(['https://example.com/', 'https://example.com/a', 'https://example.com/b'])
+    expect(res.pages.filter((p) => p.status_kind === 'blocked_robots')).toHaveLength(20)
+    expect(calls.some((c) => c.includes('/go/'))).toBe(false)
+    expect(res.page_limit_reached).toBe(false)
   })
 })

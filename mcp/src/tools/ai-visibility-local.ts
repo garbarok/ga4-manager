@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadContext } from '../utils/project-context-store.js'
 import { MODEL_IDS, DEFAULT_MODELS, MODELS, type ModelId } from './ai-visibility/models.js'
 import { analyzeAnswer } from './ai-visibility/detect.js'
-import { brandFromDomain, contextInputs, generatePrompts } from './ai-visibility/generate.js'
+import { brandFromDomain, contextInputs, generatePrompts, templateLanguage } from './ai-visibility/generate.js'
 import {
   DEFAULT_TRACKER_ID,
   exportRows,
@@ -65,6 +65,7 @@ export const promptsGenerateInputSchema = z.object({
   topics: z.array(z.string().min(2)).max(20).optional().describe('Extra topics besides key-page topics in project context'),
   audience: z.string().optional().describe('Who asks, e.g. "small businesses"'),
   max: z.number().int().min(1).max(100).optional().default(40),
+  language_code: z.string().optional().describe('Prompt language: en, es, de or fr (default: the saved tracker language, else en)'),
   ...stateZod,
 })
 
@@ -74,14 +75,18 @@ export function runPromptsGenerate(input: z.infer<typeof promptsGenerateInputSch
   const hasContext = ctx.updated_at !== null
   const base = contextInputs(hasContext ? ctx : null, input.topics ?? [])
   const brand = base.brand ?? brandFromDomain(site)
-  const prompts = generatePrompts({ ...base, brand, audience: input.audience, max: input.max })
+  const requested = input.language_code ?? loadTracker(storeFor(input), site)?.language_code ?? 'en'
+  const language = templateLanguage(requested)
+  const prompts = generatePrompts({ ...base, brand, audience: input.audience, max: input.max, language: language ?? 'en' })
   const warnings: string[] = []
+  if (!language) warnings.push(`No prompt templates for language "${requested}"; prompts are in English. Write prompts in the market language and save them with ai_visibility_tracker_save.`)
   if (!hasContext) warnings.push('No project context for this site: only the topics you passed were used. Fill it with project_context_update (brand, competitors, key pages).')
   if (base.topics.length === 0) warnings.push('No topics: pass topics, or add key pages with a topic to project context.')
   return {
     success: true,
     site,
     prompts,
+    language: language ?? 'en',
     sources_used: { brand, topics: base.topics, competitors: base.competitors.map((c) => c.domain) },
     warnings,
     next_step: 'Pick the prompts worth tracking and save them with ai_visibility_tracker_save (prompts: [{text, tags}]).',
@@ -103,6 +108,7 @@ export const aiVisibilityPromptsGenerateSpec = native({
         topics: { type: 'array', items: { type: 'string' }, description: 'Extra topics besides key-page topics in project context' },
         audience: { type: 'string', description: 'Who asks, e.g. "small businesses"' },
         max: { type: 'number', default: 40, description: 'Maximum prompts returned (1-100)' },
+        language_code: { type: 'string', description: 'Prompt language: en, es, de or fr (default: the saved tracker language, else en)' },
         ...stateProps,
       },
     },

@@ -408,6 +408,21 @@ The tool's keyless throttle (`bottleneck` 1 req per 100s) still applies as a saf
 
 ---
 
+### `config not found: <name>`
+
+Tools that take a config name (`ga4_link_*`, `ga4_report --project`) search, in order:
+1. `GA4M_CONFIG_DIR`;
+2. `./configs` (the server's working directory, `/` under Claude Desktop);
+3. `configs/` next to the `ga4` binary;
+4. `~/.config/ga4-manager/configs`;
+5. the `examples/` folder inside each of the above.
+
+Set `GA4M_CONFIG_DIR` in the MCP server environment, or pass a path to the YAML file instead of a name.
+
+### Every Search Console / GA4 tool returns `AUTH_DENIED` for one site
+
+The credential has the scopes but no access to that site or property. Run `server_info` with `site`, `property_id` or `config`: `access` names the service-account email and the exact grant to add, in Search Console (Users and permissions) or GA4 (Property access management).
+
 ### `site_audit_*` — every page is `fetch_error` ("fetch failed")
 
 Node's `fetch` ignores `HTTPS_PROXY` and `HTTP_PROXY`. Behind a proxy (corporate network, sandbox), start the MCP server or `ga4m` with `NODE_USE_ENV_PROXY=1` (Node ≥ 22.21). The detached audit worker inherits it. Also check that the site's host is reachable from where the server runs.

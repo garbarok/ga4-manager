@@ -62,6 +62,23 @@ OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO 
 - **`data_through`** on every Search Console performance result: the last date with final data.
 - `pnpm manifest:sync` regenerates the `.mcpb` tool list from the registry. A test keeps the root README tool table equal to the registry.
 
+### Fixed (found by a full test run against a live site)
+
+- **Wrapped Google results:** Google serves many organic results and AI Overview references as `google.com/goto?url=…` redirects.
+  - `keyword_serp_snapshot` listed `google.com` for every such result. `keyword_rank_check` could report a false "not found". The rank tracker stored the redirect as the ranking URL and listed `google.com` as a competitor. AI-visibility sources collapsed into "(unnamed source)".
+  - The new `utils/serp-host.ts` recovers the real host from the breadcrumb, `displayed_link`, `domain` or site name. Wrapped results return `url: null` plus an approximate `url_hint`. AI references with only a name map to known platforms or stay visible by name, and `unattributed_citations` counts the rest.
+- **Timeouts:** live SERP and AI calls now wait 120 s (was 30 s). A request that still times out is logged as possibly billed (`note`), instead of vanishing from the research log and the spending cap.
+- **One error shape:** tools backed by the `ga4` CLI now report a Google 403/404/429 as `AUTH_DENIED` / `NOT_FOUND` / `QUOTA_EXCEEDED` in the same `{success:false, error:{code, message, hint}}` shape as native tools. Log lines and cobra usage text are stripped. Commands that exit 0 but print a failure, unknown tools and invalid input use the same shape.
+- **`gsc_change_impact`** reports a site the credential cannot read as `AUTH_DENIED`, not as a server error.
+- **`site_growth_brief`** data gaps show the real cause instead of a Go log line.
+- **`server_info`** takes `site`, `property_id` or `config` and checks that the credential can actually read them. Scopes alone did not prove it. Each denied resource comes with the exact grant to add.
+- **Dry runs:** `dry_run: true` previews of destructive tools (`ga4_setup`, `ga4_cleanup`) pass the destructive gate. The gate reads validated input, so a `dry_run` a tool does not define cannot unlock it.
+- **Site crawl:** robots-blocked URLs no longer use the page budget. Lighthouse picks pages by section after the locale (`/es/blog` vs `/es/mantenimiento`) instead of one page per language.
+- **`ai_visibility_prompts_generate`** writes prompts in Spanish, German or French (`language_code`, or the tracker's language) instead of mixing English templates with local topics.
+- **`ai_visibility_research`** scores questions against the seed keyword. Loosely matched ones go to `low_relevance` and are not suggested.
+- **`serp_competitors`** flags platforms (YouTube, Facebook, Wikipedia, app stores…) and no longer suggests them as competitors.
+- **Saved reports** render nested lists in table cells as short readable lists instead of raw JSON.
+
 ### Changed
 
 - Search Console diagnostics use one more quota unit per run, for the `data_through` lookup.

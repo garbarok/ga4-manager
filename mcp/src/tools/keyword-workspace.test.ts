@@ -244,3 +244,13 @@ describe('domain_overview', () => {
     expect((out as { warnings: string[] }).warnings[0]).toMatch(/no ranking data/)
   })
 })
+
+describe('serp_competitors platforms (B16)', () => {
+  it('flags platforms so they are not suggested as competitors', async () => {
+    const { isPlatform } = await import('./serp-competitors.js')
+    expect(isPlatform('www.youtube.com')).toBe(true)
+    expect(isPlatform('es.wikipedia.org')).toBe(true)
+    expect(isPlatform('amazon.it')).toBe(true)
+    expect(isPlatform('motor.mapfre.es')).toBe(false)
+  })
+})

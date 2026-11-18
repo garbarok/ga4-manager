@@ -150,3 +150,23 @@ describe('site audit job', () => {
     expect(new Set(picked.map((u) => new URL(u).pathname.split('/')[1])).size).toBe(4)
   })
 })
+
+describe('representative pages on multilingual sites (B8)', () => {
+  it('picks page types, not one page per language', async () => {
+    const { pickRepresentativePages } = await import('../audit/lighthouse.js')
+    const page = (path: string, inlinks: number) => ({
+      url: `https://example.com${path}`, final_url: `https://example.com${path}`, status: 200, status_kind: 'ok', content_type: 'text/html',
+      noindex: false, canonicals: [], inlinks,
+    }) as unknown as import('../audit/crawler.js').CrawledPage
+    const pages = [
+      page('/en', 50), page('/en/blog', 40), page('/es/blog', 40), page('/de/blog', 40), page('/fr/blog', 40),
+      page('/en/maintenance/model-a', 30), page('/en/tools/itv', 20), page('/es/mantenimiento/model-a', 25),
+    ]
+    expect(pickRepresentativePages(pages, 'https://example.com/en', 4)).toEqual([
+      'https://example.com/en',
+      'https://example.com/en/blog',
+      'https://example.com/en/maintenance/model-a',
+      'https://example.com/en/tools/itv',
+    ])
+  })
+})

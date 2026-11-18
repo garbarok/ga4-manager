@@ -494,6 +494,7 @@ export async function crawlSite(opts: CrawlOptions, deps: CrawlDeps): Promise<Cr
   let pageLimit = false
   let timeLimit = false
   let stopped = false
+  let fetchStarted = 0
 
   const crawlOne = async (item: { url: string; via: CrawledPage['found_via']; depth: number | null }): Promise<void> => {
     const page = emptyPage(item.url, item.via, item.depth)
@@ -601,7 +602,9 @@ export async function crawlSite(opts: CrawlOptions, deps: CrawlDeps): Promise<Cr
       }
       if (queue.length === 0) break
     }
-    if (pages.size + inFlight.size >= opts.maxPages) {
+    // Only fetched pages use the budget: robots-blocked URLs are recorded at
+    // dequeue time and never fetched, so they must not crowd out real pages.
+    if (fetchStarted >= opts.maxPages) {
       if (queue.length > 0 || sitemapQueue.some((u) => !queued.has(u))) pageLimit = true
       if (inFlight.size === 0) break
       await Promise.race(inFlight)
@@ -612,6 +615,13 @@ export async function crawlSite(opts: CrawlOptions, deps: CrawlDeps): Promise<Cr
       continue
     }
     const item = queue.shift()!
+    if (!allowed(item.url)) {
+      const blocked = emptyPage(item.url, item.via, item.depth)
+      blocked.status_kind = 'blocked_robots'
+      pages.set(item.url, blocked)
+      continue
+    }
+    fetchStarted += 1
     const p = crawlOne(item).then(async () => {
       if (delayMs > 0) await sleep(delayMs)
     })

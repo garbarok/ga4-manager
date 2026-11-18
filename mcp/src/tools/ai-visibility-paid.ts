@@ -87,7 +87,37 @@ export interface ResearchQuestion {
   ai_search_volume: number | null
   source_count: number
   cites_site: boolean | null
+  /** Share of the seed keyword's content words found in the question (0–1). */
+  relevance: number
 }
+
+/** Words that carry no topic, in the languages the tools target. */
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'how', 'what', 'best', 'app', 'apps', 'tool', 'tools',
+  'para', 'con', 'que', 'los', 'las', 'del', 'una', 'mejor', 'mejores', 'como', 'cual',
+  'der', 'die', 'das', 'und', 'mit', 'fur', 'beste', 'wie', 'les', 'des', 'pour', 'avec', 'meilleur', 'meilleure',
+])
+
+/** Lowercase, accent-free content words, cut to a 5-letter stem so plurals and inflections match. */
+export function topicStems(text: string): string[] {
+  return (text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/g) ?? [])
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+    .map((w) => (w.length > 4 ? w.replace(/(es|s)$/, '') : w).slice(0, 5))
+}
+
+/**
+ * How on-topic a question is for its seed keyword. LLM Mentions matches
+ * loosely (a seed like "app mantenimiento moto" returns "uber eats
+ * repartidor"), so questions below MIN_RELEVANCE are set aside.
+ */
+export function relevanceTo(seed: string, question: string): number {
+  const want = [...new Set(topicStems(seed))]
+  if (want.length === 0) return 1
+  const have = new Set(topicStems(question))
+  return Math.round((want.filter((w) => have.has(w)).length / want.length) * 100) / 100
+}
+
+export const MIN_RELEVANCE = 0.5
 
 export function researchPlan(input: AiVisibilityResearchInput): PlannedRequest[] {
   return input.keywords.map((keyword) => ({
@@ -107,7 +137,7 @@ export function researchPlan(input: AiVisibilityResearchInput): PlannedRequest[]
 export function digestResearch(
   perKeyword: { keyword: string; items: MentionItem[] }[],
   site: string | null,
-): { questions: ResearchQuestion[]; top_cited_domains: { domain: string; citations: number; is_own: boolean }[] } {
+): { questions: ResearchQuestion[]; low_relevance: ResearchQuestion[]; top_cited_domains: { domain: string; citations: number; is_own: boolean }[] } {
   const questions = new Map<string, ResearchQuestion>()
   const domains = new Map<string, number>()
   for (const { keyword, items } of perKeyword) {
@@ -127,11 +157,16 @@ export function digestResearch(
         ai_search_volume: typeof item.ai_search_volume === 'number' ? item.ai_search_volume : null,
         source_count: sources.length,
         cites_site: site ? sources.some((s) => domainMatches(s.domain ?? (s.url ? normalizeDomain(s.url) : null), site)) : null,
+        relevance: relevanceTo(keyword, q),
       })
     }
   }
+  const sorted = [...questions.values()].sort(
+    (a, b) => b.relevance - a.relevance || (b.ai_search_volume ?? -1) - (a.ai_search_volume ?? -1) || a.question.localeCompare(b.question),
+  )
   return {
-    questions: [...questions.values()].sort((a, b) => (b.ai_search_volume ?? -1) - (a.ai_search_volume ?? -1) || a.question.localeCompare(b.question)),
+    questions: sorted.filter((q) => q.relevance >= MIN_RELEVANCE),
+    low_relevance: sorted.filter((q) => q.relevance < MIN_RELEVANCE),
     top_cited_domains: [...domains.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 20)
@@ -163,6 +198,8 @@ export async function runAiVisibilityResearch(input: AiVisibilityResearchInput):
       site,
       platform: input.platform,
       questions: digest.questions,
+      // Loosely matched questions LLM Mentions returned; kept for review, not suggested.
+      low_relevance: digest.low_relevance,
       top_cited_domains: digest.top_cited_domains,
       suggested_prompts: digest.questions.slice(0, 30).map((q) => q.question),
       errors,

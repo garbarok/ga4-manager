@@ -53,6 +53,18 @@ interface LabsCompetitorsResult {
   items?: LabsCompetitor[] | null
 }
 
+/** Platforms that rank for almost any topic; flagged so they are not suggested as competitors. */
+export const PLATFORM_DOMAINS = [
+  'youtube.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'x.com', 'twitter.com', 'linkedin.com', 'pinterest.com',
+  'reddit.com', 'quora.com', 'wikipedia.org', 'medium.com', 'amazon.com', 'amazon.es', 'amazon.de', 'amazon.fr', 'amazon.co.uk',
+  'ebay.com', 'ebay.es', 'ebay.de', 'play.google.com', 'apps.apple.com', 'google.com', 'maps.google.com', 'tripadvisor.com', 'yelp.com',
+]
+
+export function isPlatform(domain: string): boolean {
+  const d = domain.toLowerCase().replace(/^www\./, '')
+  return PLATFORM_DOMAINS.some((p) => d === p || d.endsWith(`.${p}`)) || /^amazon\.|^ebay\./.test(d)
+}
+
 export interface CompetitorRow {
   domain: string
   keywords_count: number
@@ -63,6 +75,8 @@ export interface CompetitorRow {
   etv: number | null
   is_site: boolean
   is_known_competitor: boolean
+  /** Social, video, marketplace, app-store or reference site: ranks everywhere, rarely a business competitor. */
+  is_platform: boolean
   /** Best position per keyword in the set. */
   best_positions: Record<string, number>
 }
@@ -92,6 +106,7 @@ export function mapCompetitors(items: LabsCompetitor[], keywordCount: number, si
         etv: round(i.etv),
         is_site: isSite,
         is_known_competitor: !isSite && [...known].some((k) => domain === k || domain.endsWith(`.${k}`)),
+        is_platform: isPlatform(domain),
         best_positions: best,
       }
     })
@@ -127,7 +142,7 @@ export async function runSerpCompetitors(input: SerpCompetitorsInput) {
     const { items, cost } = await dataforseoRequest<LabsCompetitorsResult>({ path: plan.path, task: plan.task })
     const known = new Set(site ? loadContext(store, site).competitors.map((c) => siteKey(c.domain)) : [])
     const rows = mapCompetitors(items[0]?.items ?? [], keywords.length, site, known)
-    const suggestions = rows.filter((r) => !r.is_site && !r.is_known_competitor && r.share_of_keywords >= 0.2).slice(0, 5).map((r) => r.domain)
+    const suggestions = rows.filter((r) => !r.is_site && !r.is_known_competitor && !r.is_platform && r.share_of_keywords >= 0.2).slice(0, 5).map((r) => r.domain)
     const ownRow = rows.find((r) => r.is_site) ?? null
     return {
       success: true as const,

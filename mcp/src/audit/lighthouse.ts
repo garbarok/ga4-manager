@@ -56,12 +56,30 @@ export interface PsiResponse {
   }
 }
 
+const LOCALE = /^[a-z]{2}([-_][a-z]{2,4})?$/i
+
+/** Path segments with a leading locale ("es", "pt-br") split off. */
+export function splitLocale(url: string): { locale: string | null; segments: string[] } {
+  const segs = new URL(url).pathname.split('/').filter(Boolean)
+  return segs.length && LOCALE.test(segs[0]) ? { locale: segs[0].toLowerCase(), segments: segs.slice(1) } : { locale: null, segments: segs }
+}
+
 /**
  * Pick up to `n` pages: the start URL, then the most-linked indexable page of
- * each top-level section (first path segment), then the most-linked rest.
+ * each section, then the most-linked rest. On multilingual sites the section
+ * is the segment after the locale (/es/mantenimiento/x → "mantenimiento"),
+ * and pages in the start URL's locale are tried first, so the picks cover
+ * page types (blog, tools, product pages) instead of one page per language.
  */
 export function pickRepresentativePages(pages: CrawledPage[], startUrl: string, n: number): string[] {
-  const candidates = pages.filter(isIndexable).sort((a, b) => b.inlinks - a.inlinks || a.url.localeCompare(b.url))
+  const startLocale = splitLocale(startUrl).locale
+  const candidates = pages
+    .filter(isIndexable)
+    .sort((a, b) => {
+      const la = splitLocale(a.url).locale === startLocale ? 0 : 1
+      const lb = splitLocale(b.url).locale === startLocale ? 0 : 1
+      return la - lb || b.inlinks - a.inlinks || a.url.localeCompare(b.url)
+    })
   const out: string[] = []
   const push = (u: string): void => {
     if (out.length < n && !out.includes(u)) out.push(u)
@@ -70,7 +88,7 @@ export function pickRepresentativePages(pages: CrawledPage[], startUrl: string, 
   if (start) push(start.url)
   const seenSection = new Set<string>()
   for (const p of candidates) {
-    const section = new URL(p.url).pathname.split('/').filter(Boolean)[0] ?? ''
+    const section = splitLocale(p.url).segments[0] ?? ''
     if (seenSection.has(section)) continue
     seenSection.add(section)
     push(p.url)

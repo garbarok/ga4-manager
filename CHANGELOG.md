@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config: optional `search_console.hreflang_pairs`.
 - `ga4 gsc decay` — BO-02 content decay: query/page pairs with position slip ≥ 1 and clicks down ≥ 20% between two equal, finalised windows; exit 2 on findings.
 
+### Fixed
+- Configs found by name outside the repo's working directory: `GA4M_CONFIG_DIR`, `./configs`, `configs/` next to the `ga4` binary, then `~/.config/ga4-manager/configs`. Operator configs are searched before examples, and the error lists every directory searched. Name lookups also accept a path to a YAML file.
+- API errors print without the cobra usage block; typos in flags still show usage.
+
 ### Planned
 - `ga4 doctor` subcommand — preflight checks for credentials, scopes, API enablement, and per-resource access
 - Priority filtering (`--priority high/medium/low`)

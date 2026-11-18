@@ -183,3 +183,24 @@ describe('reads over stored runs', () => {
     expect(exportRows([])).toEqual([])
   })
 })
+
+describe('prompt language (B5)', () => {
+  it('writes Spanish, German and French prompts, and warns on an unsupported language', async () => {
+    const { generatePrompts, templateLanguage } = await import('./ai-visibility/generate.js')
+    const es = generatePrompts({ topics: ['mantenimiento moto'], brand: 'Example', competitors: [{ domain: 'rival.example', name: 'Rival' }], max: 20, language: 'es-ES' })
+    expect(es.map((p) => p.text)).toEqual([
+      '¿cuáles son las mejores apps para mantenimiento moto?',
+      '¿cuál es la mejor app de mantenimiento moto?',
+      '¿cómo elegir una app de mantenimiento moto?',
+      'opiniones de Example',
+      '¿Example es buena?',
+      '¿qué es Example?',
+      'Example vs Rival',
+      'alternativas a Rival',
+    ])
+    expect(generatePrompts({ topics: ['Kette spannen'], competitors: [], max: 1, language: 'de' })[0].text).toBe('Was sind die besten Apps für Kette spannen?')
+    expect(generatePrompts({ topics: ['entretien moto'], competitors: [], max: 1, language: 'fr' })[0].text).toBe('quelles sont les meilleures applications pour entretien moto ?')
+    expect(templateLanguage('it')).toBeNull()
+    expect(generatePrompts({ topics: ['x y'], competitors: [], max: 1, language: 'it' })[0].text).toBe('what are the best x y tools')
+  })
+})

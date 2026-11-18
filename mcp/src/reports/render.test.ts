@@ -126,3 +126,19 @@ describe('humanize', () => {
     expect(humanize('dataThrough')).toBe('Data Through')
   })
 })
+
+describe('nested data in table cells (B17)', () => {
+  it('shows arrays of objects as short label lists, escaped, with +N more', async () => {
+    const { renderData } = await import('./render.js')
+    const html = renderData([{ type: 'thin-content', pages: [
+      { url: 'https://example.com/a', detail: '120 words' },
+      { url: 'https://example.com/b' },
+      { url: 'https://example.com/c' },
+      { url: 'https://example.com/<script>' },
+    ] }])
+    expect(html).toContain('<ul class="cell-list"><li>https://example.com/a — 120 words</li>')
+    expect(html).toContain('+1 more')
+    expect(html).not.toContain('[{&quot;url')
+    expect(html).not.toContain('<script>')
+  })
+})
