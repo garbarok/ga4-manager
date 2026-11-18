@@ -58,3 +58,13 @@ describe('destructive tool declarations', () => {
     },
   )
 })
+
+describe('dry runs (B14)', () => {
+  it('lets a destructive tool preview with dry_run: true, but not under read-only mode', () => {
+    const destructive = { title: 'x', readOnlyHint: false, destructiveHint: true }
+    expect(checkWriteGate(destructive, {}, { dry_run: true }).allowed).toBe(true)
+    expect(checkWriteGate(destructive, {}, { dry_run: false }).allowed).toBe(false)
+    expect(checkWriteGate(destructive, {}).allowed).toBe(false)
+    expect(checkWriteGate(destructive, { GA4M_READ_ONLY: '1' }, { dry_run: true }).allowed).toBe(false)
+  })
+})

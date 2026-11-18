@@ -3,7 +3,7 @@ import { native, isSuccessExit } from '../tool-spec.js'
 import type { CLIExecutor } from '../cli/executor.js'
 import { runReport, type DataApiResponse } from '../utils/ga4-data-client.js'
 import { resolveConfigs, type ResolvedConfig } from '../utils/config-resolve.js'
-import { ToolError, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
+import { stderrMessage, ToolError, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 import { normalizeGa4Property } from '../utils/url-normalize.js'
 import { querySearchAnalytics } from './gsc-traffic-compare.js'
 import { buildOpportunitiesArgs, gscOpportunitiesInputSchema, parseOpportunitiesOutput } from './gsc-opportunities.js'
@@ -209,7 +209,7 @@ async function collectDiagnostics(executor: CLIExecutor, cfg: ResolvedConfig, da
   const run = async <T extends { quota_used: number }>(args: string[], parse: (s: string) => T): Promise<T> => {
     const result = await executor.execute({ command: 'gsc', args, timeout: DIAGNOSTIC_TIMEOUT_MS })
     if (!isSuccessExit(result.exitCode)) {
-      throw new Error((result.stderr || result.stdout).trim().split('\n').pop() ?? `exit ${result.exitCode}`)
+      throw new Error(stderrMessage(result.stderr || result.stdout) || `exit ${result.exitCode}`)
     }
     return parse(result.stdout)
   }

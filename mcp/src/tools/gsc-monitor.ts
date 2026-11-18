@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { native, isSuccessExit } from '../tool-spec.js';
-import { mapCLIError } from '../utils/errors.js';
+import { cliFailure } from '../utils/errors.js';
 
 // ============================================================================
 // GSC Monitor URLs Tool
@@ -673,7 +673,7 @@ export const gscMonitorUrlsSpec = native({
       args: buildMonitorUrlsArgs(input),
     });
     if (!isSuccessExit(result.exitCode)) {
-      return { output: mapCLIError(result, 'gsc_monitor_urls'), isError: true };
+      return { output: cliFailure(result, 'gsc_monitor_urls'), isError: true };
     }
     return { output: parseMonitorUrlsOutput(result.stdout, input), isError: false };
   },

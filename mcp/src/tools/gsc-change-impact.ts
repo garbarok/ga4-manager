@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { native } from '../tool-spec.js'
 import type { CLIExecutor } from '../cli/executor.js'
 import { querySearchFiltered, prefixRegex, type GscFilter } from '../utils/gsc-query.js'
-import { gscDataThrough } from '../utils/gsc-data-through.js'
+import { gscDataThroughOrThrow } from '../utils/gsc-data-through.js'
 import { resolveConfigs } from '../utils/config-resolve.js'
 import { normalizeGscSite, normalizeGa4Property } from '../utils/url-normalize.js'
 import { setContextSite } from '../utils/tool-context.js'
@@ -242,8 +242,10 @@ export async function runGscChangeImpact(input: GscChangeImpactInput, executor: 
     }
     if (changes.length === 0) throw new ToolError(ErrorCode.INVALID_INPUT, 'No changes to evaluate.')
 
-    const dataThrough = await gscDataThrough(site, now)
-    if (!dataThrough) throw new ToolError(ErrorCode.UPSTREAM_5XX, 'Could not read the last Search Console data date for this site.', 'Check access with gsc_analytics_run.')
+    const dataThrough = await gscDataThroughOrThrow(site, now)
+    if (!dataThrough) {
+      throw new ToolError(ErrorCode.NOT_FOUND, `Search Console has no data for ${site} in the last 14 days.`, 'Check the site format (sc-domain:example.com or https://example.com/) and that it receives impressions.')
+    }
     const thresholds: Thresholds = {
       window_days: input.window_days,
       min_days: input.min_days,

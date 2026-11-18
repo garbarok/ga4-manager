@@ -7,14 +7,22 @@ import { querySearchAnalytics } from '../tools/gsc-traffic-compare.js'
  * Returns null on any failure: it is context, never a reason to fail a tool.
  */
 export async function gscDataThrough(site: string, now: Date = new Date()): Promise<string | null> {
-  const end = now.toISOString().slice(0, 10)
-  const start = new Date(now.getTime() - 14 * 86_400_000).toISOString().slice(0, 10)
   try {
-    const rows = await querySearchAnalytics(site, start, end, ['date'], 30)
-    return latestDate(rows.map((r) => r.keys?.[0]))
+    return await gscDataThroughOrThrow(site, now)
   } catch {
     return null
   }
+}
+
+/**
+ * Same lookup for tools that cannot work without the date: a failure keeps
+ * its real cause (AUTH_DENIED for a site the credential cannot read, quota…).
+ */
+export async function gscDataThroughOrThrow(site: string, now: Date = new Date()): Promise<string | null> {
+  const end = now.toISOString().slice(0, 10)
+  const start = new Date(now.getTime() - 14 * 86_400_000).toISOString().slice(0, 10)
+  const rows = await querySearchAnalytics(site, start, end, ['date'], 30)
+  return latestDate(rows.map((r) => r.keys?.[0]))
 }
 
 export function latestDate(keys: (string | undefined)[]): string | null {

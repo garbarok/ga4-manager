@@ -30,6 +30,7 @@ function refuse(message: string, hint: string): WriteGateResult {
 export function checkWriteGate(
   annotations: ToolAnnotations | undefined,
   env: Record<string, string | undefined>,
+  input?: unknown,
 ): WriteGateResult {
   if (isOn(env.GA4M_READ_ONLY) && annotations?.readOnlyHint !== true) {
     return refuse(
@@ -37,7 +38,10 @@ export function checkWriteGate(
       'Unset GA4M_READ_ONLY (or set it to 0) to allow write tools.',
     )
   }
-  if (annotations?.destructiveHint === true && !isOn(env.GA4M_ALLOW_DESTRUCTIVE)) {
+  // A dry run previews and changes nothing, so the destructive opt-in is not
+  // needed for it (read-only mode above still applies).
+  const dryRun = Boolean(input && typeof input === 'object' && (input as { dry_run?: unknown }).dry_run === true)
+  if (annotations?.destructiveHint === true && !dryRun && !isOn(env.GA4M_ALLOW_DESTRUCTIVE)) {
     return refuse(
       'This tool is destructive and is disabled by default.',
       'Set GA4M_ALLOW_DESTRUCTIVE=1 in the MCP server environment to enable it.',

@@ -32,60 +32,49 @@ func LoadConfig(path string) (*ProjectConfig, error) {
 	return &config, nil
 }
 
-// LoadConfigByName loads a config from the configs/examples directory by name
-// For example: "my-project" loads "configs/examples/my-project.yaml" or "configs/my-project.yaml"
+// LoadConfigByName loads the config named name ("my-project" → my-project.yaml).
+// Operator directories (OperatorConfigDirs) are searched before the example
+// templates, so a real config is never shadowed by an example of the same
+// name. The error lists every directory searched.
 func LoadConfigByName(name string) (*ProjectConfig, error) {
-	// Try configs/examples/{name}.yaml
-	path := filepath.Join("configs", "examples", name+".yaml")
-	if _, err := os.Stat(path); err == nil {
-		return LoadConfig(path)
+	// A path to a YAML file works too, so callers that only take a name
+	// (ga4 link --project) can still point at any config.
+	if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") || strings.ContainsRune(name, filepath.Separator) {
+		if _, err := os.Stat(name); err == nil {
+			return LoadConfig(name)
+		}
 	}
-
-	// Try configs/{name}.yaml
-	path = filepath.Join("configs", name+".yaml")
-	if _, err := os.Stat(path); err == nil {
-		return LoadConfig(path)
+	searched := append(OperatorConfigDirs(), ExampleConfigDirs()...)
+	for _, dir := range searched {
+		path := filepath.Join(dir, name+".yaml")
+		if _, err := os.Stat(path); err == nil {
+			return LoadConfig(path)
+		}
 	}
-
-	return nil, fmt.Errorf("config not found: %s (looked in configs/ and configs/examples/)", name)
+	return nil, fmt.Errorf("config not found: %s (searched %s; set %s or pass a config path)", name, strings.Join(searched, ", "), ConfigDirEnv)
 }
 
-// ListAvailableConfigs returns a list of available config files
+// ListAvailableConfigs returns the names of the configs in every searched
+// directory (operator directories first, then examples), without duplicates.
 func ListAvailableConfigs() ([]string, error) {
 	var configs []string
-
-	// Check configs/examples/
-	examplesPath := filepath.Join("configs", "examples")
-	if entries, err := os.ReadDir(examplesPath); err == nil {
+	seen := map[string]bool{}
+	for _, dir := range append(OperatorConfigDirs(), ExampleConfigDirs()...) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".yaml") {
-				name := strings.TrimSuffix(entry.Name(), ".yaml")
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+				continue
+			}
+			name := strings.TrimSuffix(entry.Name(), ".yaml")
+			if !seen[name] {
+				seen[name] = true
 				configs = append(configs, name)
 			}
 		}
 	}
-
-	// Check configs/
-	configsPath := "configs"
-	if entries, err := os.ReadDir(configsPath); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".yaml") {
-				name := strings.TrimSuffix(entry.Name(), ".yaml")
-				// Don't duplicate if already found in examples
-				found := false
-				for _, existing := range configs {
-					if existing == name {
-						found = true
-						break
-					}
-				}
-				if !found {
-					configs = append(configs, name)
-				}
-			}
-		}
-	}
-
 	return configs, nil
 }
 

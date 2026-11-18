@@ -57,13 +57,48 @@ describe('dispatchTool', () => {
   const executor = new CLIExecutor('/nonexistent/ga4')
 
   it('reports unknown tools and invalid input as errors', async () => {
-    expect(await dispatchTool('nope', {}, executor)).toMatchObject({ isError: true, output: { error: 'Unknown tool: nope' } })
+    expect(await dispatchTool('nope', {}, executor)).toMatchObject({ isError: true, output: { success: false, error: { code: 'NOT_FOUND', message: 'Unknown tool: nope' } } })
     const bad = await dispatchTool('keyword_volume', { keywords: 'not-an-array' }, executor)
-    expect(bad.isError).toBe(true)
+    expect(bad).toMatchObject({ isError: true, output: { success: false, error: { code: 'INVALID_INPUT', message: expect.stringMatching(/keywords: /) } } })
   })
 
   it('applies the write gate', async () => {
     const out = await dispatchTool('ga4_setup', { config: 'x.yaml' }, executor, { GA4M_READ_ONLY: '1' })
     expect(out).toMatchObject({ isError: true, output: { success: false, error: { code: 'INVALID_INPUT' } } })
+  })
+})
+
+describe('CLI tools that exit 0 with a failure (B11)', () => {
+  it('report isError and the shared error shape', async () => {
+    // stdout captured from `ga4 link --project <name> --list` with no GA4 access (exit 0).
+    const stdout = [
+      '📦 Project: Site (Property: 123456789)',
+      '🔍 Existing Links and Configurations',
+      'BigQuery Export:',
+      '  ✗ Error: failed to list BigQuery links: googleapi: Error 403: The caller does not have permission, forbidden',
+      'Channel Groups:',
+      '  ✗ Error: failed to list channel groups: googleapi: Error 403: The caller does not have permission, forbidden',
+    ].join('\n')
+    const executor = { execute: async () => ({ stdout, stderr: '', exitCode: 0, duration: 1 }), isBinaryUsable: () => true } as unknown as CLIExecutor
+    const out = await dispatchTool('ga4_link_list', { project_name: 'mysite' }, executor)
+    expect(out.isError).toBe(true)
+    expect(out.output).toMatchObject({ success: false, error: { code: 'AUTH_DENIED' } })
+  })
+})
+
+describe('dry_run and the destructive gate (B14)', () => {
+  const executor = { execute: async () => ({ stdout: '{}', stderr: '', exitCode: 0, duration: 1 }), isBinaryUsable: () => true } as unknown as CLIExecutor
+
+  it('a tool without a dry-run mode stays gated even if the caller sends dry_run: true', async () => {
+    const out = await dispatchTool('gsc_sitemaps_delete', { site: 'sc-domain:example.com', url: 'https://example.com/sitemap.xml', dry_run: true }, executor, {})
+    expect(out).toMatchObject({ isError: true, output: { error: { message: expect.stringMatching(/destructive/) } } })
+  })
+
+  it('ga4_setup with dry_run: true reaches the CLI with --dry-run', async () => {
+    const calls: string[][] = []
+    const spy = { execute: async (p: { args: string[] }) => (calls.push(p.args), { stdout: 'ok', stderr: '', exitCode: 0, duration: 1 }), isBinaryUsable: () => true } as unknown as CLIExecutor
+    const out = await dispatchTool('ga4_setup', { config_path: 'configs/site.yaml', dry_run: true }, spy, {})
+    expect(out.isError).toBe(false)
+    expect(calls[0]).toContain('--dry-run')
   })
 })

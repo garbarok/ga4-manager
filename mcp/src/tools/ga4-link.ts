@@ -407,7 +407,7 @@ export const ga4LinkListTool = {
     properties: {
       project_name: {
         type: 'string',
-        description: 'Config file name (without .yaml) - required',
+        description: 'Config name (without .yaml), searched in GA4M_CONFIG_DIR, ./configs, configs/ next to the ga4 binary and ~/.config/ga4-manager/configs; or a path to a YAML config',
       },
     },
     required: ['project_name'] as const,
@@ -429,7 +429,7 @@ export const ga4LinkCreateTool = {
     properties: {
       project_name: {
         type: 'string',
-        description: 'Config file name (without .yaml) - required',
+        description: 'Config name (without .yaml), searched in GA4M_CONFIG_DIR, ./configs, configs/ next to the ga4 binary and ~/.config/ga4-manager/configs; or a path to a YAML config',
       },
       service: {
         type: 'string',
@@ -470,7 +470,7 @@ export const ga4LinkRemoveTool = {
     properties: {
       project_name: {
         type: 'string',
-        description: 'Config file name (without .yaml) - required',
+        description: 'Config name (without .yaml), searched in GA4M_CONFIG_DIR, ./configs, configs/ next to the ga4 binary and ~/.config/ga4-manager/configs; or a path to a YAML config',
       },
       service: {
         type: 'string',

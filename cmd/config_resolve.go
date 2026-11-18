@@ -56,11 +56,13 @@ Examples:
 		case configResolvePath != "":
 			paths = []string{configResolvePath}
 		case configResolveAll:
-			matches, err := operatorConfigPaths("configs")
-			if err != nil {
-				return err
+			for _, dir := range config.OperatorConfigDirs() {
+				matches, err := operatorConfigPaths(dir)
+				if err != nil {
+					return err
+				}
+				paths = append(paths, matches...)
 			}
-			paths = matches
 		default:
 			return fmt.Errorf("specify --config <path> or --all")
 		}

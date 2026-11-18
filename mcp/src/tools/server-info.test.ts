@@ -56,3 +56,36 @@ describe('server_info', () => {
     expect(out.update_hint).toMatch(/INSTALL\.md/)
   })
 })
+
+describe('per-resource access (B13)', () => {
+  it('turns the affected groups degraded with the grant to add', async () => {
+    const { applyAccess } = await import('./server-info.js')
+    const groups = [
+      { id: 'search_console', title: 'Search Console', status: 'enabled' as const, reasons: [], tools: [] },
+      { id: 'ga4_data', title: 'GA4', status: 'enabled' as const, reasons: [], tools: [] },
+      { id: 'dataforseo', title: 'DFS', status: 'enabled' as const, reasons: [], tools: [] },
+    ]
+    const out = applyAccess(groups, [
+      { resource: 'sc-domain:example.com', api: 'search_console', ok: false, permission: null, how_to_fix: 'add sa@example.iam' },
+      { resource: 'properties/123456789', api: 'ga4', ok: true, permission: 'viewer or above' },
+    ])
+    expect(out.map((g) => [g.id, g.status])).toEqual([['search_console', 'degraded'], ['ga4_data', 'enabled'], ['dataforseo', 'enabled']])
+    expect(out[0].reasons[0]).toMatch(/No access to sc-domain:example.com: add sa@example.iam/)
+  })
+
+  it('probes the site and property with free read calls', async () => {
+    const { vi } = await import('vitest')
+    const auth = await import('../utils/google-auth.js')
+    vi.spyOn(auth, 'getGoogleAuthHeaders').mockResolvedValue({ Authorization: 'Bearer t' })
+    vi.spyOn(global, 'fetch').mockImplementation(async (url) =>
+      String(url).includes('webmasters')
+        ? new Response(JSON.stringify({ siteUrl: 'sc-domain:example.com', permissionLevel: 'siteRestrictedUser' }))
+        : new Response(JSON.stringify({ error: { message: 'The caller does not have permission' } }), { status: 403 }),
+    )
+    const { probeResourceAccess } = await import('./server-info.js')
+    const out = await probeResourceAccess({ site: 'sc-domain:example.com', property: 'properties/123456789' }, 'sa@example.iam')
+    expect(out[0]).toMatchObject({ api: 'search_console', ok: true, permission: 'siteRestrictedUser' })
+    expect(out[1]).toMatchObject({ api: 'ga4', ok: false, reason: 'The caller does not have permission', how_to_fix: expect.stringMatching(/add sa@example.iam as Viewer/) })
+    vi.restoreAllMocks()
+  })
+})

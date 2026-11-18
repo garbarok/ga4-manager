@@ -2,18 +2,23 @@ import { z } from 'zod'
 import { readFileSync } from 'node:fs'
 import { native } from '../tool-spec.js'
 import type { CLIExecutor } from '../cli/executor.js'
-import { GROUPS, GROUP_BY_TOOL, type GroupDef, type Requirement } from '../tool-groups.js'
+import { GROUPS, GROUP_BY_TOOL, SCOPES, type GroupDef, type Requirement } from '../tool-groups.js'
 import { readServerVersion } from '../binary.js'
 import { getGoogleAuthHeaders } from '../utils/google-auth.js'
 import { readSpendLimits } from '../utils/spend-guard.js'
 import { resolveStateDir } from '../utils/state-store.js'
 import { cacheEnabled } from '../utils/lookup-cache.js'
+import { resolveConfigs } from '../utils/config-resolve.js'
+import { normalizeGa4Property } from '../utils/url-normalize.js'
 
 // ============================================================================
 // Input Schema
 // ============================================================================
 
 export const serverInfoInputSchema = z.object({
+  site: z.string().min(1).optional().describe('Search Console site to check access to (sc-domain:example.com or https://example.com/)'),
+  property_id: z.string().min(1).optional().describe('GA4 property to check access to (numeric or properties/N)'),
+  config: z.string().min(1).optional().describe("YAML config whose site and property to check"),
   probe_scopes: z
     .boolean()
     .optional()
@@ -46,7 +51,9 @@ export interface ServerInfoResult {
   node: string
   tool_count: number
   groups: GroupReport[]
-  credentials: { google: string; type: string | null }
+  credentials: { google: string; type: string | null; client_email: string | null }
+  /** Per-resource access, when site/property_id/config was given. */
+  access?: ResourceAccess[]
   state_dir: string
   lookup_cache: 'on' | 'off'
   spending_caps: ReturnType<typeof readSpendLimits>
@@ -167,6 +174,93 @@ async function ga4CliVersion(executor: CLIExecutor): Promise<string | null> {
   }
 }
 
+export interface ResourceAccess {
+  resource: string
+  api: 'search_console' | 'ga4'
+  ok: boolean
+  /** Search Console permission level, or "viewer or above" for GA4. */
+  permission: string | null
+  reason?: string
+  how_to_fix?: string
+}
+
+function clientEmail(env: NodeJS.ProcessEnv): string | null {
+  try {
+    const parsed = JSON.parse(readFileSync(env.GOOGLE_APPLICATION_CREDENTIALS ?? '', 'utf8')) as { client_email?: string }
+    return parsed.client_email ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Free read calls that say whether this credential can read a given site or property. */
+export async function probeResourceAccess(
+  targets: { site?: string; property?: string },
+  who: string | null,
+): Promise<ResourceAccess[]> {
+  const out: ResourceAccess[] = []
+  const account = who ?? 'the credential in GOOGLE_APPLICATION_CREDENTIALS'
+  if (targets.site) {
+    try {
+      const headers = await getGoogleAuthHeaders([SCOPES.webmastersReadonly])
+      const res = await fetch(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(targets.site)}`, { headers })
+      const body = (await res.json().catch(() => ({}))) as { permissionLevel?: string; error?: { message?: string } }
+      const ok = res.ok && body.permissionLevel !== undefined && body.permissionLevel !== 'siteUnverifiedUser'
+      out.push({
+        resource: targets.site,
+        api: 'search_console',
+        ok,
+        permission: body.permissionLevel ?? null,
+        ...(ok ? {} : {
+          reason: body.error?.message ?? `HTTP ${res.status}`,
+          how_to_fix: `In Search Console → Settings → Users and permissions for ${targets.site}, add ${account} (Restricted is enough for read tools; Full for sitemap submit/delete).`,
+        }),
+      })
+    } catch (err) {
+      out.push({ resource: targets.site, api: 'search_console', ok: false, permission: null, reason: (err as Error).message })
+    }
+  }
+  if (targets.property) {
+    try {
+      const headers = await getGoogleAuthHeaders([SCOPES.analyticsReadonly])
+      const res = await fetch(`https://analyticsadmin.googleapis.com/v1beta/${targets.property}`, { headers })
+      const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
+      out.push({
+        resource: targets.property,
+        api: 'ga4',
+        ok: res.ok,
+        permission: res.ok ? 'viewer or above' : null,
+        ...(res.ok ? {} : {
+          reason: body.error?.message ?? `HTTP ${res.status}`,
+          how_to_fix: `In GA4 → Admin → Property access management for ${targets.property}, add ${account} as Viewer (Editor for ga4_setup/cleanup/links).`,
+        }),
+      })
+    } catch (err) {
+      out.push({ resource: targets.property, api: 'ga4', ok: false, permission: null, reason: (err as Error).message })
+    }
+  }
+  return out
+}
+
+/** Mark the groups that use a resource the credential cannot read. */
+export function applyAccess(groups: GroupReport[], access: ResourceAccess[]): GroupReport[] {
+  const denied = access.filter((a) => !a.ok)
+  if (denied.length === 0) return groups
+  const affects: Record<ResourceAccess['api'], string[]> = {
+    search_console: ['search_console', 'cross_source'],
+    ga4: ['ga4_data', 'ga4_admin', 'cross_source'],
+  }
+  return groups.map((g) => {
+    const hits = denied.filter((a) => affects[a.api].includes(g.id))
+    if (hits.length === 0) return g
+    return {
+      ...g,
+      status: g.status === 'disabled' ? 'disabled' : 'degraded',
+      reasons: [...hits.map((a) => `No access to ${a.resource}: ${a.how_to_fix ?? a.reason}`), ...g.reasons],
+    }
+  })
+}
+
 export async function runServerInfo(input: ServerInfoInput, executor: CLIExecutor, env: NodeJS.ProcessEnv = process.env): Promise<ServerInfoResult> {
   // Lazy import: the registry imports this module.
   const { SPECS } = await import('../registry.js')
@@ -178,7 +272,24 @@ export async function runServerInfo(input: ServerInfoInput, executor: CLIExecuto
   }))
   const ungrouped = registered.filter((r) => !GROUP_BY_TOOL.has(r.name)).map((r) => r.name)
   const binaryUsable = executor.isBinaryUsable()
-  const groups = await evaluateGroups(registered, { env, binaryUsable, probe: input.probe_scopes ? scopeGranted : undefined })
+  let groups = await evaluateGroups(registered, { env, binaryUsable, probe: input.probe_scopes ? scopeGranted : undefined })
+  let site = input.site
+  let property = input.property_id
+  if (input.config) {
+    try {
+      const [cfg] = await resolveConfigs(executor, { config: input.config })
+      site = site ?? cfg?.gsc_site
+      property = property ?? cfg?.property_id
+    } catch {
+      // An unreadable config leaves the per-resource check to the explicit inputs.
+    }
+  }
+  const email = clientEmail(env)
+  let access: ResourceAccess[] | undefined
+  if (site || property) {
+    access = await probeResourceAccess({ site, property: property ? normalizeGa4Property(property) : undefined }, email)
+    groups = applyAccess(groups, access)
+  }
   if (ungrouped.length) {
     groups.push({ id: 'other', title: 'Other', status: 'enabled', reasons: [], tools: ungrouped.map((name) => ({ name, available: true })) })
   }
@@ -197,7 +308,8 @@ export async function runServerInfo(input: ServerInfoInput, executor: CLIExecuto
     node: process.version,
     tool_count: registered.length,
     groups,
-    credentials: { google: cred.summary, type: cred.type },
+    credentials: { google: cred.summary, type: cred.type, client_email: email },
+    ...(access ? { access } : {}),
     state_dir: resolveStateDir({ env }),
     lookup_cache: cacheEnabled(env) ? 'on' : 'off',
     spending_caps: readSpendLimits(env),
@@ -219,10 +331,15 @@ export const serverInfoTool = {
     'Use first when a tool seems missing or fails with a credentials error, or to see what this install can do. ' +
     'Returns the server version, the ga4 CLI version, every tool group (GA4 admin, GA4 data, Search Console, AdSense, audits, DataForSEO, ValueSERP, local state) ' +
     'with status enabled/degraded/disabled and the reason (e.g. missing DATAFORSEO_USERNAME, no ga4 binary, read-only mode), the state directory, ' +
-    'lookup-cache status, spending caps and how to update an outdated install. Free; no API calls unless probe_scopes is true. Also answers "whoami".',
+    'lookup-cache status, spending caps and how to update an outdated install. Free; no API calls unless probe_scopes is true. Also answers "whoami". ' +
+    'Pass site, property_id or config to check that this credential can actually read that Search Console site / GA4 property (scopes alone do not mean access): ' +
+    '`access` then lists each resource with the exact grant to add, and the affected groups turn degraded.',
   inputSchema: {
     type: 'object',
     properties: {
+      site: { type: 'string', description: 'Search Console site to check access to (sc-domain:example.com or https://example.com/)' },
+      property_id: { type: 'string', description: 'GA4 property to check access to (numeric or properties/N)' },
+      config: { type: 'string', description: 'YAML config whose search_console.site_url and ga4.property_id to check' },
       probe_scopes: {
         type: 'boolean',
         description: 'Also mint a Google token per scope and check it was granted (free network call). Default false.',

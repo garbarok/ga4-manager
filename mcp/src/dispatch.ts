@@ -2,7 +2,7 @@ import type { CLIExecutor } from './cli/executor.js'
 import { isSuccessExit } from './tool-spec.js'
 import { SPEC_BY_NAME } from './registry.js'
 import { checkWriteGate } from './write-gate.js'
-import { mapCLIError } from './utils/errors.js'
+import { cliFailure, errorResult, ErrorCode, ToolError, toolErrorToFailure } from './utils/errors.js'
 import { contextFromArgs, runWithContext, type ToolContext } from './utils/tool-context.js'
 import { logResearch } from './utils/project-context-store.js'
 
@@ -47,28 +47,46 @@ export async function dispatchTool(
 ): Promise<DispatchResult> {
   try {
     const spec = SPEC_BY_NAME.get(name)
-    if (!spec) throw new Error(`Unknown tool: ${name}`)
+    if (!spec) return { output: errorResult(ErrorCode.NOT_FOUND, `Unknown tool: ${name}`, 'List tools with server_info or `ga4m list`.'), isError: true }
 
-    const gate = checkWriteGate(spec.tool.annotations, env)
+    const parsed = spec.schema.safeParse(args ?? {})
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((i) => `${i.path.join('.') || '(input)'}: ${i.message}`)
+      return {
+        output: errorResult(ErrorCode.INVALID_INPUT, `Invalid input for ${name}: ${issues.join('; ')}`, `See the tool's input schema (ga4m help ${name.replace(/_/g, '-')}).`),
+        isError: true,
+      }
+    }
+    const input = parsed.data as never
+    // The gate sees the validated input: a `dry_run` the tool does not define is
+    // stripped by its schema and cannot unlock a destructive call.
+    const gate = checkWriteGate(spec.tool.annotations, env, parsed.data)
     if (!gate.allowed) return { output: gate.failure, isError: true }
-
-    const input = spec.schema.parse(args ?? {}) as never
     const ctx = contextFromArgs(name, args, env)
 
     const result = await runWithContext(ctx, async (): Promise<DispatchResult> => {
       if (spec.kind === 'native') return spec.run(input, executor)
       const run = await executor.execute({ command: spec.command, args: spec.buildArgs(input), timeout: spec.timeoutMs })
-      if (!isSuccessExit(run.exitCode)) return { output: mapCLIError(run, name), isError: true }
-      return { output: spec.parse(run.stdout, input), isError: false }
+      if (!isSuccessExit(run.exitCode)) return { output: cliFailure(run, name), isError: true }
+      const output = spec.parse(run.stdout, input)
+      // Some commands exit 0 but report a failure in their output (ga4 link --list
+      // when every lookup is denied). Treat that as an error, in the shared shape.
+      if (output && typeof output === 'object' && (output as { success?: unknown }).success === false) {
+        const err = (output as { error?: unknown }).error
+        if (typeof err === 'string') {
+          return { output: { ...(output as object), error: cliFailure({ ...run, stderr: err }, name).error }, isError: true }
+        }
+        return { output, isError: true }
+      }
+      return { output, isError: false }
     })
 
     return { output: decorate(result.output, ctx), isError: result.isError }
   } catch (error) {
+    // Every failure leaves in the shared shape; a ToolError keeps its code and hint.
+    if (error instanceof ToolError) return { output: toolErrorToFailure(error), isError: true }
     return {
-      output: {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      },
+      output: errorResult(ErrorCode.UPSTREAM_5XX, `${name} failed: ${error instanceof Error ? error.message : String(error)}`),
       isError: true,
     }
   }

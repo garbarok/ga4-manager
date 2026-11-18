@@ -109,3 +109,15 @@ describe('runGscChangeImpact', () => {
     expect(gscChangeImpactInputSchema.safeParse({ site: 'sc-domain:example.com' }).success).toBe(false)
   })
 })
+
+describe('access errors (B9)', () => {
+  afterEach(() => vi.restoreAllMocks())
+  it('reports a Search Console 403 as AUTH_DENIED, not as a server error', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(new Response('{"error":{"code":403}}', { status: 403 }))
+    const out = await runGscChangeImpact(
+      { site: 'sc-domain:example.com', changes: [{ changed_on: '2026-10-01', label: 'x' }], from_annotations: false, window_days: 28, min_days: 7, clicks_threshold_pct: 10, position_threshold: 1, min_impressions: 100 },
+      new CLIExecutor('/nonexistent/ga4'),
+    )
+    expect(out).toMatchObject({ success: false, error: { code: 'AUTH_DENIED' } })
+  })
+})
