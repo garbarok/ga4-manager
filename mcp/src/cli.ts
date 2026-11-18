@@ -4,6 +4,7 @@ import { CLIExecutor } from './cli/executor.js'
 import { SPECS, SPEC_BY_NAME } from './registry.js'
 import { dispatchTool } from './dispatch.js'
 import { resolveBinaryPath, readServerVersion } from './binary.js'
+import { applyCredentialsFromEnv } from './utils/credentials-env.js'
 import type { ToolDef } from './tool-spec.js'
 
 /**
@@ -204,6 +205,7 @@ export async function main(argv: string[], out: Writer = process.stdout, err: Wr
 // Run only as the entry point, not when imported by tests or the worker launcher.
 const entry = process.argv[1] ?? ''
 if (/[\\/]cli\.(js|ts)$/.test(entry) || /[\\/]ga4m$/.test(entry)) {
+  applyCredentialsFromEnv()
   main(process.argv.slice(2)).then((code) => {
     process.exitCode = code
   })
