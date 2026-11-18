@@ -15,8 +15,8 @@ Real Search Console domain property and its GA4 property (one small personal sit
 | Quota | 2 GSC queries, 1 GA4 report |
 
 All three expected warnings fired:
-- Time zones differ: the property is on a UTC+1 zone, Search Console on Pacific Time, 9 h apart.
-- Two GSC hosts: the main host and a links subdomain.
+- Time zones differ: the GA4 property and Search Console (Pacific Time) use different zones, several hours apart.
+- Two GSC hosts: the main host and a secondary subdomain.
 - No key events, so the engagement-rate fallback was used.
 
 Top scores were 82–96, all for pages at positions 6–9 with the most impressions.

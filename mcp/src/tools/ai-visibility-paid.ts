@@ -107,7 +107,7 @@ export function topicStems(text: string): string[] {
 
 /**
  * How on-topic a question is for its seed keyword. LLM Mentions matches
- * loosely (a seed like "app mantenimiento moto" returns "uber eats
+ * loosely (a seed like "app cuidado jardin" returns "uber eats
  * repartidor"), so questions below MIN_RELEVANCE are set aside.
  */
 export function relevanceTo(seed: string, question: string): number {

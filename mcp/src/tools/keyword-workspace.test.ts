@@ -251,6 +251,6 @@ describe('serp_competitors platforms (B16)', () => {
     expect(isPlatform('www.youtube.com')).toBe(true)
     expect(isPlatform('es.wikipedia.org')).toBe(true)
     expect(isPlatform('amazon.it')).toBe(true)
-    expect(isPlatform('motor.mapfre.es')).toBe(false)
+    expect(isPlatform('news.example.org')).toBe(false)
   })
 })

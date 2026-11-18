@@ -31,7 +31,7 @@ interface Templates {
 
 /**
  * One template set per language, written as a native speaker would type the
- * question; topics are noun phrases ("mantenimiento moto"), so templates wrap
+ * question; topics are noun phrases ("cuidado del jardín"), so templates wrap
  * them with a preposition instead of using them as adjectives.
  */
 export const TEMPLATES: Record<string, Templates> = {

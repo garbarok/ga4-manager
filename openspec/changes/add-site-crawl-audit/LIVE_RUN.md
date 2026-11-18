@@ -1,6 +1,6 @@
 # Live dry run (2026-11-18)
 
-Target: a real, small production site (static site generator, two languages, served from a CDN). The site name and URLs are intentionally left out. Run with `ga4m site-audit-run --start-url https://<site>/ --max-pages 300 --lighthouse --lighthouse-pages 3` (background), then polled with `ga4m site-audit-status` until done.
+Target: a real, small production site (static, multilingual). The site name and URLs are intentionally left out. Run with `ga4m site-audit-run --start-url https://<site>/ --max-pages 300 --lighthouse --lighthouse-pages 3` (background), then polled with `ga4m site-audit-status` until done.
 
 ## Crawl
 

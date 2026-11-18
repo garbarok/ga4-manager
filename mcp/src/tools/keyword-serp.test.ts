@@ -70,13 +70,13 @@ describe('runKeywordSerpSnapshot', () => {
 describe('wrapped google.com/goto results (B1)', () => {
   it('reports the breadcrumb host, never google.com, and no wrapped url', async () => {
     mockPost.mockResolvedValueOnce({
-      items: [{ keyword: 'calculadora itv', items: [
+      items: [{ keyword: 'calculadora hipoteca', items: [
         { type: 'organic', rank_absolute: 1, url: 'https://google.com/goto?url=CAESWQ', domain: 'google.com', breadcrumb: 'https://www.example.com › calc', website_name: 'example.com', title: 'Calc' },
         { type: 'organic', rank_absolute: 2, url: 'https://plain.example.org/a', domain: 'plain.example.org', title: 'Plain' },
       ] }],
       cost: 0.002,
     } as never)
-    const r = await runKeywordSerpSnapshot(keywordSerpSnapshotInputSchema.parse({ keyword: 'calculadora itv' }))
+    const r = await runKeywordSerpSnapshot(keywordSerpSnapshotInputSchema.parse({ keyword: 'calculadora hipoteca' }))
     if (!r.success) throw new Error('expected success')
     expect(r.results[0]).toMatchObject({ domain: 'www.example.com', url: null, url_hint: 'https://www.example.com/calc', url_wrapped: 'https://google.com/goto?url=CAESWQ' })
     expect(r.results[1]).toMatchObject({ domain: 'plain.example.org', url: 'https://plain.example.org/a' })

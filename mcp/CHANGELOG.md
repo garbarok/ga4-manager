@@ -73,7 +73,7 @@ OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO 
 - **`site_growth_brief`** data gaps show the real cause instead of a Go log line.
 - **`server_info`** takes `site`, `property_id` or `config` and checks that the credential can actually read them. Scopes alone did not prove it. Each denied resource comes with the exact grant to add.
 - **Dry runs:** `dry_run: true` previews of destructive tools (`ga4_setup`, `ga4_cleanup`) pass the destructive gate. The gate reads validated input, so a `dry_run` a tool does not define cannot unlock it.
-- **Site crawl:** robots-blocked URLs no longer use the page budget. Lighthouse picks pages by section after the locale (`/es/blog` vs `/es/mantenimiento`) instead of one page per language.
+- **Site crawl:** robots-blocked URLs no longer use the page budget. Lighthouse picks pages by section after the locale (`/es/blog` vs `/es/guias`) instead of one page per language.
 - **`ai_visibility_prompts_generate`** writes prompts in Spanish, German or French (`language_code`, or the tracker's language) instead of mixing English templates with local topics.
 - **`ai_visibility_research`** scores questions against the seed keyword. Loosely matched ones go to `low_relevance` and are not suggested.
 - **`serp_competitors`** flags platforms (YouTube, Facebook, Wikipedia, app stores…) and no longer suggests them as competitors.

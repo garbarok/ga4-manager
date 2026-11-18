@@ -253,15 +253,15 @@ describe('ai_visibility_research', () => {
 describe('research relevance (B6)', () => {
   it('keeps on-topic questions and sets loose matches aside', async () => {
     const { digestResearch, relevanceTo } = await import('./ai-visibility-paid.js')
-    expect(relevanceTo('app mantenimiento moto', 'app motos')).toBe(0.5)
-    expect(relevanceTo('app mantenimiento moto', 'mantenimiento de motos')).toBe(1)
-    expect(relevanceTo('app mantenimiento moto', 'uber eats repartidor')).toBe(0)
-    const d = digestResearch([{ keyword: 'app mantenimiento moto', items: [
+    expect(relevanceTo('app cuidado jardin', 'apps jardines')).toBe(0.5)
+    expect(relevanceTo('app cuidado jardin', 'cuidado de jardines')).toBe(1)
+    expect(relevanceTo('app cuidado jardin', 'uber eats repartidor')).toBe(0)
+    const d = digestResearch([{ keyword: 'app cuidado jardin', items: [
       { question: 'uber eats repartidor', ai_search_volume: 1600, sources: [] },
-      { question: 'mantenimiento de motos', ai_search_volume: 90, sources: [] },
-      { question: 'apps moto', ai_search_volume: 300, sources: [] },
+      { question: 'cuidado de jardines', ai_search_volume: 90, sources: [] },
+      { question: 'apps jardin', ai_search_volume: 300, sources: [] },
     ] }], 'example.com')
-    expect(d.questions.map((q) => q.question)).toEqual(['mantenimiento de motos', 'apps moto'])
+    expect(d.questions.map((q) => q.question)).toEqual(['cuidado de jardines', 'apps jardin'])
     expect(d.low_relevance.map((q) => q.question)).toEqual(['uber eats repartidor'])
   })
 })

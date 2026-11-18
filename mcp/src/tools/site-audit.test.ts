@@ -160,13 +160,13 @@ describe('representative pages on multilingual sites (B8)', () => {
     }) as unknown as import('../audit/crawler.js').CrawledPage
     const pages = [
       page('/en', 50), page('/en/blog', 40), page('/es/blog', 40), page('/de/blog', 40), page('/fr/blog', 40),
-      page('/en/maintenance/model-a', 30), page('/en/tools/itv', 20), page('/es/mantenimiento/model-a', 25),
+      page('/en/guides/a', 30), page('/en/tools/calc', 20), page('/es/guias/a', 25),
     ]
     expect(pickRepresentativePages(pages, 'https://example.com/en', 4)).toEqual([
       'https://example.com/en',
       'https://example.com/en/blog',
-      'https://example.com/en/maintenance/model-a',
-      'https://example.com/en/tools/itv',
+      'https://example.com/en/guides/a',
+      'https://example.com/en/tools/calc',
     ])
   })
 })

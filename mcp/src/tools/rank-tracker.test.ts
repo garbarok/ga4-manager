@@ -217,11 +217,11 @@ describe('wrapped google.com/goto results (B2)', () => {
     const r = parseSerpForSite('kw', [
       { type: 'organic', rank_group: 1, rank_absolute: 1, ...wrap(null, 'Some Shop') },
       { type: 'organic', rank_group: 2, rank_absolute: 2, ...wrap('https://rival.example › a', 'Rival') },
-      { type: 'organic', rank_group: 3, rank_absolute: 3, ...wrap('https://www.example.com › es › mantenimiento › modelo', 'Example') },
+      { type: 'organic', rank_group: 3, rank_absolute: 3, ...wrap('https://www.example.com › es › guias › modelo', 'Example') },
     ], 'example.com')
     expect(r.position).toBe(3)
     expect(r.url).toBeNull()
-    expect(r.url_hint).toBe('https://www.example.com/es/mantenimiento/modelo')
+    expect(r.url_hint).toBe('https://www.example.com/es/guias/modelo')
     expect(r.competitors.map((c) => c.domain)).toEqual(['rival.example'])
   })
 })

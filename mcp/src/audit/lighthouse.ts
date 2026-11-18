@@ -67,7 +67,7 @@ export function splitLocale(url: string): { locale: string | null; segments: str
 /**
  * Pick up to `n` pages: the start URL, then the most-linked indexable page of
  * each section, then the most-linked rest. On multilingual sites the section
- * is the segment after the locale (/es/mantenimiento/x → "mantenimiento"),
+ * is the segment after the locale (/es/guias/x → "guias"),
  * and pages in the start URL's locale are tried first, so the picks cover
  * page types (blog, tools, product pages) instead of one page per language.
  */
