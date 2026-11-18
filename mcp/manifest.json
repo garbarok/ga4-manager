@@ -285,6 +285,34 @@
       "description": "Link gap vs competitors"
     },
     {
+      "name": "report_save",
+      "description": "Save an HTML report"
+    },
+    {
+      "name": "report_list",
+      "description": "List saved reports"
+    },
+    {
+      "name": "report_get",
+      "description": "Get a saved report"
+    },
+    {
+      "name": "report_delete",
+      "description": "Delete a saved report"
+    },
+    {
+      "name": "report_template_save",
+      "description": "Save a report template"
+    },
+    {
+      "name": "report_template_list",
+      "description": "List report templates"
+    },
+    {
+      "name": "report_template_delete",
+      "description": "Delete a report template"
+    },
+    {
       "name": "indexnow_submit",
       "description": "Submit URLs to IndexNow"
     },
