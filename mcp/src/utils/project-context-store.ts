@@ -32,6 +32,7 @@ export interface ResearchLogEntry {
   endpoint: string
   params: Record<string, unknown>
   cost_usd: number | null
+  note?: string
 }
 
 export interface ProjectContext {
@@ -73,7 +74,7 @@ export function saveContext(store: StateStore, ctx: ProjectContext, now: Date = 
 export function researchEntries(tool: string, lookups: PaidLookup[], now: Date = new Date()): ResearchLogEntry[] {
   return lookups
     .filter((l) => !l.from_cache)
-    .map((l) => ({ at: now.toISOString(), tool, endpoint: l.path, params: l.params, cost_usd: l.cost_usd }))
+    .map((l) => ({ at: now.toISOString(), tool, endpoint: l.path, params: l.params, cost_usd: l.cost_usd, ...(l.note ? { note: l.note } : {}) }))
 }
 
 export function appendResearch(ctx: ProjectContext, entries: ResearchLogEntry[]): ProjectContext {

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
 import { dataforseoRequest, normalizeDomain, sumCosts } from '../utils/dataforseo-client.js'
+import { referenceHost, isWrappedUrl } from '../utils/serp-host.js'
 import { ToolError, toolErrorToFailure, errorResult, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 
 // ============================================================================
@@ -84,9 +85,11 @@ export function summarizeMentions(keyword: string, target: string, items: LlmMen
 
   for (const item of items) {
     for (const source of item.sources ?? []) {
-      const raw = source.domain || source.url
+      const recovered = referenceHost({ domain: source.domain, url: source.url })
+      const raw = recovered || source.domain || source.url
       if (!raw) continue
       const host = normalizeDomain(raw)
+      if (host === 'google.com' && source.url && isWrappedUrl(source.url)) continue // unattributable redirect
       counts.set(host, (counts.get(host) ?? 0) + 1)
       if (matchesTarget(host, target)) citations.add(source.url ?? host)
     }

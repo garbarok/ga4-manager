@@ -106,15 +106,29 @@ export async function dataforseoRequest<R>(
   if (!req.unbilled) beforePaidCall('dataforseo')
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
 
-  const response = await fetch(`${DATAFORSEO_BASE}/${req.path}`, {
-    method,
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/json',
-    },
-    ...(method === 'POST' ? { body: JSON.stringify([req.task ?? {}]) } : {}),
-    signal: AbortSignal.timeout(req.timeoutMs ?? 30_000),
-  })
+  const timeoutMs = req.timeoutMs ?? defaultTimeoutMs(req.path)
+  let response: Response
+  try {
+    response = await fetch(`${DATAFORSEO_BASE}/${req.path}`, {
+      method,
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      ...(method === 'POST' ? { body: JSON.stringify([req.task ?? {}]) } : {}),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  } catch (err) {
+    const name = (err as Error)?.name
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      // DataForSEO bills a live task once it starts, even if we stop waiting:
+      // record it (cost unknown) so the research log and the next agent see it.
+      const note = `Timed out after ${Math.round(timeoutMs / 1000)} s; DataForSEO may still have billed this request.`
+      ctx?.lookups.push({ path: req.path, params: summarizeParams(req.task), cost_usd: null, from_cache: false, note })
+      throw new ToolError(ErrorCode.UPSTREAM_5XX, `DataForSEO request to ${req.path} timed out after ${Math.round(timeoutMs / 1000)} s.`, 'Retry later; a cached copy will be used if DataForSEO completed it. The charge, if any, is noted in the research log.')
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const text = await response.text()
@@ -145,6 +159,15 @@ export async function dataforseoRequest<R>(
     writeCache(ctx.stateDir, ctx.site, key, { path: req.path, task: req.task ?? null, items, cost_usd: cost }, cacheTtlMs(req.path))
   }
   return { items, cost }
+}
+
+/**
+ * Live SERP, AI Mode and LLM endpoints routinely take 30–90 s; a short client
+ * timeout aborts requests DataForSEO still bills. Other endpoints answer fast.
+ */
+export function defaultTimeoutMs(path: string): number {
+  if (/^serp\/.*\/live\//.test(path) || /^ai_optimization\//.test(path)) return 120_000
+  return 60_000
 }
 
 /** Fields worth keeping in the research log, so a later agent can tell what was already bought. */

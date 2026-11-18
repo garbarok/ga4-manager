@@ -31,11 +31,11 @@ describe('normalizeAiOverview (AI Mode / AI Overview)', () => {
     expect(a.answer_text).toBe('Popular choices are **ToolB** and **ToolA**.')
     expect(a.sources.map((s) => s.domain)).toEqual(['toolb.example.com', 'reviews.example.net', 'toola.example.com'])
   })
-  it('resolves google.com/goto references to the named site, or null when only a name is given', () => {
+  it('resolves google.com/goto references to the named site, or keeps the name when only a name is given', () => {
     const a = normalizeAiOverview(result('google-ai-overview'))
     expect(a.sources).toEqual([
       { url: 'https://google.com/goto?url=CAESabc', domain: 'reviews.example.net', title: 'Top analytics tools' },
-      { url: 'https://google.com/goto?url=CAESdef', domain: null, title: 'Top 14 tools' },
+      { url: 'https://google.com/goto?url=CAESdef', domain: null, source_name: 'Webmaster Tips', title: 'Top 14 tools' },
       { url: 'https://toolc.example.org/', domain: 'toolc.example.org', title: 'ToolC' },
     ])
   })
@@ -72,5 +72,22 @@ describe('model table', () => {
   it('cleanUrl drops tracking parameters only', () => {
     expect(cleanUrl('https://a.example.com/x?utm_source=chatgpt.com&id=2')).toBe('https://a.example.com/x?id=2')
     expect(cleanUrl('not a url')).toBe('not a url')
+  })
+})
+
+describe('AI Overview references behind google.com/goto (B4)', () => {
+  it('maps known platform names to domains and keeps other names as source_name', () => {
+    const out = normalizeAiOverview({
+      items: [{ type: 'ai_overview', markdown: 'answer', references: [
+        { url: 'https://google.com/goto?url=A', domain: 'google.com', source: 'Reddit', title: 'r' },
+        { url: 'https://google.com/goto?url=B', domain: 'google.com', source: 'Forocoches', title: 'f' },
+        { url: 'https://example.com/a', domain: 'example.com', source: 'Example', title: 'e' },
+      ] }],
+    })
+    expect(out.sources.map((s) => [s.domain, s.source_name ?? null])).toEqual([
+      ['reddit.com', null],
+      [null, 'Forocoches'],
+      ['example.com', null],
+    ])
   })
 })

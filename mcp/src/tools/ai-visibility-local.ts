@@ -349,14 +349,18 @@ export function runSources(input: z.infer<typeof sourcesInputSchema>) {
   const runs = input.run_id || input.scope === 'latest' ? [loadRun(store, site, input.run_id)] : loadRuns(store, site)
   if (runs.length === 0) return errorResult(ErrorCode.NOT_FOUND, `No AI-visibility runs for ${site} yet.`)
   const competitors = runs[0].competitors
-  const rows = topSources(runs, site, competitors, input.by, input.limit)
+  // Totals count every source, not just the `limit` rows shown.
+  const all = topSources(runs, site, competitors, input.by, Number.MAX_SAFE_INTEGER)
+  const rows = all.slice(0, input.limit)
   return {
     success: true,
     site,
     runs: runs.map((r) => r.id),
     by: input.by,
     sources: rows,
-    own_citations: rows.filter((r) => r.is_own).reduce((a, r) => a + r.citations, 0),
+    own_citations: all.filter((r) => r.is_own).reduce((a, r) => a + r.citations, 0),
+    // Citations whose site could not be identified (Google redirect links with no usable name).
+    unattributed_citations: all.filter((r) => r.key.endsWith('(no domain)') || r.key === '(unnamed source)').reduce((a, r) => a + r.citations, 0),
   }
 }
 

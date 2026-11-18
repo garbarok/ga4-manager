@@ -19,6 +19,8 @@ export interface PaidLookup {
   cost_usd: number | null
   from_cache: boolean
   cached_at?: string
+  /** Set when the outcome is uncertain, e.g. a timed-out request DataForSEO may still bill. */
+  note?: string
 }
 
 export interface ToolContext {

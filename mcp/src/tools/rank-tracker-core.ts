@@ -1,3 +1,4 @@
+import { resultHost, resultUrl, referenceHost, hostMatchesSite, type SerpResultFields } from '../utils/serp-host.js'
 // ============================================================================
 // rank-tracker-core.ts — pure rank-tracker model: trackers, runs, SERP parsing,
 // run-to-run comparison and history. No I/O except through StateStore.
@@ -44,7 +45,10 @@ export interface KeywordRank {
   /** rank_group of the site's first organic result; null when not in the scanned depth. */
   position: number | null
   rank_absolute: number | null
+  /** The ranking page; null when Google served it through a google.com/goto redirect (see url_hint). */
   url: string | null
+  /** Approximate ranking URL rebuilt from the breadcrumb of a wrapped result. */
+  url_hint?: string | null
   serp_features: string[]
   ai_overview: { present: boolean; site_cited: boolean | null; cited_url: string | null }
   /** The top 3 organic results that are not the site. */
@@ -184,38 +188,20 @@ export interface SerpItem {
   domain?: string | null
   url?: string | null
   breadcrumb?: string | null
+  website_name?: string | null
   references?: { domain?: string | null; url?: string | null; source?: string | null }[] | null
 }
 
-function hostOf(url: string | null | undefined): string | null {
-  if (!url) return null
-  try {
-    return new URL(url).hostname.toLowerCase()
-  } catch {
-    return null
-  }
-}
-
 /**
- * The real host of a SERP item. DataForSEO sometimes reports `domain:
- * "google.com"` with a `google.com/goto?url=...` redirect URL; the result's
- * own host is then only in the breadcrumb ("https://dev.to › path").
+ * The real host of a SERP item. DataForSEO often reports `domain: "google.com"`
+ * with a `google.com/goto?url=...` redirect URL; see utils/serp-host.ts.
  */
-export function itemHost(item: { domain?: string | null; url?: string | null; breadcrumb?: string | null }): string | null {
-  const urlHost = hostOf(item.url)
-  const wrapped = urlHost === 'google.com' || urlHost === 'www.google.com' || /\/goto\?/.test(item.url ?? '')
-  if (wrapped && item.breadcrumb) {
-    const crumbHost = hostOf(item.breadcrumb.split(' › ')[0]?.trim())
-    if (crumbHost) return crumbHost
-  }
-  if (!wrapped && urlHost) return urlHost
-  return item.domain?.toLowerCase() ?? urlHost
+export function itemHost(item: SerpResultFields): string | null {
+  return resultHost(item)
 }
 
 export function hostMatches(host: string | null, site: string): boolean {
-  if (!host) return false
-  const h = host.replace(/^www\./, '')
-  return h === site || h.endsWith(`.${site}`)
+  return hostMatchesSite(host, site)
 }
 
 export function parseSerpForSite(keyword: string, items: SerpItem[], site: string): KeywordRank {
@@ -226,18 +212,24 @@ export function parseSerpForSite(keyword: string, items: SerpItem[], site: strin
   let aiOverview: KeywordRank['ai_overview'] = { present: false, site_cited: null, cited_url: null }
   if (overview) {
     const refs = overview.references ?? []
-    const cited = refs.find((r) => hostMatches(itemHost({ domain: r.domain, url: r.url }), site))
+    const cited = refs.find((r) => hostMatches(referenceHost(r), site))
     aiOverview = { present: true, site_cited: refs.length ? Boolean(cited) : null, cited_url: cited?.url ?? null }
   }
+  // Results whose host cannot be recovered are left out rather than listed as google.com.
   const competitors = organic
-    .filter((i) => i !== own && !hostMatches(itemHost(i), site))
+    .filter((i) => i !== own && itemHost(i) !== null && !hostMatches(itemHost(i), site))
     .slice(0, 3)
-    .map((i) => ({ position: i.rank_group ?? 0, domain: (itemHost(i) ?? '').replace(/^www\./, ''), url: i.url ?? '' }))
+    .map((i) => {
+      const u = resultUrl(i)
+      return { position: i.rank_group ?? 0, domain: (itemHost(i) ?? '').replace(/^www\./, ''), url: u.url ?? u.url_hint ?? '' }
+    })
+  const ownUrl = own ? resultUrl(own) : null
   return {
     keyword,
     position: own?.rank_group ?? null,
     rank_absolute: own?.rank_absolute ?? null,
-    url: own?.url ?? null,
+    url: ownUrl?.url ?? null,
+    ...(ownUrl?.url_hint ? { url_hint: ownUrl.url_hint } : {}),
     serp_features: features,
     ai_overview: aiOverview,
     competitors,

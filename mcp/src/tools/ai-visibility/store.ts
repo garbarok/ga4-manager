@@ -176,7 +176,8 @@ export function topSources(
   for (const run of runs) {
     for (const a of run.answers) {
       for (const s of a.sources) {
-        const key = by === 'domain' ? s.domain ?? '(unnamed source)' : s.url
+        // Without a domain, group by the engine's source name so the citation stays visible.
+        const key = by === 'domain' ? s.domain ?? (s.source_name ? `${s.source_name} (no domain)` : '(unnamed source)') : s.url
         const row = rows.get(key) ?? { citations: 0, prompts: new Set(), models: new Set(), domain: s.domain }
         row.citations += 1
         row.prompts.add(a.prompt)

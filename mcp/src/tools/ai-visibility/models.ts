@@ -31,7 +31,38 @@ export interface AnswerSource {
   url: string
   /** Lowercase host without www; null when the engine only gave a name (some AI Overview references). */
   domain: string | null
+  /** The engine's name for the source when it gave no domain (e.g. "Forocoches"). */
+  source_name?: string
   title?: string
+}
+
+/**
+ * Sites AI Overviews cite by name behind google.com/goto links. Mapping the
+ * name keeps their citations attributable; unknown names are kept as
+ * source_name instead of disappearing into one "(unnamed source)" bucket.
+ */
+export const KNOWN_SOURCE_NAMES: Record<string, string> = {
+  facebook: 'facebook.com',
+  reddit: 'reddit.com',
+  youtube: 'youtube.com',
+  instagram: 'instagram.com',
+  tiktok: 'tiktok.com',
+  x: 'x.com',
+  twitter: 'x.com',
+  linkedin: 'linkedin.com',
+  pinterest: 'pinterest.com',
+  quora: 'quora.com',
+  wikipedia: 'wikipedia.org',
+  medium: 'medium.com',
+  amazon: 'amazon.com',
+  'google play': 'play.google.com',
+  'app store': 'apps.apple.com',
+  'apple app store': 'apps.apple.com',
+}
+
+export function domainFromSourceName(name: string | null | undefined): string | null {
+  if (!name) return null
+  return KNOWN_SOURCE_NAMES[name.trim().toLowerCase()] ?? null
 }
 
 export interface AnswerRecord {
@@ -122,12 +153,14 @@ function source(urlRaw: unknown, domainRaw: unknown, titleRaw: unknown, nameRaw?
   let domain = str(domainRaw) ? normalizeDomain(domainRaw as string) : hostOf(url)
   // AI Overview references sometimes point at google.com/goto?url=… redirects;
   // the real site is then only in `source` (a domain or a site name).
+  let sourceName: string | null = null
   if (domain === 'google.com' && /\/goto\?/.test(url)) {
     const name = str(nameRaw)
-    domain = name && DOMAIN_LIKE.test(name.trim()) ? normalizeDomain(name) : null
+    domain = name && DOMAIN_LIKE.test(name.trim()) ? normalizeDomain(name) : domainFromSourceName(name)
+    if (!domain && name) sourceName = name.trim()
   }
   const title = str(titleRaw) ?? (str(nameRaw) && !DOMAIN_LIKE.test(String(nameRaw)) ? String(nameRaw) : null)
-  return { url: cleanUrl(url), domain, ...(title ? { title } : {}) }
+  return { url: cleanUrl(url), domain, ...(sourceName ? { source_name: sourceName } : {}), ...(title ? { title } : {}) }
 }
 
 function dedupe(sources: (AnswerSource | null)[]): AnswerSource[] {

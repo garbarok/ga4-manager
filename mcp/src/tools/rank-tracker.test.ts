@@ -209,3 +209,19 @@ describe('rank tracker tools', () => {
     expect(out).toMatchObject({ success: false })
   })
 })
+
+describe('wrapped google.com/goto results (B2)', () => {
+  it('stores the breadcrumb hint as the ranking URL and drops unattributable competitors', async () => {
+    const { parseSerpForSite } = await import('./rank-tracker-core.js')
+    const wrap = (b: string | null, name: string | null) => ({ url: 'https://google.com/goto?url=CAES', domain: 'google.com', breadcrumb: b, website_name: name })
+    const r = parseSerpForSite('kw', [
+      { type: 'organic', rank_group: 1, rank_absolute: 1, ...wrap(null, 'Some Shop') },
+      { type: 'organic', rank_group: 2, rank_absolute: 2, ...wrap('https://rival.example › a', 'Rival') },
+      { type: 'organic', rank_group: 3, rank_absolute: 3, ...wrap('https://www.example.com › es › mantenimiento › modelo', 'Example') },
+    ], 'example.com')
+    expect(r.position).toBe(3)
+    expect(r.url).toBeNull()
+    expect(r.url_hint).toBe('https://www.example.com/es/mantenimiento/modelo')
+    expect(r.competitors.map((c) => c.domain)).toEqual(['rival.example'])
+  })
+})

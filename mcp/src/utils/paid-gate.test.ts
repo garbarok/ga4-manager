@@ -168,3 +168,31 @@ describe('lookup cache through dataforseoRequest', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('timeouts (B3)', () => {
+  beforeEach(() => {
+    resetSpend()
+    vi.stubEnv('DATAFORSEO_USERNAME', 'u')
+    vi.stubEnv('DATAFORSEO_PASSWORD', 'p')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('uses 120 s for live SERP and AI endpoints, 60 s otherwise', async () => {
+    const { defaultTimeoutMs } = await import('./dataforseo-client.js')
+    expect(defaultTimeoutMs('serp/google/organic/live/advanced')).toBe(120_000)
+    expect(defaultTimeoutMs('ai_optimization/chat_gpt/llm_scraper/live/advanced')).toBe(120_000)
+    expect(defaultTimeoutMs('dataforseo_labs/google/ranked_keywords/live')).toBe(60_000)
+  })
+
+  it('records a timed-out request as a possibly billed lookup', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }))
+    const ctx: ToolContext = { tool: 'rank_tracker_run', site: 'example.com', stateDir: mkdtempSync(join(tmpdir(), 'ga4-to-')), refresh: false, lookups: [] }
+    await expect(runWithContext(ctx, () => dataforseoRequest({ path: 'serp/google/organic/live/advanced', task: { keyword: 'k' } }))).rejects.toThrow(/timed out after 120 s/)
+    expect(ctx.lookups).toEqual([
+      expect.objectContaining({ path: 'serp/google/organic/live/advanced', cost_usd: null, from_cache: false, note: expect.stringMatching(/may still have billed/) }),
+    ])
+  })
+})
