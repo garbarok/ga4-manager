@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { PROMPTS, getPrompt, PromptError } from './prompts.js'
+import { PROMPTS as ALL_PROMPTS, getPrompt, PromptError } from './prompts.js'
+import { isWorkflowPrompt } from './workflow-prompts.js'
+
+// The monitoring routines; the workflow prompts are tested in workflow-prompts.test.ts.
+const PROMPTS = ALL_PROMPTS.filter((p) => !isWorkflowPrompt(p.name))
 import { SPEC_BY_NAME } from './registry.js'
 
 const FULL = {

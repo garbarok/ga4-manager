@@ -45,8 +45,10 @@ test:
 	@go test -v ./...
 
 # Run linter
-# Pinned so local runs match; v2.14+ is needed for Go 1.27 toolchains.
-GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+# Pinned so local runs match. golangci-lint refuses to lint code that targets a
+# newer Go than the one it was built with, so build it with the go.mod toolchain.
+GO_TOOLCHAIN := $(shell go env GOVERSION)
+GOLANGCI_LINT ?= GOTOOLCHAIN=$(GO_TOOLCHAIN) go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 GORELEASER ?= go run github.com/goreleaser/goreleaser/v2@latest
 
 lint:

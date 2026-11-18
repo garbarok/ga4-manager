@@ -1,0 +1,103 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.004,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.004,
+      "path": [
+        "v3",
+        "ai_optimization",
+        "chat_gpt",
+        "llm_scraper",
+        "live",
+        "advanced"
+      ],
+      "result": [
+        {
+          "keyword": "what are the best open source web analytics tools",
+          "location_code": 2840,
+          "language_code": "en",
+          "model": "gpt-6",
+          "check_url": "https://chatgpt.com/?prompt=what%20are%20the%20best%20open%20source%20web%20analytics%20tools",
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "markdown": "The best open-source web analytics tools are **ToolA**, **ToolB** and **ToolC**.\n\n1. **ToolA** (toola.example.com) is the most complete option.\n2. **ToolB** is lightweight and cookie-free; see toolb.example.com.\n3. **ToolC** suits product analytics. Compare them on Wikipedia.",
+          "search_results": [
+            {
+              "type": "chatgpt_search_result",
+              "url": "https://reviews.example.net/best-analytics?utm_source=chatgpt.com",
+              "domain": "reviews.example.net",
+              "title": "Best analytics tools",
+              "description": "A comparison.",
+              "breadcrumb": "reviews.example.net"
+            }
+          ],
+          "sources": [
+            {
+              "type": "chat_gpt_source",
+              "title": "ToolA",
+              "snippet": null,
+              "domain": "toola.example.com",
+              "url": "https://toola.example.com/?utm_source=chatgpt.com",
+              "thumbnail": null,
+              "source_name": null,
+              "publication_date": null,
+              "markdown": "[ToolA](https://toola.example.com/?utm_source=chatgpt.com)"
+            },
+            {
+              "type": "chat_gpt_source",
+              "title": "GitHub",
+              "snippet": null,
+              "domain": "github.com",
+              "url": "https://github.com/example/toolb",
+              "thumbnail": null,
+              "source_name": null,
+              "publication_date": null,
+              "markdown": "[GitHub](https://github.com/example/toolb)"
+            },
+            {
+              "type": "chat_gpt_source",
+              "title": "Review",
+              "snippet": null,
+              "domain": "reviews.example.net",
+              "url": "https://reviews.example.net/best-analytics?utm_source=chatgpt.com",
+              "thumbnail": null,
+              "source_name": null,
+              "publication_date": null,
+              "markdown": "[Review](https://reviews.example.net/best-analytics?utm_source=chatgpt.com)"
+            }
+          ],
+          "fan_out_queries": [
+            "best open source web analytics tools 2026"
+          ],
+          "brand_entities": [
+            {
+              "type": "chat_gpt_brand_entity",
+              "title": "ToolA",
+              "category": "software",
+              "markdown": "ToolA",
+              "urls": null
+            }
+          ],
+          "se_results_count": 0,
+          "item_types": [
+            "chat_gpt_text"
+          ],
+          "items_count": 1,
+          "items": [
+            {
+              "type": "chat_gpt_text",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "markdown": "The best open-source web analytics tools are **ToolA**, **ToolB** and **ToolC**.\n\n1. **ToolA** (toola.example.com) is the most complete option.\n2. **ToolB** is lightweight and cookie-free; see toolb.example.com.\n3. **ToolC** suits product analytics. Compare them on Wikipedia.",
+              "sources": null,
+              "brand_entities": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

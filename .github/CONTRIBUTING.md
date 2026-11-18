@@ -21,7 +21,7 @@ Please be respectful and professional in all interactions. We aim to maintain a 
 ## Getting Started
 
 ### Prerequisites
-- Go 1.21 or higher
+- Go 1.27 or higher (`go.mod` pins 1.27.4; with the default `GOTOOLCHAIN=auto`, an older `go` downloads it automatically)
 - Google Cloud account with GA4 Admin API access
 - Service account credentials
 - golangci-lint v2.6.2+

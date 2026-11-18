@@ -20,6 +20,8 @@ Available operations:
 
 Requires a verified site in Google Search Console and proper authentication.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Runtime errors (API, config) print without the usage text.
+		cmd.SilenceUsage = true
 		// Check for credentials
 		if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
 			color.Red("✗ GOOGLE_APPLICATION_CREDENTIALS environment variable not set")

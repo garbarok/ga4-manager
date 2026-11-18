@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO tool, as local tools. Every tool is also a `ga4m` command.
+
+### Added
+
+- **`server_info`** reports:
+  - the server and `ga4` CLI versions and the tool count;
+  - every tool group as enabled, degraded or disabled, with the reason (missing `DATAFORSEO_*`, no binary, scope not granted, read-only mode);
+  - the state dir, cache status, spending caps and the update path for Desktop, npx and npm.
+- **`ga4m` CLI** (new npm bin): every registered tool runs from the terminal through the same dispatcher as the MCP server.
+  - Commands: `ga4m list`, `ga4m help <tool>`, `ga4m <tool> --flag value | --input JSON`.
+  - See ADR-0006.
+- **Site crawl audit** (`site_audit_run`, `site_audit_status`, `site_audit_issues`, `site_audit_pages`, `site_audit_lighthouse`, `site_audit_list`, `site_audit_delete`):
+  - A same-origin, robots.txt-aware background crawler with page and time budgets, robots-style `exclude_paths`, 429 backoff (throttled URLs reported as `rate_limited`, not broken) and optional JS rendering.
+  - 30 site-wide issue types, each with a severity and `how_to_fix`.
+  - Lighthouse on up to 10 representative pages, mobile and desktop: scores, LCP/CLS/INP/TTFB and top savings with resources.
+  - Results are persisted per audit and pollable.
+- **`page_opportunities`**: Search Console pages ranking 4–20 joined with GA4 organic landing-page outcomes.
+  - Score: round(100 × (0.5 demand + 0.3 business value + 0.2 reachability)). Business value is the key-event rate, falling back to engagement rate, smoothed for small samples.
+  - Unmatched pages stay visible.
+  - Reports coverage, plus warnings for an empty GA4, differing time zones and several hosts.
+- **`gsc_change_impact`**: clicks, impressions, CTR and position over equal windows before and after each change or GA4 annotation.
+  - The change day is skipped and the after window ends at `data_through`.
+  - Verdict too_early / improved / worse / flat, with the thresholds shown.
+- **GA4 organic reports**: `ga4_organic_overview` (previous-period comparison, daily/weekly trend), `ga4_organic_landing_pages`, `ga4_key_events`, `ga4_traffic_acquisition`, `ga4_audience`, `ga4_site_search`, `ga4_ecommerce`, and `ga4_measurement_health`, which explains empty results.
+- **Project context**: `project_context_get` / `project_context_update` store, per site:
+  - brand, prose sections and competitors;
+  - key pages with roles;
+  - a dated research log of paid lookups.
+
+  Updates are add/upsert/remove patch operations, applied all or nothing.
+- **Rank tracker with history** (`rank_tracker_*`):
+  - Keyword sets per site, market and device, with pinned keywords.
+  - A free estimate, and gated runs that store positions, ranking URLs, SERP features and AI Overview citations.
+  - History over time. Scheduling stays in cron.
+- **AI visibility tracking** (`ai_visibility_*`):
+  - prompt research and deterministic prompt generation;
+  - saved prompt sets;
+  - cost-gated runs across ChatGPT, Gemini, Google AI Overviews / AI Mode, Claude, Perplexity and the OpenAI/Gemini APIs;
+  - mentions, citations and competitor appearances;
+  - trend, top cited sources, single answers and CSV/JSON export.
+- **Keyword workspace and SERP competitors**:
+  - `keywords_save` / `keywords_list` / `keywords_remove` (tagged lists per site);
+  - `keyword_suggestions` (free GSC striking-distance queries, plus optional paid ideas);
+  - `serp_competitors`, `domain_overview`, and `serp_locations` (free).
+- **Saved reports**: `report_save`, `report_list`, `report_get`, `report_delete` and report templates (`report_template_*`, with a built-in `monthly_seo_checkin`).
+  - Each report is a self-contained, script-free HTML file per site.
+  - Untrusted text is escaped.
+- **Lookup cache**: DataForSEO responses are cached per site and parameters: 6 h for SERPs, 24 h for Labs data, 7 days for AI answers. Results report `cache.hits`. `refresh_cache`, `GA4M_CACHE=off` and `GA4M_CACHE_TTL_HOURS` control it.
+- **Cost gate** on every new paid tool: an estimate from DataForSEO's live price list (SERP depth billed per 10 results; measured surcharges for async AI Overview, AI Mode and LLM tokens). It refuses above `max_cost_usd` or the balance. `estimate_only` spends nothing.
+- **Research log**: billed DataForSEO lookups from any tool, old ones included, are appended to the site's project context automatically.
+- **Workflow prompts**: `project_setup`, `seo_audit`, `keyword_research`, `keyword_clustering`, `competitor_analysis`, `competitive_landscape`, `ai_visibility_audit`, `monthly_report`.
+- **`gsc_analytics_run`**: `min_position`, `max_position` and `min_impressions` filters, applied over the fetched top rows, with a `row_filter` report.
+- **`data_through`** on every Search Console performance result: the last date with final data.
+- `pnpm manifest:sync` regenerates the `.mcpb` tool list from the registry. A test keeps the root README tool table equal to the registry.
+
+### Fixed (found by a full test run against a live site)
+
+- **Wrapped Google results:** Google serves many organic results and AI Overview references as `google.com/goto?url=…` redirects.
+  - `keyword_serp_snapshot` listed `google.com` for every such result. `keyword_rank_check` could report a false "not found". The rank tracker stored the redirect as the ranking URL and listed `google.com` as a competitor. AI-visibility sources collapsed into "(unnamed source)".
+  - The new `utils/serp-host.ts` recovers the real host from the breadcrumb, `displayed_link`, `domain` or site name. Wrapped results return `url: null` plus an approximate `url_hint`. AI references with only a name map to known platforms or stay visible by name, and `unattributed_citations` counts the rest.
+- **Timeouts:** live SERP and AI calls now wait 120 s (was 30 s). A request that still times out is logged as possibly billed (`note`), instead of vanishing from the research log and the spending cap.
+- **One error shape:** tools backed by the `ga4` CLI now report a Google 403/404/429 as `AUTH_DENIED` / `NOT_FOUND` / `QUOTA_EXCEEDED` in the same `{success:false, error:{code, message, hint}}` shape as native tools. Log lines and cobra usage text are stripped. Commands that exit 0 but print a failure, unknown tools and invalid input use the same shape.
+- **`gsc_change_impact`** reports a site the credential cannot read as `AUTH_DENIED`, not as a server error.
+- **`site_growth_brief`** data gaps show the real cause instead of a Go log line.
+- **`server_info`** takes `site`, `property_id` or `config` and checks that the credential can actually read them. Scopes alone did not prove it. Each denied resource comes with the exact grant to add.
+- **Dry runs:** `dry_run: true` previews of destructive tools (`ga4_setup`, `ga4_cleanup`) pass the destructive gate. The gate reads validated input, so a `dry_run` a tool does not define cannot unlock it.
+- **Site crawl:** robots-blocked URLs no longer use the page budget. Lighthouse picks pages by section after the locale (`/es/blog` vs `/es/guias`) instead of one page per language.
+- **`ai_visibility_prompts_generate`** writes prompts in Spanish, German or French (`language_code`, or the tracker's language) instead of mixing English templates with local topics.
+- **`ai_visibility_research`** scores questions against the seed keyword. Loosely matched ones go to `low_relevance` and are not suggested.
+- **`serp_competitors`** flags platforms (YouTube, Facebook, Wikipedia, app stores…) and no longer suggests them as competitors.
+- **Saved reports** render nested lists in table cells as short readable lists instead of raw JSON.
+
+### Changed
+
+- **Dependencies updated:**
+  - @modelcontextprotocol/sdk 1.32.2, zod 4.6.7, tldts 7.5.4;
+  - csv-parse 7 and node-html-parser 9 (majors; same behaviour, all tests pass);
+  - dev: vitest 5, eslint 10.15, typescript-eslint 8.73, @types/node 26.
+  - TypeScript stays on 6.0.3: typescript-eslint does not support TypeScript 7 yet.
+  - Transitive dependencies of the MCP SDK (express, hono, body-parser, qs…) refreshed: `npm audit --omit=dev` and `pnpm audit --prod` report no known vulnerabilities.
+- Search Console diagnostics use one more quota unit per run, for the `data_through` lookup.
+- MCP tool calls go through a shared dispatcher (`src/dispatch.ts`). Results of paid tools gain `research_log`, and `cache` when a lookup was served from cache.
+
+### Fixed
+
+- The `gsc_traffic_compare` result now says how fresh the data is (`data_through`), so lag is not read as a drop.
+
 ## [4.1.2] - 2026-10-29
 
 ### Fixed

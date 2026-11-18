@@ -43,6 +43,12 @@ export const gscAnalyticsRunInputSchema = z.object({
   limit: z.number().int().min(1).max(25000).optional().default(100),
   /** Preview query without making API call */
   dry_run: z.boolean().optional(),
+  /** Keep rows with average position >= this (applied over the fetched top rows) */
+  min_position: z.number().min(0).optional(),
+  /** Keep rows with average position <= this (applied over the fetched top rows) */
+  max_position: z.number().min(0).optional(),
+  /** Keep rows with at least this many impressions */
+  min_impressions: z.number().int().min(0).optional(),
 }).refine(
   (data) => data.site || data.config,
   {
@@ -128,6 +134,17 @@ export interface AnalyticsRunOutput {
   metadata?: AnalyticsQueryMetadata;
   quota?: QuotaStatus;
   dry_run?: DryRunQuery;
+  /** Last date Search Console has final data for (YYYY-MM-DD). */
+  data_through?: string;
+  /** What the position/impression filter considered and kept. */
+  row_filter?: {
+    min_position?: number;
+    max_position?: number;
+    min_impressions?: number;
+    rows_considered: number;
+    rows_kept: number;
+    note: string;
+  };
   error?: string;
   validation_errors?: string[];
 }
@@ -194,6 +211,10 @@ export function buildAnalyticsRunArgs(input: GscAnalyticsRunInput): string[] {
   if (input.dry_run) {
     args.push('--dry-run');
   }
+
+  if (input.min_position !== undefined) args.push('--min-position', String(input.min_position));
+  if (input.max_position !== undefined) args.push('--max-position', String(input.max_position));
+  if (input.min_impressions !== undefined) args.push('--min-impressions', String(input.min_impressions));
 
   return args;
 }
@@ -367,6 +388,8 @@ function parseJsonOutput(output: string): AnalyticsRunOutput {
     result.site = data.SiteURL || data.site_url;
     result.period = data.Period || data.period;
     result.total_rows = data.TotalRows || data.total_rows || 0;
+    if (typeof data.data_through === 'string' && data.data_through) result.data_through = data.data_through;
+    if (data.row_filter && typeof data.row_filter === 'object') result.row_filter = data.row_filter;
 
     // Parse aggregates
     const agg = data.Aggregates || data.aggregates;
@@ -514,7 +537,9 @@ function parseTableOutput(output: string): AnalyticsRunOutput {
  */
 export const gscAnalyticsRunTool = {
   name: 'gsc_analytics_run',
-  description: 'Generate search analytics reports from Google Search Console. Query search performance data including top queries, landing pages, CTR, positions, and more. This is the primary tool for SEO analysis and search performance monitoring.',
+  description: 'Generate search analytics reports from Google Search Console. Query search performance data including top queries, landing pages, CTR, positions, and more. This is the primary tool for SEO analysis and search performance monitoring. ' +
+    'min_position / max_position / min_impressions filter the fetched top rows server-side (row_filter reports rows considered vs kept). ' +
+    'Returns data_through: the last date Search Console has final data for.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -549,6 +574,18 @@ export const gscAnalyticsRunTool = {
         type: 'boolean',
         description: 'Preview query parameters without making the API call. Useful for validating configuration.',
         default: false,
+      },
+      min_position: {
+        type: 'number',
+        description: 'Keep rows with average position >= this, e.g. 4 for striking-distance work. Applied over the top `limit` rows fetched (GSC cannot filter by position); raise limit to widen the pool.',
+      },
+      max_position: {
+        type: 'number',
+        description: 'Keep rows with average position <= this, e.g. 20. Applied over the fetched top rows.',
+      },
+      min_impressions: {
+        type: 'number',
+        description: 'Keep rows with at least this many impressions.',
       },
     },
     // Note: Zod schema handles mutual exclusivity validation

@@ -16,6 +16,8 @@ export interface ValueSerpOrganicResult {
   title: string
   link: string
   domain?: string
+  /** "https://host › seg › seg"; identifies the result when `link` is a google.com/goto redirect. */
+  displayed_link?: string
   snippet?: string
 }
 

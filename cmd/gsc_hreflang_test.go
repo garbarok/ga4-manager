@@ -108,11 +108,11 @@ func TestHreflangCommand_ConfigPairsNoDiscovery(t *testing.T) {
 	if len(fetcher.requested) != 2 || out.PagesFetched != 2 {
 		t.Errorf("fetched %v (pages_fetched %d), want exactly the two pair members", fetcher.requested, out.PagesFetched)
 	}
-	if len(client.queries) != 1 || client.queries[0].Dimensions[0] != "query" {
+	if len(client.queries) != 2 || client.queries[0].Dimensions[0] != "query" || client.queries[1].Dimensions[0] != "date" { // +1: the data_through lookup (one date-dimension query).
 		t.Errorf("config pairs must skip the discovery page query; calls = %d", len(client.queries))
 	}
-	if out.QuotaUsed != 1 {
-		t.Errorf("quota_used = %d, want 1", out.QuotaUsed)
+	if out.QuotaUsed != 2 {
+		t.Errorf("quota_used = %d, want 2", out.QuotaUsed)
 	}
 	issues := map[string]bool{}
 	for _, r := range out.Results {
@@ -140,7 +140,7 @@ func TestHreflangCommand_DiscoveryFetchesTopPagesThenMembers(t *testing.T) {
 	if status != diagcmd.ExitClean {
 		t.Fatalf("status = %d, want clean (well-formed pair); results %+v", status, out.Results)
 	}
-	if len(client.queries) != 2 || client.queries[0].Dimensions[0] != "page" {
+	if len(client.queries) != 3 || client.queries[0].Dimensions[0] != "page" { // +1: the data_through lookup (one date-dimension query).
 		t.Errorf("want page query then query×page, got %d calls", len(client.queries))
 	}
 	if out.PagesFetched != 3 || len(fetcher.requested) != 3 {
@@ -200,7 +200,7 @@ func TestHreflangCommand_NoPairsInfoOnly(t *testing.T) {
 	if len(out.Results) != 1 || out.Results[0].Issue != "no_hreflang" {
 		t.Errorf("results = %+v", out.Results)
 	}
-	if len(client.queries) != 1 {
+	if len(client.queries) != 2 { // +1: the data_through lookup.
 		t.Errorf("no pairs → no query×page call; calls = %d", len(client.queries))
 	}
 }

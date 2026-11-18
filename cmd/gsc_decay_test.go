@@ -129,8 +129,8 @@ func TestRunDecayCommand_Table(t *testing.T) {
 					t.Errorf("results[%d].query = %q, want %q", i, got.Results[i].Query, q)
 				}
 			}
-			if got.QuotaUsed != 2 {
-				t.Errorf("quota_used = %d, want 2", got.QuotaUsed)
+			if got.QuotaUsed != 3 { // +1: the data_through lookup (one date-dimension query).
+				t.Errorf("quota_used = %d, want 3", got.QuotaUsed)
 			}
 		})
 	}
@@ -221,8 +221,8 @@ func TestDecayWindows_EqualLengthAndFinalized(t *testing.T) {
 		params.Days = days
 		params.Factory = func() (gsc.SearchAPI, func(), error) { return fake, func() {}, nil }
 		runDecayCommand(params)
-		if len(fake.queries) != 2 {
-			t.Fatalf("days=%d: got %d queries, want 2", days, len(fake.queries))
+		if len(fake.queries) != 3 { // +1: the data_through lookup (one date-dimension query).
+			t.Fatalf("days=%d: got %d queries, want 3", days, len(fake.queries))
 		}
 		parse := func(s string) time.Time {
 			d, err := time.Parse("2006-01-02", s)

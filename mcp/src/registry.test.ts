@@ -82,3 +82,12 @@ describe('tool registry', () => {
     expect(manifest.tools.map((t) => t.name)).toEqual(SPECS.map((s) => s.tool.name));
   });
 });
+
+describe('root README tool table', () => {
+  it('lists exactly the registered tools', () => {
+    const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+    const table = readme.slice(readme.indexOf('| Group | Tools |'), readme.indexOf('**Prompts:**'))
+    const listed = [...new Set([...table.matchAll(/`([a-z0-9_]+)`/g)].map((m) => m[1]))].sort()
+    expect(listed).toEqual(SPECS.map((s) => s.tool.name).sort())
+  })
+})

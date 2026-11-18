@@ -749,7 +749,8 @@ describe('runGscTrafficCompare before/after mode', () => {
       expect(result.period_b).toBe('2026-05-12 to 2026-05-25')
       expect(result.warnings).toEqual([])
     }
-    expect(requestedRanges(mockFetch)).toEqual([
+    // The third request is the data_through lookup (date dimension, last 14 days).
+    expect(requestedRanges(mockFetch).slice(0, 2)).toEqual([
       ['2026-04-26', '2026-05-09'],
       ['2026-05-12', '2026-05-25'],
     ])

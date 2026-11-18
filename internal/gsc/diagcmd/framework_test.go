@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/garbarok/ga4-manager/internal/gsc"
 )
 
 type row struct {
@@ -117,5 +119,19 @@ func TestValidateFormat(t *testing.T) {
 	}
 	if err := ValidateFormat("xml"); err == nil {
 		t.Error("xml should be invalid")
+	}
+}
+
+type dtFake struct{}
+
+func (dtFake) QuerySearchAnalytics(*gsc.SearchAnalyticsQuery) (*gsc.SearchAnalyticsReport, error) {
+	return &gsc.SearchAnalyticsReport{Rows: []gsc.SearchAnalyticsRow{{Keys: []string{"2026-01-09"}}}, QuotaUsed: 4}, nil
+}
+
+func TestAttachDataThrough(t *testing.T) {
+	env := NewEnvelope[int]("x", "sc-domain:example.com", time.Now(), nil, 3)
+	AttachDataThrough(&env, dtFake{}, time.Date(2026, 1, 12, 0, 0, 0, 0, time.UTC))
+	if env.DataThrough != "2026-01-09" || env.QuotaUsed != 4 {
+		t.Fatalf("env = %+v", env)
 	}
 }

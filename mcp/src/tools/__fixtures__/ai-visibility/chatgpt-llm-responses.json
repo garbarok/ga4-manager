@@ -1,0 +1,70 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.021,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.021,
+      "path": [
+        "v3",
+        "ai_optimization",
+        "chat_gpt",
+        "llm_responses",
+        "live"
+      ],
+      "result": [
+        {
+          "model_name": "gpt-5.4-mini-2026-03-17",
+          "input_tokens": 1000,
+          "output_tokens": 300,
+          "reasoning_tokens": 164,
+          "web_search": true,
+          "money_spent": 0.01,
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "items": [
+            {
+              "type": "reasoning",
+              "sections": [
+                {
+                  "type": "summary_text",
+                  "text": "Searching for options."
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "sections": [
+                {
+                  "type": "text",
+                  "text": "Consider ToolA or ToolC.",
+                  "annotations": [
+                    {
+                      "title": "ToolA",
+                      "url": "https://toola.example.com/?utm_source=openai",
+                      "start_index": null,
+                      "end_index": null,
+                      "text": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "fan_out_queries": [
+            "best open source web analytics tools"
+          ],
+          "search_results": [
+            {
+              "title": "ToolA",
+              "url": "https://toola.example.com/",
+              "date": "2026-11-01 00:00:00 +00:00",
+              "snippet": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

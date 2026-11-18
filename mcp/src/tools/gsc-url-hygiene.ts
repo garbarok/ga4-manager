@@ -44,6 +44,8 @@ export interface UrlHygieneOutput {
   generated_at: string
   results: UrlHygieneResultRow[]
   quota_used: number
+  /** Last date Search Console has final data for (YYYY-MM-DD); absent when unknown. */
+  data_through?: string
 }
 
 // ============================================================================

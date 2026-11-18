@@ -10,85 +10,22 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js'
 import { CLIExecutor } from './cli/executor.js'
-import { mapCLIError } from './utils/errors.js'
-import { fileURLToPath } from 'url'
-import { dirname, join, delimiter } from 'path'
-import { accessSync, constants, readFileSync } from 'fs'
-import { isSuccessExit } from './tool-spec.js'
-import { SPECS, SPEC_BY_NAME } from './registry.js'
-import { checkWriteGate } from './write-gate.js'
+import { SPECS } from './registry.js'
 import { PROMPTS, PromptError, getPrompt } from './prompts.js'
+import { dispatchTool } from './dispatch.js'
+import { resolveBinaryPath, readServerVersion } from './binary.js'
 
 /**
  * GA4 Manager MCP Server
  *
- * Exposes GA4 Manager CLI commands as structured MCP tools for Claude Desktop
- * and Claude Code CLI.
- *
  * Every tool is one deep module that exports its own ToolSpec; ./registry.ts
- * collects them into SPECS, which drives both `tools/list` and `tools/call`.
- * This file is just the server bootstrap: binary resolution and dispatch.
+ * collects them into SPECS, which drives `tools/list`. `tools/call` goes
+ * through ./dispatch.ts, the same path the `ga4m` command line uses
+ * (ADR-0006). This file is just the stdio bootstrap.
  */
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-/**
- * Resolve the ga4 CLI binary, in priority order:
- *   1. GA4_BINARY_PATH — explicit override (used verbatim, even if missing,
- *      so an intentional misconfiguration still surfaces a clear error).
- *   2. The repo-root build next to mcp/ (../../ga4) — the dev default.
- *   3. A `ga4` on the user's PATH (e.g. a globally installed binary).
- *
- * Without (3), installing the CLI globally but not symlinking it into the
- * repo root crashed the server on startup. Falling back to PATH removes
- * the need for that manual symlink. If nothing is found, we return the
- * repo-root default so CLIExecutor emits the helpful "build it first" hint.
- */
-function resolveBinaryPath(): string {
-  if (process.env.GA4_BINARY_PATH) return process.env.GA4_BINARY_PATH
-
-  const repoRootBinary = join(__dirname, '../../ga4')
-  if (isExecutable(repoRootBinary)) return repoRootBinary
-
-  const onPath = findOnPath('ga4')
-  if (onPath) return onPath
-
-  return repoRootBinary
-}
-
-function isExecutable(path: string): boolean {
-  try {
-    accessSync(path, constants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function findOnPath(name: string): string | null {
-  const pathEnv = process.env.PATH
-  if (!pathEnv) return null
-  for (const dir of pathEnv.split(delimiter)) {
-    if (!dir) continue
-    const candidate = join(dir, name)
-    if (isExecutable(candidate)) return candidate
-  }
-  return null
-}
 
 const binaryPath = resolveBinaryPath()
 const executor = new CLIExecutor(binaryPath)
-
-// Single source of truth for the server version: package.json (dist/ -> ../package.json).
-function readServerVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'))
-    return typeof pkg.version === 'string' ? pkg.version : '0.0.0'
-  } catch {
-    return '0.0.0'
-  }
-}
 const serverVersion = readServerVersion()
 
 // ============================================================================
@@ -131,39 +68,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params
-
-  try {
-    const spec = SPEC_BY_NAME.get(name)
-    if (!spec) throw new Error(`Unknown tool: ${name}`)
-
-    const gate = checkWriteGate(spec.tool.annotations, process.env)
-    if (!gate.allowed) return jsonContent(gate.failure, true)
-
-    const input = spec.schema.parse(args) as never
-
-    if (spec.kind === 'native') {
-      const { output, isError } = await spec.run(input, executor)
-      return jsonContent(output, isError)
-    }
-
-    const result = await executor.execute({
-      command: spec.command,
-      args: spec.buildArgs(input),
-      timeout: spec.timeoutMs,
-    })
-    if (!isSuccessExit(result.exitCode)) {
-      return jsonContent(mapCLIError(result, name), true)
-    }
-    return jsonContent(spec.parse(result.stdout, input))
-  } catch (error) {
-    return jsonContent(
-      {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-      true,
-    )
-  }
+  const { output, isError } = await dispatchTool(name, args, executor)
+  return jsonContent(output, isError)
 })
 
 async function main() {

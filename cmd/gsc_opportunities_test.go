@@ -70,7 +70,7 @@ func TestRunOpportunitiesCommand_CleanExitWhenNoUnderConverters(t *testing.T) {
 	if status := runOpportunitiesCommand(params); status != diagcmd.ExitClean {
 		t.Fatalf("status = %d, want %d", status, diagcmd.ExitClean)
 	}
-	if got := stdout.String(); got != "quota used: 1\n" {
+	if got := stdout.String(); got != "quota used: 2\n" { // +1: the data_through lookup.
 		t.Errorf("expected only quota footer, got %q", got)
 	}
 }
@@ -190,8 +190,8 @@ func TestRunOpportunitiesCommand_JSONShapeFull(t *testing.T) {
 	if got.GeneratedAt != "2026-06-05T12:00:00Z" {
 		t.Errorf("generated_at = %q", got.GeneratedAt)
 	}
-	if got.QuotaUsed != 1 {
-		t.Errorf("quota_used = %d, want 1", got.QuotaUsed)
+	if got.QuotaUsed != 2 { // +1: the data_through lookup.
+		t.Errorf("quota_used = %d, want 2", got.QuotaUsed)
 	}
 	if len(got.Results) == 0 {
 		t.Fatal("expected at least one opportunity")

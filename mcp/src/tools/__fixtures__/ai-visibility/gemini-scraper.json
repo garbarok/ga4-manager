@@ -1,0 +1,69 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.004,
+  "tasks": [
+    {
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.004,
+      "path": [
+        "v3",
+        "ai_optimization",
+        "gemini",
+        "llm_scraper",
+        "live",
+        "advanced"
+      ],
+      "result": [
+        {
+          "keyword": "what are the best open source web analytics tools",
+          "location_code": 2840,
+          "language_code": "en",
+          "model": "3.5 Flash-Lite",
+          "datetime": "2026-11-17 12:00:00 +00:00",
+          "markdown": "For self-hosted analytics, ToolC and ToolA lead. ToolB is a lighter choice.",
+          "sources": [
+            {
+              "type": "gemini_source",
+              "title": "ToolC docs",
+              "snippet": null,
+              "domain": "toolc.example.org",
+              "url": "https://toolc.example.org/docs",
+              "thumbnail": null,
+              "source_name": "toolc.example.org",
+              "publication_date": null,
+              "markdown": "ToolC docs"
+            },
+            {
+              "type": "gemini_source",
+              "title": "Wikipedia",
+              "snippet": null,
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Web_analytics",
+              "thumbnail": null,
+              "source_name": "en.wikipedia.org",
+              "publication_date": null,
+              "markdown": "Wikipedia"
+            }
+          ],
+          "se_results_count": 0,
+          "item_types": [
+            "gemini_text"
+          ],
+          "items_count": 1,
+          "items": [
+            {
+              "type": "gemini_text",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "markdown": "For self-hosted analytics, ToolC and ToolA lead. ToolB is a lighter choice.",
+              "original_text": "For self-hosted analytics, ToolC and ToolA lead. ToolB is a lighter choice.",
+              "sources": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

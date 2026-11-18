@@ -29,6 +29,9 @@ It helps you automate:
 Configure your projects using YAML config files.`,
 	// Subcommands with their own PersistentPreRun (gsc) replace this one.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Flags parsed fine; a failure from here on is a runtime error (API,
+		// config), so print the error without the usage text.
+		cmd.SilenceUsage = true
 		if needsCredentials(cmd) {
 			validateCredentials()
 		}

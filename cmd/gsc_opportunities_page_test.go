@@ -98,8 +98,8 @@ func TestPageOpportunities_SurfacesLongTailPage(t *testing.T) {
 	if r.TopQueries == nil || len(*r.TopQueries) != 2 || (*r.TopQueries)[0].Query != "mortgage calculator" {
 		t.Errorf("top_queries = %+v", r.TopQueries)
 	}
-	if env.QuotaUsed != 2 {
-		t.Errorf("quota_used = %d, want 2", env.QuotaUsed)
+	if env.QuotaUsed != 3 { // +1: the data_through lookup.
+		t.Errorf("quota_used = %d, want 3", env.QuotaUsed)
 	}
 }
 
@@ -131,8 +131,8 @@ func TestPageOpportunities_DefaultFloorStillSurfacesCalculator(t *testing.T) {
 func TestPageOpportunities_RequestsPageThenQueryPage(t *testing.T) {
 	fake := longTailPageClient()
 	runPageMode(t, fake, 50)
-	if len(fake.queries) != 2 {
-		t.Fatalf("calls = %d, want 2", len(fake.queries))
+	if len(fake.queries) != 3 { // +1: the data_through lookup.
+		t.Fatalf("calls = %d, want 3", len(fake.queries))
 	}
 	if got := strings.Join(fake.queries[0].Dimensions, ","); got != "page" {
 		t.Errorf("first call dims = %q, want page", got)

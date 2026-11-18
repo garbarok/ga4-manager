@@ -132,3 +132,20 @@ describe('runKeywordRankCheck', () => {
     if (!result.success) expect(result.error.code).toBe(ErrorCode.AUTH_DENIED)
   })
 })
+
+describe('wrapped google.com/goto results (B1)', () => {
+  it('finds the site behind a wrapped link via ValueSERP domain/displayed_link', async () => {
+    mockSearch.mockResolvedValueOnce(
+      searchResult([
+        { position: 1, title: 'Competitor', link: 'https://competitor.com/crm' },
+        { position: 2, title: 'Mine', link: 'https://www.google.com/goto?url=CAESabc', domain: 'www.example.com', displayed_link: 'https://www.example.com › crm › software' } as never,
+      ]),
+    )
+    const result = await runKeywordRankCheck(keywordRankCheckInputSchema.parse({ keyword: 'crm software', domain: 'example.com', check_ai_overview: false }))
+    if (!result.success) throw new Error('expected success')
+    expect(result.result.position).toBe(2)
+    expect(result.result.matched_url).toBe('https://www.example.com/crm/software')
+    expect(result.result.matched_url_is_hint).toBe(true)
+    expect(result.result.top_results[1]).toMatchObject({ domain: 'www.example.com', wrapped: true })
+  })
+})

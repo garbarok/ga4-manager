@@ -158,6 +158,7 @@ func runURLHygieneCommand(p urlHygieneParams) int {
 	}
 
 	env := diagcmd.NewEnvelope(urlHygieneCommandName, site, p.Now, rows, report.QuotaUsed)
+	diagcmd.AttachDataThrough(&env, client, p.Now)
 	if err := diagcmd.Render(p.Stdout, env, p.Format, urlHygieneColumns, urlHygieneTextRow); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}

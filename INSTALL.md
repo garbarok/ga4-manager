@@ -117,7 +117,7 @@ ga4 --help
 ## Build from Source
 
 ### Prerequisites
-- Go 1.21 or higher
+- Go 1.27 or higher (`go.mod` pins 1.27.4; with the default `GOTOOLCHAIN=auto`, an older `go` downloads it automatically)
 - Git
 
 ### Steps
@@ -277,6 +277,75 @@ Ensure your `.env` file exists and has the correct path:
 cat .env
 ls -l $(grep GOOGLE_APPLICATION_CREDENTIALS .env | cut -d= -f2)
 ```
+
+---
+
+## Updating
+
+Clients do not update the MCP server on their own, and each install method updates differently. Run `server_info` from your assistant, or `ga4m server-info` in a terminal: it reports the running version, which tool groups are enabled, and why a group is off (for example, missing `DATAFORSEO_*` variables, no `ga4` binary, or read-only mode). If tools listed in [mcp/README.md](mcp/README.md) are missing, the client is running an older install.
+
+### Claude Desktop (.mcpb bundle)
+
+The bundle is a snapshot. It does not auto-update.
+
+1. Download the latest `ga4-manager-mcp-<os>-<arch>.mcpb` from [GitHub Releases](https://github.com/garbarok/ga4-manager/releases/latest).
+2. In Claude Desktop, open **Settings → Extensions**, remove **GA4 Manager**, then open the new `.mcpb` file to install it. Your settings (credentials path, API keys) are asked for again.
+3. Restart Claude Desktop. Then ask: "run server_info" and check `version`.
+
+If you configured Desktop by hand with `npx` in `claude_desktop_config.json`, follow the npx steps below instead.
+
+### npx (Claude Desktop JSON config, Claude Code, Cursor, VS Code, Cline)
+
+`npx ga4-manager-mcp` reuses whatever version it cached first. Pin `@latest` so every client start checks for a new release:
+
+```json
+{
+  "mcpServers": {
+    "ga4-manager": {
+      "command": "npx",
+      "args": ["-y", "ga4-manager-mcp@latest"]
+    }
+  }
+}
+```
+
+If a client still starts an old version, clear the npx cache, then restart the client:
+
+```bash
+rm -rf ~/.npm/_npx
+```
+
+For Claude Code, re-register the server:
+
+```bash
+claude mcp remove ga4-manager
+```
+
+```bash
+claude mcp add ga4-manager -- npx -y ga4-manager-mcp@latest
+```
+
+### Global npm install (and the `ga4m` command)
+
+```bash
+npm install -g ga4-manager-mcp@latest
+```
+
+```bash
+ga4m --version
+```
+
+`ga4m` runs every MCP tool from the terminal: `ga4m list`, `ga4m help <tool>`, `ga4m <tool> --flag value`. See [ADR-0006](docs/adr/0006-native-tool-cli-parity-and-local-state.md).
+
+### The `ga4` CLI binary
+
+The MCP server calls the `ga4` binary for GA4 admin tools and most `gsc_*` diagnostics. Update it the way you installed it: re-download from Releases (see [Quick Install](#quick-install-macoslinux)), or rebuild from source:
+
+```bash
+git pull && make build
+```
+
+The `.mcpb` bundle ships its own `ga4` binary, which updates when you reinstall the bundle.
 
 ---
 

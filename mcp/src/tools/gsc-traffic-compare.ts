@@ -9,6 +9,7 @@ import {
   type ToolFailureResult,
 } from '../utils/errors.js'
 import { normalizeGscSite, normalizeUrl } from '../utils/url-normalize.js'
+import { gscDataThrough } from '../utils/gsc-data-through.js'
 import {
   computeTrafficDiff,
   type GscRow,
@@ -162,6 +163,8 @@ export type GscTrafficCompareResult =
   | {
       success: true
       warnings: string[]
+      /** Last date Search Console has data for (YYYY-MM-DD); null when unknown. */
+      data_through: string | null
       site: string
       period_a: string
       period_b: string
@@ -422,10 +425,14 @@ export async function runGscTrafficCompare(
     warnings.push(siteWarning)
   }
 
-  const [resultA, resultB] = await Promise.allSettled([
+  const periodResults = Promise.allSettled([
     querySearchAnalytics(site, period_a.start, period_a.end, dimensions, fetch_limit),
     querySearchAnalytics(site, period_b.start, period_b.end, dimensions, fetch_limit),
   ])
+  // Issued after the period queries; a failure only leaves data_through null.
+  const dataThroughPromise = gscDataThrough(site)
+  const [resultA, resultB] = await periodResults
+  const dataThrough = await dataThroughPromise
 
   const aFailed = resultA.status === 'rejected'
   const bFailed = resultB.status === 'rejected'
@@ -521,6 +528,7 @@ export async function runGscTrafficCompare(
 
   return {
     success: true,
+    data_through: dataThrough,
     warnings,
     site,
     period_a: `${period_a.start} to ${period_a.end}`,

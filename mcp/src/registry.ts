@@ -26,12 +26,33 @@ import { gscHreflangSpec } from './tools/gsc-hreflang.js'
 import { gscHealthSpec } from './tools/gsc-health.js'
 import { gscMonitorUrlsSpec } from './tools/gsc-monitor.js'
 import { gscTrafficCompareSpec } from './tools/gsc-traffic-compare.js'
+import { gscChangeImpactSpec } from './tools/gsc-change-impact.js'
 import { ga4ConsentHealthSpec } from './tools/ga4-consent-health.js'
 import { ga4TrafficReportSpec } from './tools/ga4-traffic-report.js'
+import {
+  ga4OrganicOverviewSpec,
+  ga4OrganicLandingPagesSpec,
+  ga4KeyEventsSpec,
+  ga4TrafficAcquisitionSpec,
+  ga4AudienceSpec,
+  ga4SiteSearchSpec,
+  ga4EcommerceSpec,
+} from './tools/ga4-organic-reports.js'
+import { ga4MeasurementHealthSpec } from './tools/ga4-measurement-health.js'
 import { ga4AnnotationsSpec } from './tools/ga4-annotations.js'
 import { siteGrowthBriefSpec } from './tools/site-growth-brief.js'
+import { pageOpportunitiesSpec } from './tools/page-opportunities.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
+import {
+  siteAuditRunSpec,
+  siteAuditStatusSpec,
+  siteAuditIssuesSpec,
+  siteAuditPagesSpec,
+  siteAuditLighthouseSpec,
+  siteAuditListSpec,
+  siteAuditDeleteSpec,
+} from './tools/site-audit.js'
 import { adsenseAccountsListSpec } from './tools/adsense-accounts.js'
 import { adsenseReportSpec } from './tools/adsense-report.js'
 import { keywordVolumeSpec } from './tools/keyword-volume.js'
@@ -39,6 +60,21 @@ import { keywordSerpSnapshotSpec } from './tools/keyword-serp.js'
 import { keywordRankCheckSpec } from './tools/keyword-rank-check.js'
 import { dataforseoBalanceSpec } from './tools/dataforseo-balance.js'
 import { llmMentionsSpec } from './tools/llm-mentions.js'
+import {
+  aiVisibilityResearchSpec,
+  aiVisibilityExploreSpec,
+  aiVisibilityEstimateSpec,
+  aiVisibilityRunSpec,
+} from './tools/ai-visibility-paid.js'
+import {
+  aiVisibilityPromptsGenerateSpec,
+  aiVisibilityTrackerSaveSpec,
+  aiVisibilityResultsSpec,
+  aiVisibilityTrendSpec,
+  aiVisibilitySourcesSpec,
+  aiVisibilityAnswerSpec,
+  aiVisibilityExportSpec,
+} from './tools/ai-visibility-local.js'
 import { keywordGapSpec } from './tools/keyword-gap.js'
 import { rankedKeywordsSpec } from './tools/ranked-keywords.js'
 import { keywordIdeasSpec } from './tools/keyword-ideas.js'
@@ -47,11 +83,35 @@ import { linkGapSpec } from './tools/link-gap.js'
 import { dataforseoRequestSpec } from './tools/dataforseo-request.js'
 import { googleTrendsSpec } from './tools/google-trends.js'
 import { indexnowSubmitSpec } from './tools/indexnow-submit.js'
+import { serverInfoSpec } from './tools/server-info.js'
+import { projectContextGetSpec, projectContextUpdateSpec } from './tools/project-context.js'
+import {
+  reportSaveSpec,
+  reportListSpec,
+  reportGetSpec,
+  reportDeleteSpec,
+  reportTemplateSaveSpec,
+  reportTemplateListSpec,
+  reportTemplateDeleteSpec,
+} from './tools/reports.js'
+import { rankTrackerSpecs } from './tools/rank-tracker.js'
+import { keywordsSaveSpec, keywordsListSpec, keywordsRemoveSpec } from './tools/keyword-workspace.js'
+import { keywordSuggestionsSpec } from './tools/keyword-suggestions.js'
+import { serpCompetitorsSpec } from './tools/serp-competitors.js'
+import { serpLocationsSpec } from './tools/serp-locations.js'
+import { domainOverviewSpec } from './tools/domain-overview.js'
 
 /** The full tool registry. Order is the tools/list order. */
 export const SPECS: ToolSpec[] = [
+  // What this install can do and why a group is off (start here)
+  serverInfoSpec,
+  // Project context: shared agent memory per site (item 4)
+  projectContextGetSpec,
+  projectContextUpdateSpec,
   // Cross-source entry point: the brief an assistant starts a growth plan from
   siteGrowthBriefSpec,
+  // Search Console × GA4 page opportunities (item 2)
+  pageOpportunitiesSpec,
   // GA4
   ga4SetupSpec,
   ga4ReportSpec,
@@ -78,11 +138,30 @@ export const SPECS: ToolSpec[] = [
   gscMonitorUrlsSpec,
   // Native (no CLI)
   gscTrafficCompareSpec,
+  // Did a change work? Before/after windows around each change (item 10)
+  gscChangeImpactSpec,
   ga4ConsentHealthSpec,
   ga4TrafficReportSpec,
+  // GA4 organic reports (item 3)
+  ga4OrganicOverviewSpec,
+  ga4OrganicLandingPagesSpec,
+  ga4KeyEventsSpec,
+  ga4TrafficAcquisitionSpec,
+  ga4AudienceSpec,
+  ga4SiteSearchSpec,
+  ga4EcommerceSpec,
+  ga4MeasurementHealthSpec,
   ga4AnnotationsSpec,
   seoPageAuditSpec,
   seoAuditBatchSpec,
+  // Site crawl audit (item 1): background crawl, site-wide issues, Lighthouse
+  siteAuditRunSpec,
+  siteAuditStatusSpec,
+  siteAuditIssuesSpec,
+  siteAuditPagesSpec,
+  siteAuditLighthouseSpec,
+  siteAuditListSpec,
+  siteAuditDeleteSpec,
   // AdSense (publisher reporting — native, no CLI)
   adsenseAccountsListSpec,
   adsenseReportSpec,
@@ -93,12 +172,42 @@ export const SPECS: ToolSpec[] = [
   // Competitive & AI-visibility research (DataForSEO)
   dataforseoBalanceSpec,
   llmMentionsSpec,
+  // AI visibility (item 6)
+  aiVisibilityResearchSpec,
+  aiVisibilityPromptsGenerateSpec,
+  aiVisibilityTrackerSaveSpec,
+  aiVisibilityEstimateSpec,
+  aiVisibilityExploreSpec,
+  aiVisibilityRunSpec,
+  aiVisibilityResultsSpec,
+  aiVisibilityTrendSpec,
+  aiVisibilitySourcesSpec,
+  aiVisibilityAnswerSpec,
+  aiVisibilityExportSpec,
   keywordGapSpec,
   rankedKeywordsSpec,
   keywordIdeasSpec,
   googleTrendsSpec,
   backlinksOverviewSpec,
   linkGapSpec,
+  // Saved reports (item 8)
+  reportSaveSpec,
+  reportListSpec,
+  reportGetSpec,
+  reportDeleteSpec,
+  reportTemplateSaveSpec,
+  reportTemplateListSpec,
+  reportTemplateDeleteSpec,
+  // Rank tracker (item 5)
+  ...rankTrackerSpecs,
+  // Keyword workspace (item 7)
+  keywordsSaveSpec,
+  keywordsListSpec,
+  keywordsRemoveSpec,
+  keywordSuggestionsSpec,
+  serpCompetitorsSpec,
+  serpLocationsSpec,
+  domainOverviewSpec,
   // Indexing notification (IndexNow — Bing, Yandex, etc.; native, no CLI)
   indexnowSubmitSpec,
   // Gated raw escape hatch (needs DATAFORSEO_ALLOW_RAW)

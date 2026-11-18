@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **OpenSEO parity in the MCP server and the new `ga4m` CLI.** Covers the site crawl audit with Lighthouse, Search Console × GA4 page opportunities, change impact, GA4 organic reports, project context, rank and AI-visibility tracking, the keyword workspace, SERP competitors, saved reports, the lookup cache, the cost gate and workflow prompts. See `mcp/CHANGELOG.md` and ADR-0006.
+- `ga4 gsc analytics run --min-position --max-position --min-impressions`: filters over the fetched top rows. JSON output gains `row_filter` and `data_through`.
+- `data_through` in every `ga4 gsc` diagnostic's JSON envelope (`gsc.DataThrough`, `diagcmd.AttachDataThrough`): the last date with final Search Console data. Each diagnostic now uses one more quota unit.
 - `ga4 --version`, `help` and completion stay silent; `configs/` is scaffolded only by interactive mode, never by every command.
 - `ga4 gsc url-hygiene` — URLs with search impressions that should not be indexed (malformed paths, fragments, framework asset routes, query duplicates, utility pages).
 - `ga4 gsc hreflang` — hreflang pair integrity and cross-language ranking; own-site HTTP probe (`internal/gsc/httpprobe`).
@@ -15,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ga4 config resolve --config <path> | --all --format json` — machine-readable property / GSC site / hreflang pairs for MCP native tools.
 - Config: optional `search_console.hreflang_pairs`.
 - `ga4 gsc decay` — BO-02 content decay: query/page pairs with position slip ≥ 1 and clicks down ≥ 20% between two equal, finalised windows; exit 2 on findings.
+
+### Changed
+- Go 1.27.4 (was 1.25.8) and updated modules: google.golang.org/api v0.316.0, golang.org/x/net v0.63.0, golang.org/x/vuln v1.10.0, testify v1.12.1 and their dependencies. `make lint` uses golangci-lint v2.15.0, built with the `go.mod` toolchain.
+
+### Fixed
+- Configs found by name outside the repo's working directory: `GA4M_CONFIG_DIR`, `./configs`, `configs/` next to the `ga4` binary, then `~/.config/ga4-manager/configs`. Operator configs are searched before examples, and the error lists every directory searched. Name lookups also accept a path to a YAML file.
+- API errors print without the cobra usage block; typos in flags still show usage.
 
 ### Planned
 - `ga4 doctor` subcommand — preflight checks for credentials, scopes, API enablement, and per-resource access

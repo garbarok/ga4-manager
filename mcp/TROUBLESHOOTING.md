@@ -408,6 +408,37 @@ The tool's keyless throttle (`bottleneck` 1 req per 100s) still applies as a saf
 
 ---
 
+### `config not found: <name>`
+
+Tools that take a config name (`ga4_link_*`, `ga4_report --project`) search, in order:
+1. `GA4M_CONFIG_DIR`;
+2. `./configs` (the server's working directory, `/` under Claude Desktop);
+3. `configs/` next to the `ga4` binary;
+4. `~/.config/ga4-manager/configs`;
+5. the `examples/` folder inside each of the above.
+
+Set `GA4M_CONFIG_DIR` in the MCP server environment, or pass a path to the YAML file instead of a name.
+
+### Every Search Console / GA4 tool returns `AUTH_DENIED` for one site
+
+The credential has the scopes but no access to that site or property. Run `server_info` with `site`, `property_id` or `config`: `access` names the service-account email and the exact grant to add, in Search Console (Users and permissions) or GA4 (Property access management).
+
+### `site_audit_*` — every page is `fetch_error` ("fetch failed")
+
+Node's `fetch` ignores `HTTPS_PROXY` and `HTTP_PROXY`. Behind a proxy (corporate network, sandbox), start the MCP server or `ga4m` with `NODE_USE_ENV_PROXY=1` (Node ≥ 22.21). The detached audit worker inherits it. Also check that the site's host is reachable from where the server runs.
+
+### `site_audit_status` says `stalled`
+
+The background worker stopped reporting: the process was killed, the machine slept, or the MCP server's container was replaced. Partial results are not saved. Delete the audit with `site_audit_delete` and start again, using a smaller `max_pages` if the crawl is long, or `background: false` from cron.
+
+### `site_audit_*` — many URLs are `rate_limited`
+
+The server or its CDN returned HTTP 429 even after backoff. Those URLs are not reported as broken. Rerun with `concurrency: 1` and a higher `delay_ms`, or allowlist the `ga4-manager-audit/<version>` user agent in the WAF.
+
+### A paid tool returns `Estimated cost $X exceeds max_cost_usd $Y`
+
+The cost gate refused before spending. Run the same call with `estimate_only: true` to see the breakdown per endpoint. Then raise `max_cost_usd`, or reduce keywords, prompts, models or depth. A `QUOTA_EXCEEDED` error that names the balance means the DataForSEO account itself is short.
+
 ## False positives (signals to ignore)
 
 These signals look like problems but are not. Do not report them as page defects
@@ -464,6 +495,10 @@ first, then re-audit.
 Check Claude Desktop's MCP logs for the actual stderr.
 
 ---
+
+### Tools are missing in Claude Desktop (an older install)
+
+Call `server_info` (or run `ga4m server-info`). It returns the running `version` and every tool group with the reason it is off. If the version is old, follow INSTALL.md "Updating": reinstall the latest `.mcpb`, or use `ga4-manager-mcp@latest` with npx.
 
 ### Tools don't appear in Claude Desktop after restart
 

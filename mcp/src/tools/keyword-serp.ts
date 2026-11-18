@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
 import { dataforseoRequest } from '../utils/dataforseo-client.js'
+import { resultHost, resultUrl } from '../utils/serp-host.js'
 import { ToolError, toolErrorToFailure, errorResult, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 
 // ============================================================================
@@ -22,14 +23,20 @@ export type KeywordSerpSnapshotInput = z.infer<typeof keywordSerpSnapshotInputSc
 
 export interface SerpOrganicRow {
   position: number
-  url: string
+  /** The page URL; null when Google served the result through a google.com/goto redirect (see url_hint). */
+  url: string | null
+  /** The result's real host, recovered from the breadcrumb when the link is wrapped. */
   domain: string | null
   title: string | null
   description: string | null
+  /** Google's redirect link, when the result was wrapped. */
+  url_wrapped?: string
+  /** Approximate page URL rebuilt from the breadcrumb of a wrapped result. */
+  url_hint?: string
 }
 
 export type KeywordSerpSnapshotResult =
-  | { success: true; keyword: string; results: SerpOrganicRow[]; cost_usd: number | null }
+  | { success: true; keyword: string; results: SerpOrganicRow[]; notes?: string[]; cost_usd: number | null }
   | ToolFailureResult
 
 // ============================================================================
@@ -41,6 +48,8 @@ interface SerpItem {
   rank_absolute?: number
   url?: string
   domain?: string
+  breadcrumb?: string | null
+  website_name?: string | null
   title?: string
   description?: string
 }
@@ -74,15 +83,28 @@ export async function runKeywordSerpSnapshot(input: KeywordSerpSnapshotInput): P
     const organic = (result.items ?? [])
       .filter((item) => item.type === 'organic' && item.url)
       .slice(0, input.depth)
-      .map((item) => ({
-        position: item.rank_absolute ?? 0,
-        url: item.url as string,
-        domain: item.domain ?? null,
-        title: item.title ?? null,
-        description: item.description ?? null,
-      }))
+      .map((item): SerpOrganicRow => {
+        const u = resultUrl(item)
+        return {
+          position: item.rank_absolute ?? 0,
+          url: u.url,
+          domain: resultHost(item),
+          title: item.title ?? null,
+          description: item.description ?? null,
+          ...(u.url_wrapped ? { url_wrapped: u.url_wrapped } : {}),
+          ...(u.url_hint ? { url_hint: u.url_hint } : {}),
+        }
+      })
 
-    return { success: true, keyword: result.keyword, results: organic, cost_usd: cost }
+    const wrapped = organic.filter((r) => r.url_wrapped).length
+    const unknown = organic.filter((r) => !r.domain).length
+    return {
+      success: true,
+      keyword: result.keyword,
+      results: organic,
+      ...(wrapped ? { notes: [`${wrapped} of ${organic.length} results were served through google.com/goto redirects; their domain comes from the breadcrumb and url is null (url_hint is approximate).${unknown ? ` ${unknown} could not be attributed to any host.` : ''}`] } : {}),
+      cost_usd: cost,
+    }
   } catch (err) {
     if (err instanceof ToolError) return toolErrorToFailure(err)
     return errorResult(ErrorCode.UPSTREAM_5XX, err instanceof Error ? err.message : String(err))

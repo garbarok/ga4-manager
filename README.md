@@ -17,7 +17,8 @@ A CLI + MCP server for managing GA4 properties, Search Console sites, sitemaps, 
 - **SEO audits** — on-page audit with title/meta/canonical/schema/redirect checks plus optional Core Web Vitals
 - **Traffic diagnostics** — compare GSC traffic between two date ranges per URL to find biggest drops and gains
 - **Consent mode health** — report grant/deny rates and banner-bypass for GA4 sessions
-- **MCP server** — 29 tools surfaced to Claude Desktop, Claude CLI, VS Code, Cursor, Cline
+- **SEO workspace** — site crawl audits with Lighthouse, Search Console × GA4 page opportunities, change-impact verdicts, rank and AI-visibility tracking, keyword workspace, competitor research, saved HTML reports and per-site project memory
+- **MCP server + `ga4m` CLI** — every tool is both an MCP tool (Claude Desktop, Claude Code, VS Code, Cursor, Cline) and a `ga4m` command
 
 Define your analytics setup in YAML, apply with one command. Or talk to your assistant.
 
@@ -67,15 +68,38 @@ YAML structure and field reference: [configs/examples/README.md](configs/example
 
 ---
 
-## MCP server (17 tools)
+## MCP server and `ga4m` CLI
 
-Register the server with your AI client and Claude can run any of these directly.
+Register the server with your AI client and it can run any of these tools directly. Every tool is also a terminal command through `ga4m`, with the same input and output: `ga4m list`, `ga4m help <tool>`, `ga4m site-audit-run --start-url https://example.com/` ([ADR-0006](docs/adr/0006-native-tool-cli-parity-and-local-state.md)). `server_info` reports the installed version and which tool groups are enabled, and why a group is off.
 
 | Group | Tools |
 |-------|-------|
-| GA4 ops | `ga4_setup`, `ga4_report`, `ga4_cleanup`, `ga4_link`, `ga4_validate` |
-| GSC ops | `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage` |
-| Diagnostics & SEO | `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch` |
+| Start here | `server_info`, `project_context_get`, `project_context_update`, `site_growth_brief` |
+| GA4 ops | `ga4_setup`, `ga4_report`, `ga4_cleanup`, `ga4_link_list`, `ga4_link_create`, `ga4_link_remove`, `ga4_validate`, `ga4_annotations` |
+| GA4 reports | `ga4_traffic_report`, `ga4_consent_health`, `ga4_organic_overview`, `ga4_organic_landing_pages`, `ga4_key_events`, `ga4_traffic_acquisition`, `ga4_audience`, `ga4_site_search`, `ga4_ecommerce`, `ga4_measurement_health` |
+| Search Console ops | `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_monitor_urls`, `gsc_index_coverage` |
+| Search Console analysis | `gsc_analytics_run`, `gsc_traffic_compare`, `gsc_change_impact`, `page_opportunities`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_decay`, `gsc_cannibalization`, `gsc_url_hygiene`, `gsc_hreflang`, `gsc_health` |
+| Site audits | `site_audit_run`, `site_audit_status`, `site_audit_issues`, `site_audit_pages`, `site_audit_lighthouse`, `site_audit_list`, `site_audit_delete`, `seo_page_audit`, `seo_audit_batch` |
+| Keyword research | `keyword_suggestions`, `keyword_ideas`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_gap`, `ranked_keywords`, `google_trends`, `serp_locations` |
+| Keyword workspace | `keywords_save`, `keywords_list`, `keywords_remove` |
+| Rank tracking | `rank_tracker_create`, `rank_tracker_update`, `rank_tracker_get`, `rank_tracker_history`, `rank_tracker_list`, `rank_tracker_delete`, `rank_tracker_estimate`, `rank_tracker_run`, `keyword_rank_check` |
+| Competitors | `serp_competitors`, `domain_overview`, `backlinks_overview`, `link_gap` |
+| AI visibility | `llm_mentions`, `ai_visibility_research`, `ai_visibility_prompts_generate`, `ai_visibility_tracker_save`, `ai_visibility_estimate`, `ai_visibility_explore`, `ai_visibility_run`, `ai_visibility_results`, `ai_visibility_trend`, `ai_visibility_sources`, `ai_visibility_answer`, `ai_visibility_export` |
+| Saved reports | `report_save`, `report_list`, `report_get`, `report_delete`, `report_template_save`, `report_template_list`, `report_template_delete` |
+| AdSense | `adsense_accounts_list`, `adsense_report` |
+| Indexing | `indexnow_submit` |
+| DataForSEO account | `dataforseo_balance`, `dataforseo_request` (gated raw escape hatch) |
+
+**Prompts:**
+- Monitoring: `daily_briefing`, `weekly_review`, `core_update_check`.
+- Workflows: `project_setup`, `seo_audit`, `keyword_research`, `keyword_clustering`, `competitor_analysis`, `competitive_landscape`, `ai_visibility_audit`, `monthly_report`.
+
+**Paid lookups** (DataForSEO, ValueSERP) are opt-in and capped in three layers:
+- Every new paid tool takes `estimate_only` and `max_cost_usd`, and checks the account balance before spending.
+- Repeats are answered from a local per-site cache: 6 h for SERPs, 24 h for Labs data, 7 days for AI answers.
+- Billed lookups are logged in the site's project context, so the next agent does not buy them again.
+
+State (project context, audits, trackers, reports, cache) lives in `.ga4-state/` next to your config.
 
 ### Setup
 
@@ -90,6 +114,12 @@ Register the server with your AI client and Claude can run any of these directly
 > "Audit `https://example.com/pricing` and report on-page SEO issues. Include Core Web Vitals."
 >
 > "What's the consent banner accept rate on property 123456789 over the last 30 days?"
+>
+> "Audit https://example.com/ and tell me the five fixes that matter most." (or run the `seo_audit` prompt)
+>
+> "Which pages ranking 4–20 bring the visitors who convert?" (`page_opportunities`)
+>
+> "Did the title rewrite on /blog/ on 2026-10-01 work?" (`gsc_change_impact`)
 
 ---
 

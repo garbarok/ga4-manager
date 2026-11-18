@@ -65,6 +65,8 @@ export interface HreflangOutput {
   pages_fetched: number
   /** Search Analytics API calls. */
   quota_used: number
+  /** Last date Search Console has final data for (YYYY-MM-DD); absent when unknown. */
+  data_through?: string
 }
 
 // ============================================================================

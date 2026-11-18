@@ -1,5 +1,7 @@
 import { ToolError, ErrorCode, errorCodeForStatus } from './errors.js'
 import { beforePaidCall, recordSpend } from './spend-guard.js'
+import { currentContext, type PaidLookup } from './tool-context.js'
+import { cacheEnabled, cacheKey, cacheTtlMs, readCache, writeCache } from './lookup-cache.js'
 
 /**
  * Thin client for the DataForSEO v3 API (keyword volume, SERP snapshots).
@@ -84,21 +86,49 @@ export async function dataforseoRequest<R>(
   creds: DataforseoCredentials = {},
 ): Promise<DataforseoResult<R>> {
   const { username, password } = resolveCredentials(creds)
+  const method = req.method ?? 'POST'
+
+  // Lookup cache + research log (item 9 / item 4): only inside a dispatched
+  // tool call, which carries the site and state dir. Unbilled endpoints are
+  // never cached: they are free and must stay fresh (the balance).
+  const ctx = req.unbilled ? undefined : currentContext()
+  const key = ctx && cacheEnabled() ? cacheKey(method, req.path, req.task) : null
+  if (ctx && key && !ctx.refresh) {
+    const hit = readCache(ctx.stateDir, ctx.site, key)
+    if (hit) {
+      ctx.lookups.push({ path: req.path, params: summarizeParams(req.task), cost_usd: 0, from_cache: true, cached_at: hit.cached_at })
+      return { items: hit.items as R[], cost: 0 }
+    }
+  }
+
   // `unbilled` endpoints (appendix/user_data) stay usable once the cap is hit,
   // so the agent can still check the balance.
   if (!req.unbilled) beforePaidCall('dataforseo')
   const auth = Buffer.from(`${username}:${password}`).toString('base64')
-  const method = req.method ?? 'POST'
 
-  const response = await fetch(`${DATAFORSEO_BASE}/${req.path}`, {
-    method,
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/json',
-    },
-    ...(method === 'POST' ? { body: JSON.stringify([req.task ?? {}]) } : {}),
-    signal: AbortSignal.timeout(req.timeoutMs ?? 30_000),
-  })
+  const timeoutMs = req.timeoutMs ?? defaultTimeoutMs(req.path)
+  let response: Response
+  try {
+    response = await fetch(`${DATAFORSEO_BASE}/${req.path}`, {
+      method,
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      ...(method === 'POST' ? { body: JSON.stringify([req.task ?? {}]) } : {}),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  } catch (err) {
+    const name = (err as Error)?.name
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      // DataForSEO bills a live task once it starts, even if we stop waiting:
+      // record it (cost unknown) so the research log and the next agent see it.
+      const note = `Timed out after ${Math.round(timeoutMs / 1000)} s; DataForSEO may still have billed this request.`
+      ctx?.lookups.push({ path: req.path, params: summarizeParams(req.task), cost_usd: null, from_cache: false, note })
+      throw new ToolError(ErrorCode.UPSTREAM_5XX, `DataForSEO request to ${req.path} timed out after ${Math.round(timeoutMs / 1000)} s.`, 'Retry later; a cached copy will be used if DataForSEO completed it. The charge, if any, is noted in the research log.')
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const text = await response.text()
@@ -118,11 +148,45 @@ export async function dataforseoRequest<R>(
   // non-20000 status even on HTTP 200 — this is the caller's problem, not an outage.
   const cost = typeof task0.cost === 'number' ? task0.cost : typeof data.cost === 'number' ? data.cost : null
   recordSpend(cost)
+  const lookup: PaidLookup | null = ctx ? { path: req.path, params: summarizeParams(req.task), cost_usd: cost, from_cache: false } : null
+  if (ctx && lookup) ctx.lookups.push(lookup)
   if (task0.status_code !== 20000) {
     throw new DataforseoTaskError(`DataForSEO task failed: ${task0.status_message}`, cost)
   }
 
-  return { items: task0.result ?? [], cost }
+  const items = task0.result ?? []
+  if (ctx && key) {
+    writeCache(ctx.stateDir, ctx.site, key, { path: req.path, task: req.task ?? null, items, cost_usd: cost }, cacheTtlMs(req.path))
+  }
+  return { items, cost }
+}
+
+/**
+ * Live SERP, AI Mode and LLM endpoints routinely take 30–90 s; a short client
+ * timeout aborts requests DataForSEO still bills. Other endpoints answer fast.
+ */
+export function defaultTimeoutMs(path: string): number {
+  if (/^serp\/.*\/live\//.test(path) || /^ai_optimization\//.test(path)) return 120_000
+  return 60_000
+}
+
+/** Fields worth keeping in the research log, so a later agent can tell what was already bought. */
+const LOGGED_FIELDS = [
+  'keyword', 'keywords', 'target', 'targets', 'user_prompt', 'location_name', 'location_code',
+  'language_code', 'language_name', 'depth', 'limit', 'model_name', 'platform', 'device',
+] as const
+
+export function summarizeParams(task: Record<string, unknown> | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (!task) return out
+  for (const field of LOGGED_FIELDS) {
+    const v = task[field]
+    if (v === undefined || v === null) continue
+    if (Array.isArray(v)) out[field] = v.length > 10 ? [...v.slice(0, 10), `…+${v.length - 10}`] : v
+    else if (typeof v === 'string') out[field] = v.length > 200 ? `${v.slice(0, 200)}…` : v
+    else out[field] = v
+  }
+  return out
 }
 
 /** POST one task to a DataForSEO "live" endpoint and return its first result array (cost discarded). */

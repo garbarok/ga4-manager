@@ -108,6 +108,20 @@ You will need this email to grant access in the sections below.
 
 ---
 
+## Which tools need what
+
+`server_info` reports this live for your install: every tool group, whether it is enabled, and the missing credential or scope. With `probe_scopes: true` it also checks each Google scope was granted.
+
+- **Analytics Admin read** (`analytics.readonly`):
+  - `ga4_measurement_health` and `page_opportunities` read the property's settings (time zone) through analyticsadmin.googleapis.com.
+  - `gsc_change_impact` with `from_annotations` lists annotations.
+- **GA4 Data** (`analytics.readonly`, Viewer on the property): `ga4_organic_*`, `ga4_key_events`, `ga4_traffic_acquisition`, `ga4_audience`, `ga4_site_search`, `ga4_ecommerce` and `page_opportunities`.
+- **Search Console read** (`webmasters.readonly`): `page_opportunities`, `gsc_change_impact`, `keyword_suggestions` and the `data_through` lookups.
+- **No credentials needed:**
+  - `site_audit_*` uses public HTTP and PageSpeed. `PSI_API_KEY` is recommended for Lighthouse quota; `render_js` needs Cloudflare.
+  - `project_context_*`, `keywords_*`, the free `rank_tracker_*` / `ai_visibility_*` readers, and `report_*` only touch local files in `.ga4-state/`.
+- **DataForSEO** for every paid tool. Each new paid tool shows an estimate first (`estimate_only`) and refuses above `max_cost_usd` or the account balance.
+
 ## Google Search Console (GSC)
 
 **Affects tools:** `gsc_traffic_compare`, `gsc_analytics_run`, `gsc_index_coverage`, `gsc_inspect_url`, `gsc_monitor_urls`, `gsc_sitemaps_list`, `gsc_sitemaps_submit`, `gsc_sitemaps_delete`, `gsc_sitemaps_get`, `gsc_url_hygiene`, `gsc_hreflang`, `site_growth_brief`

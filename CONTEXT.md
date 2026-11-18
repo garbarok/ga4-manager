@@ -148,6 +148,45 @@ A source a growth brief could not use for a site — not configured, failed, or 
 
 ---
 
+---
+
+## SEO Workspace (OpenSEO parity)
+
+### Project context
+The per-site shared memory every agent reads first:
+- brand name;
+- prose sections: business_overview, current_goal, positioning, writing_preferences, custom;
+- competitors;
+- key pages with a role (hub, spoke, money, other);
+- the research log.
+
+It is stored as `project-context.<site>.json` in the state directory.
+
+Avoid: "project settings", "site profile".
+
+### Research log
+The dated list, inside a project context, of paid lookups already bought for a site: endpoint, key parameters and cost. It is appended automatically after any billed DataForSEO call. An agent checks it before buying the same data again.
+
+### Lookup cache
+On-disk copies of paid DataForSEO responses, per site and request parameters, valid for a TTL: 6 h for SERPs, 24 h for Labs data, 7 days for AI answers. A cached result costs nothing and says it came from cache.
+
+### Cost gate
+The check a paid tool runs before spending: price every planned request from DataForSEO's price list, compare the total with `max_cost_usd` and the account balance, then refuse or proceed. With `estimate_only` the tool only reports the estimate.
+
+### Site audit
+A background crawl of one site from a start URL, with its stored pages, site-wide issues and optional Lighthouse runs. It is identified by an audit id per site.
+
+Avoid: "scan", "crawl report" (the crawl is one phase of the audit).
+
+### Page opportunity
+A Search Console page ranking in a position band (default 4–20), joined with its GA4 organic landing-page outcomes. It is scored as `0.5 demand + 0.3 business value + 0.2 reachability`. It is distinct from an *Opportunity* (above): that one is defined by CTR against peers, this one by demand and outcomes.
+
+### data_through
+The last date Search Console has final data for. Performance results report it so that a reporting lag is never read as a drop.
+
+### Change impact
+The before/after comparison of Search Console metrics around a dated change, over equal windows that skip the change day and end at `data_through`. Its verdict is one of too_early, improved, worse or flat.
+
 ## Resource Limits (Quick Reference)
 
 | Resource | Standard | GA4 360 |
@@ -169,9 +208,12 @@ internal/ga4/  GA4 Admin API client (rate-limited, idempotent)
     ↓
 Google Analytics Admin API v1alpha
 
-mcp/           TypeScript MCP server
+mcp/           TypeScript MCP server (stdio) and the ga4m CLI
+    ↓ src/dispatch.ts (one path for both front ends)
     ↓ (spawns or calls)
 cmd/ binary or native fetch
+    ↓
+.ga4-state/    project-local state (ADR-0005, ADR-0006)
 ```
 
-The `internal/ga4/` package owns all GA4 API interaction. `cmd/` orchestrates config loading, validation, and output. The MCP server in `mcp/` is a separate process that invokes the CLI or makes direct API calls for tools that don't fit the CLI pattern.
+The `internal/ga4/` package owns all GA4 API interaction. `cmd/` orchestrates config loading, validation, and output. The MCP server in `mcp/` is a separate process that invokes the CLI or makes direct API calls for tools that don't fit the CLI pattern. `ga4m` runs the same registry from a terminal, so every MCP tool is also a CLI command (ADR-0006).

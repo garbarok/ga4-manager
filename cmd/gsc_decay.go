@@ -161,6 +161,7 @@ func runDecayCommand(p decayParams) int {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
+	diagcmd.AttachDataThrough(&env, client, p.Now)
 	if err := diagcmd.Render(p.Stdout, env, p.Format, decayColumns, decayTextRow); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { native } from '../tool-spec.js'
 import { valueSerpSearch, type ValueSerpAiOverviewSource } from '../utils/valueserp-client.js'
+import { resultHost, resultUrl, hostMatchesSite } from '../utils/serp-host.js'
 import { ToolError, toolErrorToFailure, errorResult, ErrorCode, type ToolFailureResult } from '../utils/errors.js'
 
 // ============================================================================
@@ -46,7 +47,10 @@ export interface KeywordRankCheckResult {
   position: number | null
   matched_url: string | null
   ai_overview: AiOverviewCheck
-  top_results: { position: number; url: string; title: string }[]
+  /** wrapped: Google served the link through google.com/goto; url is then the breadcrumb hint. */
+  top_results: { position: number; url: string; domain: string | null; title: string; wrapped: boolean }[]
+  /** True when matched_url was rebuilt from a breadcrumb (approximate). */
+  matched_url_is_hint: boolean
   checked_at: string
 }
 
@@ -56,15 +60,9 @@ export type KeywordRankCheckOutput = { success: true; result: KeywordRankCheckRe
 // Helpers
 // ============================================================================
 
-function hostnameMatches(link: string, domain: string): boolean {
-  let hostname: string
-  try {
-    hostname = new URL(link).hostname.toLowerCase()
-  } catch {
-    return false
-  }
-  const target = domain.trim().toLowerCase().replace(/^www\./, '')
-  return hostname === target || hostname === `www.${target}` || hostname.endsWith(`.${target}`)
+/** The organic result's real host: its link, or the domain/displayed_link when Google wrapped the link. */
+function organicHost(r: { link: string; domain?: string; displayed_link?: string }): string | null {
+  return resultHost({ url: r.link, domain: r.domain, displayed_link: r.displayed_link })
 }
 
 // ============================================================================
@@ -80,7 +78,7 @@ export async function runKeywordRankCheck(input: KeywordRankCheckInput): Promise
       num: input.num,
     })
 
-    const match = organic.find((r) => hostnameMatches(r.link, input.domain))
+    const match = organic.find((r) => hostMatchesSite(organicHost(r), input.domain))
 
     let aiOverview: AiOverviewCheck = {
       present: aiOverviewPresent,
@@ -102,7 +100,7 @@ export async function runKeywordRankCheck(input: KeywordRankCheckInput): Promise
         num: input.num,
         include_ai_overview: true,
       })
-      const aiMatch = aiOverviewSources.find((s) => hostnameMatches(s.url, input.domain))
+      const aiMatch = aiOverviewSources.find((s) => hostMatchesSite(resultHost({ url: s.url, domain: s.domain }), input.domain))
       aiOverview = {
         present: true,
         checked: true,
@@ -118,9 +116,13 @@ export async function runKeywordRankCheck(input: KeywordRankCheckInput): Promise
         keyword: input.keyword,
         domain: input.domain,
         position: match?.position ?? null,
-        matched_url: match?.link ?? null,
+        matched_url: match ? (resultUrl({ url: match.link, displayed_link: match.displayed_link }).url ?? resultUrl({ url: match.link, displayed_link: match.displayed_link }).url_hint) : null,
+        matched_url_is_hint: match ? resultUrl({ url: match.link }).url === null : false,
         ai_overview: aiOverview,
-        top_results: organic.slice(0, 10).map((r) => ({ position: r.position, url: r.link, title: r.title })),
+        top_results: organic.slice(0, 10).map((r) => {
+          const u = resultUrl({ url: r.link, displayed_link: r.displayed_link })
+          return { position: r.position, url: u.url ?? u.url_hint ?? r.link, domain: organicHost(r), title: r.title, wrapped: u.url_wrapped !== null }
+        }),
         checked_at: new Date().toISOString(),
       },
     }
