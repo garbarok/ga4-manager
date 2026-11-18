@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependencies only resolve to releases older than 30 days.** `pnpm-workspace.yaml` sets `minimumReleaseAge: 43200`, and the ranges in `package.json` drop to the newest versions past that window:
+  - runtime: `@modelcontextprotocol/sdk` ^1.32.1, `node-html-parser` ^9.0.5, `tldts` ^7.4.18;
+  - dev: `@types/node` ^26.6.5, `@typescript-eslint/*` ^8.72.0, `eslint` ^10.13.0, `globals` ^17.13.0, `vitest` ^5.0.5.
+- `pnpm-lock.yaml` and `package-lock.json` were regenerated and resolve to the same versions. Before, `pnpm deploy` in `scripts/build-mcpb.sh` failed with `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`.
+
+### Security
+
+- `minimumReleaseAgeExclude` lets four transitive dependencies of the MCP SDK through at their first patched release, because every fix is less than 30 days old: `body-parser@2.4.0`, `fast-uri@3.1.9`, `hono@4.13.16` and `@hono/node-server@2.1.6`. `pnpm audit --prod` is clean. Remove the exclusions once those versions are 30 days old.
+
 ## [5.0.0] - 2026-11-18
 
 OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO tool, as local tools. Every tool is also a `ga4m` command.
