@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-18
+
 ### Changed
 
 - **Dependencies only resolve to releases older than 30 days.** `pnpm-workspace.yaml` sets `minimumReleaseAge: 43200`, and the ranges in `package.json` drop to the newest versions past that window:
