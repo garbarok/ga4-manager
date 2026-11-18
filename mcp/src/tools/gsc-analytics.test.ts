@@ -666,3 +666,18 @@ describe('gscAnalyticsRunTool definition', () => {
     expect(props.dry_run).toBeDefined();
   });
 });
+
+describe('position and impression filters', () => {
+  it('passes the filter flags to the CLI', () => {
+    const args = buildAnalyticsRunArgs({ site: 'sc-domain:example.com', days: 30, dimensions: 'query,page', limit: 1000, min_position: 4, max_position: 20, min_impressions: 50 })
+    expect(args).toEqual(expect.arrayContaining(['--min-position', '4', '--max-position', '20', '--min-impressions', '50']))
+  })
+  it('parses data_through and row_filter from CLI JSON', () => {
+    const out = parseAnalyticsRunOutput(JSON.stringify({
+      SiteURL: 'sc-domain:example.com', Period: 'x', TotalRows: 1, Rows: [{ Keys: ['q'], Clicks: 1, Impressions: 60, CTR: 0.01, Position: 7 }],
+      data_through: '2026-01-09',
+      row_filter: { min_position: 4, rows_considered: 10, rows_kept: 1, note: 'n' },
+    }))
+    expect(out).toMatchObject({ data_through: '2026-01-09', row_filter: { rows_considered: 10, rows_kept: 1 } })
+  })
+})

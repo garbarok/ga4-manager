@@ -120,6 +120,7 @@ type HreflangOutput struct {
 	Results      []HreflangResultRow `json:"results"`
 	PagesFetched int                 `json:"pages_fetched"`
 	QuotaUsed    int                 `json:"quota_used"`
+	DataThrough  string              `json:"data_through,omitempty"`
 }
 
 type hreflangParams struct {
@@ -250,12 +251,20 @@ func runHreflangCommand(p hreflangParams) int {
 		}
 	}
 
+	dataThrough := ""
+	if dt, q, dtErr := gsc.DataThrough(client, site, p.Now); dtErr == nil {
+		dataThrough = dt
+		if q > quota {
+			quota = q
+		}
+	}
+
 	if p.Format == diagcmd.FormatJSON {
 		enc := json.NewEncoder(p.Stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(HreflangOutput{
 			Command: hreflangCommandName, Site: site, GeneratedAt: p.Now.Format(time.RFC3339),
-			Results: rows, PagesFetched: pagesFetched, QuotaUsed: quota,
+			Results: rows, PagesFetched: pagesFetched, QuotaUsed: quota, DataThrough: dataThrough,
 		}); err != nil {
 			return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 		}

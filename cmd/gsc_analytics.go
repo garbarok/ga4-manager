@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -24,6 +25,9 @@ var (
 	gscAnalyticsFormat     string
 	gscAnalyticsDryRun     bool
 	gscAnalyticsRowLimit   int
+	gscAnalyticsMinPos     float64
+	gscAnalyticsMaxPos     float64
+	gscAnalyticsMinImpr    int64
 )
 
 var gscAnalyticsCmd = &cobra.Command{
@@ -114,6 +118,31 @@ func init() {
 
 	// Dry-run flag
 	gscAnalyticsRunCmd.Flags().BoolVar(&gscAnalyticsDryRun, "dry-run", false, "Preview query without making API call")
+
+	gscAnalyticsRunCmd.Flags().Float64Var(&gscAnalyticsMinPos, "min-position", 0, "Keep rows with average position >= this (applied over the fetched top rows)")
+	gscAnalyticsRunCmd.Flags().Float64Var(&gscAnalyticsMaxPos, "max-position", 0, "Keep rows with average position <= this (applied over the fetched top rows)")
+	gscAnalyticsRunCmd.Flags().Int64Var(&gscAnalyticsMinImpr, "min-impressions", 0, "Keep rows with at least this many impressions")
+}
+
+// analyticsRowFilter builds the row filter from the flags that were set.
+func analyticsRowFilter(cmd *cobra.Command) (gsc.RowFilter, error) {
+	var f gsc.RowFilter
+	if cmd.Flags().Changed("min-position") {
+		v := gscAnalyticsMinPos
+		f.MinPosition = &v
+	}
+	if cmd.Flags().Changed("max-position") {
+		v := gscAnalyticsMaxPos
+		f.MaxPosition = &v
+	}
+	if cmd.Flags().Changed("min-impressions") {
+		v := gscAnalyticsMinImpr
+		f.MinImpressions = &v
+	}
+	if f.MinPosition != nil && f.MaxPosition != nil && *f.MinPosition > *f.MaxPosition {
+		return f, fmt.Errorf("--min-position (%g) is greater than --max-position (%g)", *f.MinPosition, *f.MaxPosition)
+	}
+	return f, nil
 }
 
 func runGSCAnalytics(cmd *cobra.Command, args []string) error {
@@ -171,6 +200,12 @@ func runGSCAnalytics(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build date range
+	rowFilter, err := analyticsRowFilter(cmd)
+	if err != nil {
+		color.Red("✗ Validation failed: %v", err)
+		return err
+	}
+
 	startDate, endDate := gsc.BuildDateRange(days)
 
 	// Build query
@@ -207,6 +242,14 @@ func runGSCAnalytics(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		color.Red("✗ Failed to query search analytics: %v", err)
 		return err
+	}
+	if rowFilter.Active() {
+		res := rowFilter.Apply(report)
+		report.RowFilter = &res
+	}
+	if dt, quota, dtErr := gsc.DataThrough(client, siteURL, time.Now()); dtErr == nil {
+		report.DataThrough = dt
+		report.QuotaUsed = quota
 	}
 
 	// Display results based on format

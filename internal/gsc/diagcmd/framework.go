@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/garbarok/ga4-manager/internal/config"
+	"github.com/garbarok/ga4-manager/internal/gsc"
 	"github.com/garbarok/ga4-manager/internal/render"
 )
 
@@ -50,6 +51,25 @@ type Envelope[T any] struct {
 	GeneratedAt string `json:"generated_at"`
 	Results     []T    `json:"results"`
 	QuotaUsed   int    `json:"quota_used"`
+	// DataThrough is the last date Search Console has final data for, so a
+	// consumer can tell a real drop from data that has not landed yet.
+	// Empty when it could not be determined.
+	DataThrough string `json:"data_through,omitempty"`
+}
+
+// AttachDataThrough looks up the site's last final-data date and records it
+// on env, raising QuotaUsed to the client's cumulative usage. Call it after
+// the command's own queries. A failure leaves DataThrough empty and never
+// fails the command.
+func AttachDataThrough[T any](env *Envelope[T], api gsc.SearchAPI, now time.Time) {
+	date, quota, err := gsc.DataThrough(api, env.Site, now)
+	if err != nil {
+		return
+	}
+	env.DataThrough = date
+	if quota > env.QuotaUsed {
+		env.QuotaUsed = quota
+	}
 }
 
 // NewEnvelope returns an envelope with GeneratedAt formatted as RFC3339 and

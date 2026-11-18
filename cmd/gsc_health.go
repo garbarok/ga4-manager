@@ -220,6 +220,9 @@ func runHealthCommand(p healthParams) int {
 	}
 
 	env := diagcmd.NewEnvelope(healthCommandName, site, p.Now, rows, inspections)
+	if search, ok := client.(gsc.SearchAPI); ok {
+		diagcmd.AttachDataThrough(&env, search, p.Now)
+	}
 	if err := diagcmd.Render(p.Stdout, env, p.Format, healthColumns, healthTextRow); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}

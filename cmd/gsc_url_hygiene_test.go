@@ -43,7 +43,7 @@ func TestURLHygieneCommand_WarningsExit2(t *testing.T) {
 	if status != diagcmd.ExitIssues {
 		t.Fatalf("status = %d, want %d", status, diagcmd.ExitIssues)
 	}
-	if env.Command != urlHygieneCommandName || env.QuotaUsed != 1 {
+	if env.Command != urlHygieneCommandName || env.QuotaUsed != 2 { // +1: the data_through lookup.
 		t.Errorf("envelope = %+v", env)
 	}
 	if got := fake.queries[0].Dimensions; len(got) != 1 || got[0] != "page" {

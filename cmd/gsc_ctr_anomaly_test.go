@@ -77,7 +77,7 @@ func TestRunCTRAnomalyCommand_CleanExitWhenNoCollapses(t *testing.T) {
 	if status := runCTRAnomalyCommand(params); status != diagcmd.ExitClean {
 		t.Fatalf("status = %d, want %d", status, diagcmd.ExitClean)
 	}
-	if got := stdout.String(); got != "quota used: 2\n" {
+	if got := stdout.String(); got != "quota used: 3\n" { // +1: the data_through lookup (one date-dimension query).
 		t.Errorf("expected only quota footer, got %q", got)
 	}
 }
@@ -115,8 +115,8 @@ func TestRunCTRAnomalyCommand_DetectsSnippetCollapse(t *testing.T) {
 	if r.PositionDelta > 1.0 || r.PositionDelta < -1.0 {
 		t.Errorf("position_delta = %f, expected |x| < 1.0", r.PositionDelta)
 	}
-	if got.QuotaUsed != 2 {
-		t.Errorf("quota_used = %d, want 2 (two analytics calls)", got.QuotaUsed)
+	if got.QuotaUsed != 3 {
+		t.Errorf("quota_used = %d, want 3 (two analytics calls + data_through)", got.QuotaUsed)
 	}
 }
 

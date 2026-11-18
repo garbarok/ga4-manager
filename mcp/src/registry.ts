@@ -40,6 +40,7 @@ import {
 import { ga4MeasurementHealthSpec } from './tools/ga4-measurement-health.js'
 import { ga4AnnotationsSpec } from './tools/ga4-annotations.js'
 import { siteGrowthBriefSpec } from './tools/site-growth-brief.js'
+import { pageOpportunitiesSpec } from './tools/page-opportunities.js'
 import { seoPageAuditSpec } from './tools/seo-page-audit.js'
 import { seoAuditBatchSpec } from './tools/seo-audit-batch.js'
 import {
@@ -108,6 +109,8 @@ export const SPECS: ToolSpec[] = [
   projectContextUpdateSpec,
   // Cross-source entry point: the brief an assistant starts a growth plan from
   siteGrowthBriefSpec,
+  // Search Console × GA4 page opportunities (item 2)
+  pageOpportunitiesSpec,
   // GA4
   ga4SetupSpec,
   ga4ReportSpec,

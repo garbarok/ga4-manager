@@ -28,6 +28,10 @@ type SearchAnalyticsReport struct {
 	Aggregates SearchAnalyticsAggregate // Aggregated totals
 	Metadata   ReportMetadata           // Query metadata
 	QuotaUsed  int                      // GSC API quota used by the client after this call
+	// DataThrough is the last date with final data (YYYY-MM-DD); empty when unknown.
+	DataThrough string `json:"data_through,omitempty"`
+	// RowFilter is set when position/impression filters were applied.
+	RowFilter *RowFilterResult `json:"row_filter,omitempty"`
 }
 
 // SearchAnalyticsRow represents a single row in the search analytics results

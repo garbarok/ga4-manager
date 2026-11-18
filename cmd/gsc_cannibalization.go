@@ -225,6 +225,7 @@ func runCannibalizationCommand(p cannibalizationParams) int {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
+	diagcmd.AttachDataThrough(&env, client, p.Now)
 	if err := diagcmd.Render(p.Stdout, env, p.Format, cannibalizationColumnsFor(withCoverageState), cannibalizationTextRowFor(withCoverageState)); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}

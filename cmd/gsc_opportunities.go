@@ -203,6 +203,7 @@ func runOpportunitiesCommand(p opportunitiesParams) int {
 		return diagcmd.FailWith(p.Stderr, "%v", err)
 	}
 
+	diagcmd.AttachDataThrough(&env, client, p.Now)
 	if err := diagcmd.Render(p.Stdout, env, p.Format, opportunitiesColumns, opportunitiesTextRow); err != nil {
 		return diagcmd.FailWith(p.Stderr, "failed to render output: %v", err)
 	}

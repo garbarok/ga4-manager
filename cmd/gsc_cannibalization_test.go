@@ -91,7 +91,7 @@ func TestRunCannibalizationCommand_CleanExitOnEmpty(t *testing.T) {
 	if status != diagcmd.ExitClean {
 		t.Fatalf("status = %d, want %d", status, diagcmd.ExitClean)
 	}
-	if got := stdout.String(); got != "quota used: 1\n" {
+	if got := stdout.String(); got != "quota used: 2\n" { // +1: the data_through lookup (one date-dimension query).
 		t.Fatalf("stdout = %q, want only quota footer", got)
 	}
 }
@@ -114,7 +114,7 @@ func TestRunCannibalizationCommand_IssuesExitOnHit(t *testing.T) {
 			t.Fatalf("text output missing %q: %q", want, out)
 		}
 	}
-	if !strings.HasSuffix(strings.TrimRight(out, "\n"), "quota used: 1") {
+	if !strings.HasSuffix(strings.TrimRight(out, "\n"), "quota used: 2") { // +1: the data_through lookup (one date-dimension query).
 		t.Fatalf("text output missing or misplaced quota footer: %q", out)
 	}
 }
@@ -147,8 +147,8 @@ func TestRunCannibalizationCommand_JSONShape(t *testing.T) {
 	if got.GeneratedAt != "2026-06-05T12:00:00Z" {
 		t.Errorf("generated_at = %q", got.GeneratedAt)
 	}
-	if got.QuotaUsed != 1 {
-		t.Errorf("quota_used = %d, want 1", got.QuotaUsed)
+	if got.QuotaUsed != 2 { // +1: the data_through lookup (one date-dimension query).
+		t.Errorf("quota_used = %d, want 2", got.QuotaUsed)
 	}
 	if len(got.Results) != 2 {
 		t.Fatalf("len(results) = %d, want 2", len(got.Results))
@@ -187,8 +187,8 @@ func TestRunCannibalizationCommand_EmptyJSONStillIncludesEnvelope(t *testing.T) 
 	if got.Results == nil || len(got.Results) != 0 {
 		t.Errorf("results should be empty slice, got %#v", got.Results)
 	}
-	if got.QuotaUsed != 1 {
-		t.Errorf("quota_used = %d, want 1", got.QuotaUsed)
+	if got.QuotaUsed != 2 { // +1: the data_through lookup (one date-dimension query).
+		t.Errorf("quota_used = %d, want 2", got.QuotaUsed)
 	}
 }
 

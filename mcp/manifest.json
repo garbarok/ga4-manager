@@ -61,6 +61,10 @@
       "description": "Site growth brief"
     },
     {
+      "name": "page_opportunities",
+      "description": "Page opportunities (Search Console × GA4)"
+    },
+    {
       "name": "ga4_setup",
       "description": "Set up GA4/GSC from config"
     },
