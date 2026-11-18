@@ -1,5 +1,7 @@
 # Docs to merge
 
+> Merged into README.md, mcp/README.md, CHANGELOG.md and mcp/CHANGELOG.md on 2026-11-18. Kept as the change's record.
+
 ## README tool table (rows)
 
 | Keyword workspace | `keywords_save`, `keywords_list`, `keywords_remove`, `keyword_suggestions` |

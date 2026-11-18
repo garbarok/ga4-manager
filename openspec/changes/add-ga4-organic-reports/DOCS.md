@@ -1,5 +1,7 @@
 # Docs to merge (for the central README / CHANGELOG pass)
 
+> Merged into README.md, mcp/README.md, CHANGELOG.md and mcp/CHANGELOG.md on 2026-11-18. Kept as the change's record.
+
 ## README tool table — new row
 
 | GA4 organic reports | `ga4_organic_overview`, `ga4_organic_landing_pages`, `ga4_key_events`, `ga4_traffic_acquisition`, `ga4_audience`, `ga4_site_search`, `ga4_ecommerce`, `ga4_measurement_health` |

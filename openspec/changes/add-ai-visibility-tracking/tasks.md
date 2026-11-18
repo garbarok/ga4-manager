@@ -17,4 +17,4 @@
 
 ## 4. Checks
 - [x] 4.1 `tsc --noEmit`, `eslint src/` and `vitest run` are green in `mcp/`.
-- [ ] 4.2 README tool table and CHANGELOG entries, taken from `DOCS.md` when the parent branch merges this change.
+- [x] 4.2 README tool table and CHANGELOG entries, taken from `DOCS.md` when the parent branch merges this change.

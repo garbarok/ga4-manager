@@ -1,5 +1,7 @@
 # Docs to merge (README tool table, CHANGELOG)
 
+> Merged into README.md, mcp/README.md, CHANGELOG.md and mcp/CHANGELOG.md on 2026-11-18. Kept as the change's record.
+
 ## README.md tool table row
 
 | Group | Tools |

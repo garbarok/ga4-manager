@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **OpenSEO parity in the MCP server and the new `ga4m` CLI.** Covers the site crawl audit with Lighthouse, Search Console × GA4 page opportunities, change impact, GA4 organic reports, project context, rank and AI-visibility tracking, the keyword workspace, SERP competitors, saved reports, the lookup cache, the cost gate and workflow prompts. See `mcp/CHANGELOG.md` and ADR-0006.
+- `ga4 gsc analytics run --min-position --max-position --min-impressions`: filters over the fetched top rows. JSON output gains `row_filter` and `data_through`.
+- `data_through` in every `ga4 gsc` diagnostic's JSON envelope (`gsc.DataThrough`, `diagcmd.AttachDataThrough`): the last date with final Search Console data. Each diagnostic now uses one more quota unit.
 - `ga4 --version`, `help` and completion stay silent; `configs/` is scaffolded only by interactive mode, never by every command.
 - `ga4 gsc url-hygiene` — URLs with search impressions that should not be indexed (malformed paths, fragments, framework asset routes, query duplicates, utility pages).
 - `ga4 gsc hreflang` — hreflang pair integrity and cross-language ranking; own-site HTTP probe (`internal/gsc/httpprobe`).

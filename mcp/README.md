@@ -141,9 +141,39 @@ claude mcp list
 
 ---
 
-## Available Tools (29)
+## Available Tools
+
+The registry is the authoritative list (`ga4m list`, or `server_info` from your assistant). Every tool is also a `ga4m` command with the same input and output.
 
 ### Tool Categories
+
+**Start here (3 tools)** - What this install can do, and the shared project memory
+- `server_info` - Version, enabled tool groups and why a group is off (missing `DATAFORSEO_*`, no `ga4` binary, scope not granted), state dir, spending caps, update path
+- `project_context_get` / `project_context_update` - Per-site brand, goal, positioning, writing preferences, competitors, key pages (hub/spoke/money) and the research log of paid lookups already bought
+
+**Search Console × GA4 (2 tools)**
+- `page_opportunities` - Pages ranking 4–20 joined with GA4 organic landing-page outcomes; score = 0.5 demand + 0.3 business value + 0.2 reachability; unmatched pages kept visible; coverage and time-zone warnings
+- `gsc_change_impact` - Before/after verdict (too_early / improved / worse / flat) for changes or GA4 annotations, equal windows, lag-safe
+
+**GA4 organic reports (8 tools)**
+- `ga4_organic_overview`, `ga4_organic_landing_pages`, `ga4_key_events`, `ga4_traffic_acquisition`, `ga4_audience`, `ga4_site_search`, `ga4_ecommerce`, `ga4_measurement_health`
+
+**Site crawl audit (7 tools)** - Background crawler, free
+- `site_audit_run`, `site_audit_status`, `site_audit_issues`, `site_audit_pages`, `site_audit_lighthouse`, `site_audit_list`, `site_audit_delete`
+
+**Keyword workspace and competitors (7 tools)** - DataForSEO where marked
+- `keywords_save`, `keywords_list`, `keywords_remove` - Saved, tagged keyword lists per site
+- `keyword_suggestions` - Search Console queries at positions 4–30 not saved yet (free) + optional paid `keywords_for_site`
+- `serp_competitors` (paid), `domain_overview` (paid), `serp_locations` (free)
+
+**Rank tracking (8 tools)** - Stored runs and history
+- `rank_tracker_create`, `rank_tracker_update`, `rank_tracker_get`, `rank_tracker_history`, `rank_tracker_list`, `rank_tracker_delete`, `rank_tracker_estimate` (free), `rank_tracker_run` (paid)
+
+**AI visibility tracking (11 tools)**
+- `ai_visibility_research`, `ai_visibility_explore`, `ai_visibility_estimate`, `ai_visibility_run` (paid, gated); `ai_visibility_prompts_generate`, `ai_visibility_tracker_save`, `ai_visibility_results`, `ai_visibility_trend`, `ai_visibility_sources`, `ai_visibility_answer`, `ai_visibility_export` (free)
+
+**Saved reports (7 tools)**
+- `report_save`, `report_list`, `report_get`, `report_delete`, `report_template_save`, `report_template_list`, `report_template_delete`
 
 **Growth planning (1 tool)** - Start here for SEO / monetization plans
 - `site_growth_brief` - One compact brief per site: GSC + GA4 traffic + AdSense-in-GA4 revenue KPIs with deltas, top pages by revenue, and the top 10 diagnostic findings ranked by estimated clicks
@@ -206,7 +236,7 @@ claude mcp list
 
 ### Tool Operation Types
 
-**Read-Only (Safe):**
+**Read-Only (Safe):** every tool whose MCP annotation has `readOnlyHint: true`. The list below predates the OpenSEO-parity tools; for those, the annotations are authoritative. Tools that write only local state (project context, saved keywords, trackers, reports, audit records) are not read-only, so `GA4M_READ_ONLY` refuses them, but they are not destructive.
 - `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_rank_check`, `dataforseo_balance`, `llm_mentions`, `keyword_gap`, `ranked_keywords`, `keyword_ideas`, `google_trends`, `backlinks_overview`, `link_gap`, `dataforseo_request`
 - `ga4_report`, `ga4_validate`, `ga4_link_list`, `gsc_sitemaps_list`, `gsc_sitemaps_get`, `gsc_inspect_url`, `gsc_analytics_run`, `gsc_monitor_urls`, `gsc_index_coverage`, `gsc_cannibalization`, `gsc_opportunities`, `gsc_ctr_anomaly`, `gsc_decay`, `gsc_health`, `gsc_traffic_compare`, `ga4_consent_health`, `seo_page_audit`, `seo_audit_batch`, `adsense_accounts_list`, `adsense_report`, `site_growth_brief`, `ga4_traffic_report`, `gsc_url_hygiene`, `gsc_hreflang`, `keyword_volume`, `keyword_serp_snapshot`, `keyword_rank_check`, `dataforseo_balance`, `llm_mentions`, `keyword_gap`, `ranked_keywords`, `keyword_ideas`, `google_trends`, `backlinks_overview`, `link_gap`
 
@@ -1230,6 +1260,139 @@ search_console:
 ```
 
 ---
+
+### Paid lookups: estimates, cache and research log
+
+Every OpenSEO-parity tool that spends DataForSEO credit takes three inputs:
+
+- **`estimate_only`** returns the cost estimate and the balance, and spends nothing. Prices come from DataForSEO's own price list (`appendix/user_data`, free). SERP depth is billed per 10 results.
+- **`max_cost_usd`** makes the tool refuse when the estimate is higher. The tool also refuses when the balance is lower than the estimate.
+- **`refresh_cache`** skips the lookup cache.
+
+Two more layers apply on top:
+
+- **Lookup cache.** Paid responses are cached per site and parameters under `.ga4-state/cache/`: SERPs for 6 h, AI answers for 7 days, everything else for 24 h. Results say when they came from cache (`cache.hits`). `GA4M_CACHE=off` disables it; `GA4M_CACHE_TTL_HOURS` overrides the TTLs.
+- **Research log.** Every billed request is appended to the site's project context (`research_log`). `project_context_get` returns a de-duplicated `recent_lookups` list for the next agent.
+
+The per-session caps (`GA4M_MAX_SPEND_USD`, `GA4M_MAX_PAID_CALLS`) still apply.
+
+### Site crawl audit
+
+`site_audit_run` starts a background crawl and returns an `audit_id` at once. Poll `site_audit_status`, then read `site_audit_issues`, `site_audit_pages` and `site_audit_lighthouse`.
+
+- **Scope.** Same-origin from `start_url` (the start redirect's host counts too), seeded from the sitemaps.
+- **Limits.** `max_pages` (default 200), `max_duration_s` (default 900), `exclude_paths` with robots-style patterns (`/tag/`, `/*?sort=`, `/*.pdf$`), and `concurrency` / `delay_ms`.
+- **robots.txt.** It is honoured, Crawl-delay included. Blocked URLs are recorded as `blocked_robots`.
+- **Rate limits.** HTTP 429 backs off (Retry-After) and slows the crawl. URLs still throttled are `rate_limited`, never "broken".
+- **JS rendering.** `render_js` uses Cloudflare Browser Rendering.
+- **Issues.** Each issue has a severity and a `how_to_fix`:
+  - broken internal links, unreachable pages, orphan pages, no outgoing links, deep pages;
+  - redirect chains, redirect loops, internal links to redirects;
+  - duplicate titles, descriptions and content, thin content;
+  - heading-order skips, missing or multiple H1, images without alt, slow responses;
+  - canonical conflicts, canonicalised pages, noindex pages, title and description length;
+  - blocked and rate-limited notices, and the crawl page-limit and time-limit notices.
+- **Lighthouse.** `lighthouse: true`, or `site_audit_lighthouse {run: true}` later, runs PageSpeed Insights on up to 10 representative pages, mobile and desktop. It returns scores, lab LCP/CLS/TBT/TTFB, field LCP/CLS/INP/TTFB, and the top savings with resources.
+- **Storage.** Results are stored per audit under `.ga4-state/site-audits/`.
+- **Proxies.** Behind an HTTP proxy, set `NODE_USE_ENV_PROXY=1` (Node's fetch ignores `HTTPS_PROXY` otherwise).
+
+### page_opportunities
+
+Joins Search Console pages in a position band with GA4 Organic Search landing pages over the same calendar window, ending at `data_through`. Each page gets a score:
+
+```
+score = round(100 × (0.5 demand + 0.3 business_value + 0.2 reachability))
+```
+
+- **demand:** log-scaled impressions relative to the largest candidate.
+- **business_value:** session key-event rate (engagement rate when the property has no key events), smoothed toward the site average with a 10-session prior.
+- **reachability:** 1 at `min_position`, 0 at `max_position`.
+
+Pages with no GA4 match stay in the list with `score: null`. `coverage` reports rows considered, matched and unmatched. Warnings cover: no organic landing pages, time zones that differ (with the hour offset), several GSC hosts, and the row limit being hit.
+
+### gsc_change_impact
+
+For each change ({url | prefix | whole site, changed_on, label}), or each GA4 annotation with `from_annotations: true`, it compares equal windows before and after the change day. The change day is skipped, and the after window ends at `data_through`. It returns clicks, impressions, CTR, impression-weighted position, deltas, `days_per_window`, and a verdict:
+
+- `too_early`: fewer than 7 days after the change, or fewer than 100 impressions.
+- Otherwise, clicks ±10% decide first, then position ±1: `improved`, `worse` or `flat`.
+
+The thresholds are returned with every result.
+
+### data_through and position filters
+
+Every Search Console performance tool returns `data_through`: the last date Search Console has final data for. `gsc_analytics_run` accepts `min_position`, `max_position` and `min_impressions`. These are applied over the fetched top rows (GSC cannot filter by position), and `row_filter` reports rows considered vs kept.
+
+### GA4 organic reports
+
+Organic Search means `sessionDefaultChannelGroup` "Organic Search". All eight tools take `property_id` or `config` plus `days` (default 28, ending yesterday). They return an absolute `window`, and `warnings` that explain empty results.
+
+- `ga4_organic_overview`: KPIs vs the previous equal window, organic share of sessions, and a day/week trend.
+- `ga4_organic_landing_pages`: sessions, engagement, key events, key event rate and revenue per landing page.
+- `ga4_key_events`: key events by name (and landing page).
+- `ga4_traffic_acquisition`: all channels, and source/medium.
+- `ga4_audience`: country, device, or new vs returning.
+- `ga4_site_search`: internal search terms.
+- `ga4_ecommerce`: purchases, revenue and the item funnel.
+- `ga4_measurement_health`: pass/warn/fail checks with `how_to_fix` for organic sessions, key events, consent, freshness, "(not set)", site search and time zone vs Search Console.
+
+### Keyword workspace and competitors
+
+- `keywords_save` / `keywords_list` / `keywords_remove`: saved, tagged keyword lists per site, with optional stored metrics so bought data is reused.
+- `keyword_suggestions`: Search Console queries at positions 4–30 not saved yet (free), plus optional `keywords_for_site` (paid).
+- `serp_competitors`: the domains ranking most across a keyword set or tag. It marks your site and known competitors.
+- `domain_overview`: estimated organic traffic, keyword counts by position band, and top pages.
+- `serp_locations`: free location and language code lookup.
+
+### Rank tracker
+
+Persistent keyword sets per site, market (location, language) and device, with pinned keywords.
+
+- `rank_tracker_estimate` is free. `rank_tracker_run` (paid, gated) makes one live Google SERP request per keyword. It stores the position, ranking URL, SERP features, AI Overview citation and top competitors, and reports the change vs the previous run.
+- `rank_tracker_history` returns positions over time.
+- Scheduling stays in cron:
+
+```bash
+ga4m rank-tracker-run --site example.com --tracker-id <id>
+```
+
+### AI visibility (DataForSEO)
+
+Workflow:
+
+1. Fill project context.
+2. Draft prompts with `ai_visibility_prompts_generate` (free), or research real questions with `ai_visibility_research` (paid).
+3. Save the prompt set with `ai_visibility_tracker_save`.
+4. Check the cost with `ai_visibility_estimate`.
+5. Run it with `ai_visibility_run`.
+6. Read `ai_visibility_results`, `ai_visibility_trend`, `ai_visibility_sources`, `ai_visibility_answer` and `ai_visibility_export`.
+
+`ai_visibility_explore` runs one prompt across models without saving it.
+
+| Engine id | What it queries | Approx. cost per prompt |
+|-----------|-----------------|-------------------------|
+| `chatgpt` | ChatGPT web UI with search (LLM Scraper) | $0.004 |
+| `gemini` | Gemini web UI (LLM Scraper) | $0.004 |
+| `google_ai_overview` | Google AI Overview (SERP, async AIO) | $0.004 |
+| `google_ai_mode` | Google AI Mode | $0.004 |
+| `claude` | Claude API with web search | ~$0.012 |
+| `perplexity` | Perplexity API (sonar) | ~$0.006 |
+| `chatgpt_api` | OpenAI API with web search | ~$0.021 |
+| `gemini_api` | Gemini API with web search | ~$0.033 |
+
+The default engines are `chatgpt`, `google_ai_overview` and `google_ai_mode`. Answers are cached for 7 days per site.
+
+### Saved reports
+
+`report_save` turns any tool output into one self-contained HTML file per site: inline CSS, no scripts or remote resources, light/dark, phone-friendly. Untrusted text from crawled pages and AI answers is always HTML-escaped.
+
+- Input: `site`, `title`, and one of `sections`, `tool_output`, or `template` + `section_data`.
+- `report_get` returns `meta`, `path` or the `html`. To share a report, send the file or have the assistant publish the HTML; nothing is uploaded.
+- Templates: `report_template_save`, `report_template_list` and `report_template_delete`, global or per site. The built-in `monthly_seo_checkin` is what the `monthly_report` prompt fills.
+
+### Workflow prompts
+
+`prompts/list` includes eight workflows that chain the tools above: `project_setup`, `seo_audit`, `keyword_research`, `keyword_clustering`, `competitor_analysis`, `competitive_landscape`, `ai_visibility_audit` and `monthly_report`. Every paid workflow reads the research log before buying, checks the balance, and runs each paid step as an estimate first.
 
 ## Configuration Files
 
