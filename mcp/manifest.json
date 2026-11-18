@@ -157,6 +157,10 @@
       "description": "Compare Search Console traffic"
     },
     {
+      "name": "gsc_change_impact",
+      "description": "Search Console change impact"
+    },
+    {
       "name": "ga4_consent_health",
       "description": "GA4 consent-mode health"
     },

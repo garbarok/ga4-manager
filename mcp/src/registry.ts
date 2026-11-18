@@ -26,6 +26,7 @@ import { gscHreflangSpec } from './tools/gsc-hreflang.js'
 import { gscHealthSpec } from './tools/gsc-health.js'
 import { gscMonitorUrlsSpec } from './tools/gsc-monitor.js'
 import { gscTrafficCompareSpec } from './tools/gsc-traffic-compare.js'
+import { gscChangeImpactSpec } from './tools/gsc-change-impact.js'
 import { ga4ConsentHealthSpec } from './tools/ga4-consent-health.js'
 import { ga4TrafficReportSpec } from './tools/ga4-traffic-report.js'
 import {
@@ -137,6 +138,8 @@ export const SPECS: ToolSpec[] = [
   gscMonitorUrlsSpec,
   // Native (no CLI)
   gscTrafficCompareSpec,
+  // Did a change work? Before/after windows around each change (item 10)
+  gscChangeImpactSpec,
   ga4ConsentHealthSpec,
   ga4TrafficReportSpec,
   // GA4 organic reports (item 3)
