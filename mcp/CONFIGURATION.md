@@ -249,6 +249,7 @@ For Cline (VS Code extension), configure via Cline settings:
 | `GA4_DEFAULT_PROPERTY_ID` | Default GA4 property ID | None | `123456789` |
 | `GSC_DEFAULT_SITE` | Default GSC site URL | None | `sc-domain:example.com` |
 | `GA4M_CONFIG_DIR` | Extra directories of operator configs (`:`-separated), searched before `./configs`, `configs/` next to the `ga4` binary and `~/.config/ga4-manager/configs`. Applies to config names and `all: true`; a config path is still read relative to the working directory. | None | `/path/to/configs` |
+| `GA4_CREDENTIALS_B64` | Base64 of a Google credential JSON (service-account key or ADC `authorized_user` file), for cloud sessions and CI where there is no key file. Written to a private temp file at startup; a `GOOGLE_APPLICATION_CREDENTIALS` that names a readable file wins. See [CLOUD.md](./CLOUD.md). | None | `eyJ0eXBlIjoi...` |
 | `GA4M_STATE_DIR` | Directory for local state: project context, research log, lookup cache, site audits, reports, rank trackers. Without it, state goes in `.ga4-state/` next to the config, else in the working directory (`~/.ga4-state` when the server starts in `/`). Set it when one server serves several repos, so a site's history stays in one place. | None | `~/.ga4-state` |
 | `GA4_TIMEOUT` | CLI execution timeout (ms) | `30000` | `60000` |
 | `PSI_API_KEY` | PageSpeed Insights API key for Core Web Vitals in `seo_page_audit`/`seo_audit_batch`. Without it, keyless PSI is throttled and per-project quota is often 0. A per-call `psi_api_key` takes precedence. | None | `AIzaSy...` |

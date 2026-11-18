@@ -123,6 +123,8 @@ See **[CONFIGURATION.md](./CONFIGURATION.md)** for setup guides:
 - Cline
 - Custom integrations
 
+For Claude Code cloud sessions (claude.ai/code, `claude --cloud`), see **[CLOUD.md](./CLOUD.md)**.
+
 ### Verify Installation
 
 **Claude Desktop:**
@@ -1817,6 +1819,7 @@ mcp/
 ## Additional Documentation
 
 - **[CONFIGURATION.md](./CONFIGURATION.md)** - Multi-client setup guides
+- **[CLOUD.md](./CLOUD.md)** - Claude Code cloud sessions: setup script, credentials, network
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history
 - **[examples/README.md](./examples/README.md)** - Template documentation
 - **[../CLAUDE.md](../CLAUDE.md)** - CLI documentation for Claude Code

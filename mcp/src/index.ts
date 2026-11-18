@@ -14,6 +14,7 @@ import { SPECS } from './registry.js'
 import { PROMPTS, PromptError, getPrompt } from './prompts.js'
 import { dispatchTool } from './dispatch.js'
 import { resolveBinaryPath, readServerVersion } from './binary.js'
+import { applyCredentialsFromEnv } from './utils/credentials-env.js'
 
 /**
  * GA4 Manager MCP Server
@@ -24,6 +25,7 @@ import { resolveBinaryPath, readServerVersion } from './binary.js'
  * (ADR-0006). This file is just the stdio bootstrap.
  */
 
+applyCredentialsFromEnv()
 const binaryPath = resolveBinaryPath()
 const executor = new CLIExecutor(binaryPath)
 const serverVersion = readServerVersion()

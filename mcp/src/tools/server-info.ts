@@ -72,7 +72,7 @@ function isOn(v: string | undefined): boolean {
 
 function credentialType(env: NodeJS.ProcessEnv): { summary: string; type: string | null; problem: string | null } {
   const path = env.GOOGLE_APPLICATION_CREDENTIALS
-  if (!path) return { summary: 'not set', type: null, problem: 'GOOGLE_APPLICATION_CREDENTIALS is not set.' }
+  if (!path) return { summary: 'not set', type: null, problem: 'GOOGLE_APPLICATION_CREDENTIALS is not set. Point it at a key file, or set GA4_CREDENTIALS_B64 to the base64 of one (cloud sessions, CI).' }
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as { type?: string }
     const type = parsed.type ?? 'unknown'

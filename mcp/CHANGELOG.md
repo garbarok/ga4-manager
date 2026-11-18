@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cloud sessions.** `GA4_CREDENTIALS_B64` takes a base64 Google credential JSON, for sessions and CI with no key file. The server and `ga4m` write it to a private temp file at startup; a readable `GOOGLE_APPLICATION_CREDENTIALS` still wins. `scripts/cloud-setup.sh` installs the `ga4` binary (verified release download, or `go install` at the release commit) and the npm package from a cloud environment's setup script. See `CLOUD.md`.
+
 ### Fixed
 
 - CONFIGURATION.md named the config directory variable `GA4_CONFIG_DIR`. The server reads `GA4M_CONFIG_DIR`. It also now documents `GA4M_STATE_DIR`, which keeps a site's state in one place when one server works across several repos.
