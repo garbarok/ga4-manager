@@ -98,6 +98,7 @@ Commit a `.mcp.json` at the root of the repository the session works in:
 - The server inherits the session's environment variables, so `.mcp.json` holds no secrets.
 - Relative paths are resolved from the repository root. With these two values, the site config lives in `seo/<site>.yaml` and the state in `seo/.ga4-state/`.
 - A local MCP entry with the same name (added with `claude mcp add`) takes precedence on your own machine. Give it the same two paths if local and cloud sessions should share state.
+- **Start the session with this repository alone.** A cloud session with several repositories doesn't load any repository's `.mcp.json`, and neither does a cloud thread in a project. Without it the MCP server isn't connected and state lands wherever the session's working directory is. If you do need several repositories, have Claude run `ga4m` (installed by the setup script) with `GA4M_CONFIG_DIR` and `GA4M_STATE_DIR` set to this repository's `seo/` paths.
 
 **Commit state only to a private repository.** `seo/.ga4-state/` holds the project context, the research log of paid lookups with their costs, audits and reports. In a public repository, add `seo/.ga4-state/` to `.gitignore`. That keeps state on the VM only, and it is lost when the VM is reclaimed.
 
@@ -107,4 +108,7 @@ In a new cloud session, ask Claude to run `server_info`. It should report:
 
 - the server and `ga4` versions;
 - credentials `readable`;
-- the tool groups you configured as enabled.
+- the tool groups you configured as enabled;
+- `state_dir` ending in `seo/.ga4-state`. Any other path means `.mcp.json` was not loaded (see section 4).
+
+Pass `site` (for example `sc-domain:example.com`) to check that the credential can read that Search Console property.
