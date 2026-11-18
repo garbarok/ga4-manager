@@ -6,6 +6,8 @@
  * server in ./index.ts only wires it to prompts/list and prompts/get.
  */
 
+import { WORKFLOW_PROMPTS, buildWorkflowPrompt, isWorkflowPrompt, WorkflowPromptError } from './workflow-prompts.js'
+
 export interface PromptArgument {
   name: string
   description: string
@@ -89,6 +91,8 @@ export const PROMPTS: PromptDefinition[] = [
       },
     ],
   },
+  // Multi-step SEO workflows (OpenSEO agent-skill parity): src/workflow-prompts.ts
+  ...WORKFLOW_PROMPTS,
 ]
 
 function clean(value: string | undefined): string | undefined {
@@ -222,6 +226,15 @@ Back the verdict with the numbers. Rollout dates come from the Search Status Das
 
 /** Build the message for prompt `name`. Throws PromptError on unknown names or bad arguments. */
 export function getPrompt(name: string, args: Record<string, string> = {}): PromptResult {
+  if (isWorkflowPrompt(name)) {
+    const def = WORKFLOW_PROMPTS.find((p) => p.name === name)!
+    try {
+      return { description: def.description, messages: [{ role: 'user', content: { type: 'text', text: buildWorkflowPrompt(name, args) } }] }
+    } catch (err) {
+      if (err instanceof WorkflowPromptError) throw new PromptError(err.message)
+      throw err
+    }
+  }
   const def = PROMPTS.find((p) => p.name === name)
   if (!def) throw new PromptError(`Unknown prompt: ${name}`)
 
