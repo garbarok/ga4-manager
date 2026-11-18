@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-18
+
 OpenSEO parity: everything an agent-driven SEO workflow needs from a hosted SEO tool, as local tools. Every tool is also a `ga4m` command.
 
 ### Added
