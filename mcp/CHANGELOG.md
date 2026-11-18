@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CONFIGURATION.md named the config directory variable `GA4_CONFIG_DIR`. The server reads `GA4M_CONFIG_DIR`. It also now documents `GA4M_STATE_DIR`, which keeps a site's state in one place when one server works across several repos.
+
 ## [5.0.1] - 2026-11-18
 
 ### Changed
