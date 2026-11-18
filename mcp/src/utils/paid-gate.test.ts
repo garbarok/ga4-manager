@@ -59,6 +59,13 @@ describe('priceRequests', () => {
     expect(est.lines[0]).toMatchObject({ requests: 2, cached_requests: 1, pages_per_request: 2, subtotal_usd: 0.004 })
     expect(est.price_source).toBe('live')
   })
+  it('adds a measured surcharge unless the request is cached', () => {
+    const plan = [
+      { path: 'serp/google/ai_mode/live/advanced', task: { keyword: 'a' }, surcharge_usd: 0.002 },
+      { path: 'serp/google/ai_mode/live/advanced', task: { keyword: 'b' }, surcharge_usd: 0.002 },
+    ]
+    expect(priceRequests(plan, TREE, (r) => r.task.keyword === 'b').total_usd).toBe(0.004)
+  })
   it('notes unknown endpoints and LLM token allowance', () => {
     const est = priceRequests(
       [
